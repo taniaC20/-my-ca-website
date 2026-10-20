@@ -1,0 +1,922 @@
+import React, { useState, useRef } from "react";
+import {
+  ArrowLeft,
+  MessageSquare,
+  CheckCircle,
+  AlertTriangle,
+  ShieldCheck,
+  HelpCircle,
+  Truck,
+  RefreshCw,
+  Sparkles,
+  PenTool,
+  Hash,
+  Calendar,
+  Upload,
+  Paperclip,
+  Trash2,
+  Send,
+  Clock,
+  Ruler
+} from "lucide-react";
+import { Product, QuoteRequest } from "../types";
+
+interface ProductDetailsProps {
+  product: Product;
+  categoryName: string;
+  onBack: () => void;
+  onRequestQuote: (p: Product) => void;
+  onSubmitQuote?: (quote: Omit<QuoteRequest, "id" | "createdAt" | "updatedAt" | "status">) => void;
+}
+
+export default function ProductDetails({
+  product,
+  categoryName,
+  onBack,
+  onRequestQuote,
+  onSubmitQuote
+}: ProductDetailsProps): React.JSX.Element {
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+
+  // Form States
+  const [formData, setFormData] = useState({
+    customerName: "",
+    customerEmail: "",
+    customerPhone: "",
+    engravingText: "",
+    fontPreference: "Classic Cursive (Dancing Script)",
+    specialInstructions: "",
+    quantity: 1,
+    deadline: "",
+    alternativeRequest: false,
+    alternativeDetails: "",
+  });
+
+  const [uploadedFiles, setUploadedFiles] = useState<{ name: string; size: number; url: string }[]>([]);
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+  const hasPromo = product.promoPrice !== undefined && product.promoPrice < product.price;
+  const discountPercent = hasPromo ? Math.round(((product.price - (product.promoPrice ?? 0)) / product.price) * 100) : 0;
+
+  // Rich material storytelling tailored to product type
+  const getMaterialDescription = (catId: string) => {
+    switch (catId) {
+      case "wood":
+        return {
+          title: "Premium Sustainable Hardwoods",
+          details: "American Black Walnut, Curly Maple, or Oregon Black Cherry. Sourced from FSC-certified sustainable timber yards. Hand-planed, grain-matched, and fully conditioned in our workshop using organic, food-safe linseed oil and raw Oregon beeswax. Ready to become a multi-generation family heirloom.",
+          badge: "FSC Certified Hardwood",
+          seal: "100% Food-Safe & Organic"
+        };
+      case "leather":
+        return {
+          title: "Vegetable-Tanned Full-Grain Leather",
+          details: "Hand-selected full-grain hide from local American tanneries. Tanned with organic tree bark and plant extracts. Laser-branded at specialized temperatures to burn deep, crisp contrast into the fibers. Finished with natural leather conditioning oils to develop a rich, personal amber patina.",
+          badge: "A5 Heritage Leather",
+          seal: "Premium Veg-Tanned Patina"
+        };
+      case "glassware":
+        return {
+          title: "Lead-Free High-Clarity Crystal",
+          details: "Double-weighted crystalline formulation. Each piece is masked with custom vector lasers, then meticulously sandblast-etched by hand using ultra-fine abrasive compound in our workshop. Provides a permanent, velvet-smooth frosted touch that is 100% dishwasher safe.",
+          badge: "Permanently Hand-Etched",
+          seal: "Dishwasher Safe Frosted"
+        };
+      case "slate":
+        return {
+          title: "Natural Organic Metamorphic Slate",
+          details: "Dark metamorphic slate stone cleaved along natural planes to expose rustic split edges. Highly heat-resistant and sealed with water-repellent protective coatings. Outfitted with heavy-duty non-slip organic rubber surface bumpers on the underside.",
+          badge: "100% Natural Portland Stone",
+          seal: "Cleaved Rustic Slate"
+        };
+      default:
+        return {
+          title: "Artisan Hardwood & Earth Materials",
+          details: "Individually hand-planed American hardwoods, full-grain leather goods, sandblasted crystal, and hand-cleaved natural slate. Sourced sustainably and crafted piece-by-piece in Portland, Oregon.",
+          badge: "Hand-Finished in Oregon",
+          seal: "Artisan Bench Crafted"
+        };
+    }
+  };
+
+  const material = getMaterialDescription(product.categoryId);
+
+  const fontOptions = [
+    { name: "Classic Cursive (Dancing Script)", class: "", fontFamily: "'Dancing Script', cursive" },
+    { name: "Elegant Calligraphy (Great Vibes)", class: "", fontFamily: "'Great Vibes', cursive" },
+    { name: "Flowing Script (Alex Brush)", class: "", fontFamily: "'Alex Brush', cursive" },
+    { name: "Modern Cursive (Satisfy)", class: "", fontFamily: "'Satisfy', cursive" },
+    { name: "Slim Hand-lettered (Sacramento)", class: "", fontFamily: "'Sacramento', cursive" },
+    { name: "Retro Brush (Pacifico)", class: "", fontFamily: "'Pacifico', cursive" },
+    { name: "Natural Signature (Caveat)", class: "", fontFamily: "'Caveat', cursive" },
+    { name: "Times New Roman", class: "", fontFamily: "'Times New Roman', Times, serif" },
+    { name: "Serif Classic (Playfair Display)", class: "", fontFamily: "'Playfair Display', Georgia, serif" },
+    { name: "Modern Clean", class: "font-sans font-bold", fontFamily: "sans-serif" },
+    { name: "Geometric Gothic", class: "font-sans uppercase tracking-widest font-black", fontFamily: "Arial, sans-serif" },
+    { name: "Rustic Monospace", class: "font-mono tracking-wider", fontFamily: "'Courier New', monospace" },
+    { name: "Copperplate Gothic", class: "uppercase tracking-wider", fontFamily: "'Copperplate', 'Cinzel', serif" },
+    { name: "Other (Specify in Instructions)", class: "", fontFamily: "inherit" },
+  ];
+
+  // Visualizer Styling Mapping
+  const getVisualizerBg = () => {
+    const cat = product.categoryId;
+    switch (cat) {
+      case "wood":
+        return "bg-amber-950/95 border-amber-900 text-amber-200 bg-[radial-gradient(#5c3e21_1px,transparent_1px)] bg-[size:16px_16px] border-dashed";
+      case "leather":
+        return "bg-amber-900 text-amber-100 border-amber-800 bg-[radial-gradient(#4a2a10_1px,transparent_1px)] bg-[size:10px_10px]";
+      case "glassware":
+        return "bg-sky-950/85 text-sky-100 border-sky-800 backdrop-blur-xs opacity-90";
+      case "slate":
+        return "bg-neutral-900 text-neutral-300 border-neutral-800 bg-[radial-gradient(#1a1a1a_2px,transparent_1px)]";
+      case "sublimation":
+        return "bg-purple-950/90 text-purple-100 border-purple-800 bg-[radial-gradient(#a855f7_1px,transparent_1px)] bg-[size:12px_12px]";
+      default:
+        return "bg-stone-800 border-stone-700 text-stone-300";
+    }
+  };
+
+  const getVisualizerLabel = () => {
+    const cat = product.categoryId;
+    switch (cat) {
+      case "wood":
+        return "Walnut/Maple Grain Simulation";
+      case "leather":
+        return "Full-Grain Leather Emboss";
+      case "glassware":
+        return "Sandblasted Frosted Glass";
+      case "slate":
+        return "Etched Slate Stone";
+      case "sublimation":
+        return "Vibrant Sublimation Ink Print";
+      default:
+        return "Artisan Slate Material";
+    }
+  };
+
+  const getSelectedFontClass = () => {
+    const selected = fontOptions.find((f) => f.name === formData.fontPreference);
+    return selected ? selected.class : "";
+  };
+
+  const getSelectedFontFamily = () => {
+    const selected = fontOptions.find((f) => f.name === formData.fontPreference);
+    return selected ? selected.fontFamily : "inherit";
+  };
+
+  // Drag & Drop Handling
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      addFiles(e.dataTransfer.files);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      addFiles(e.target.files);
+    }
+  };
+
+  const addFiles = async (files: FileList) => {
+    setUploadingFiles(true);
+    setUploadError("");
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (file.size > 10 * 1024 * 1024) {
+        setUploadError(`"${file.name}" exceeds the 10MB limit.`);
+        continue;
+      }
+      const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "application/pdf"];
+      if (!allowedTypes.includes(file.type)) {
+        setUploadError(`"${file.name}" is an invalid file type.`);
+        continue;
+      }
+
+      await new Promise<void>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          const base64Data = e.target?.result as string;
+          try {
+            const response = await fetch("/api/upload", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                name: file.name,
+                type: file.type,
+                data: base64Data
+              })
+            });
+            const result = await response.json();
+            if (response.ok) {
+              setUploadedFiles((prev) => [
+                ...prev,
+                { name: result.name, size: result.size, url: result.url }
+              ]);
+            } else {
+              setUploadError(result.error || `Failed to upload "${file.name}".`);
+            }
+          } catch (err) {
+            console.error("Upload error:", err);
+            setUploadError("Failed to connect to the server.");
+          }
+          resolve();
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+    setUploadingFiles(false);
+  };
+
+  const removeFile = (idx: number) => {
+    const copy = [...uploadedFiles];
+    copy.splice(idx, 1);
+    setUploadedFiles(copy);
+  };
+
+  // Form Inputs
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    if (submitted) {
+      setSubmitted(false);
+    }
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (errors[name]) {
+      setErrors((prev) => {
+        const copy = { ...prev };
+        delete copy[name];
+        return copy;
+      });
+    }
+  };
+
+  const validate = () => {
+    const newErrors: { [key: string]: string } = {};
+    if (!formData.customerName.trim()) newErrors.customerName = "Full Name is required.";
+    if (!formData.customerEmail.trim()) {
+      newErrors.customerEmail = "Email address is required.";
+    } else if (!/\S+@\S+\.\S+/.test(formData.customerEmail)) {
+      newErrors.customerEmail = "Please enter a valid email.";
+    }
+    if (formData.quantity < 1) newErrors.quantity = "Quantity must be at least 1.";
+    return newErrors;
+  };
+
+  const handleSubmitQuoteForm = (e: React.FormEvent) => {
+    e.preventDefault();
+    const validationErrors = validate();
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+
+    let finalInstructions = formData.specialInstructions || "";
+    if (formData.alternativeRequest && formData.alternativeDetails.trim()) {
+      finalInstructions = `[ALTERNATIVE CRAFT REQUESTED: "${formData.alternativeDetails.trim()}"]\n\n` + finalInstructions;
+    }
+
+    if (onSubmitQuote) {
+      onSubmitQuote({
+        productId: product.id,
+        productName: product.name,
+        customerName: formData.customerName,
+        customerEmail: formData.customerEmail,
+        customerPhone: formData.customerPhone || undefined,
+        engravingText: formData.engravingText || undefined,
+        fontPreference: formData.fontPreference,
+        specialInstructions: finalInstructions || undefined,
+        quantity: Number(formData.quantity),
+        deadline: formData.deadline || undefined,
+        uploadedFiles: uploadedFiles.length > 0 ? uploadedFiles : undefined,
+      });
+    }
+
+    setSubmitted(true);
+    setFormData({
+      customerName: "",
+      customerEmail: "",
+      customerPhone: "",
+      engravingText: "",
+      fontPreference: "Serif Classic",
+      specialInstructions: "",
+      quantity: 1,
+      deadline: "",
+      alternativeRequest: false,
+      alternativeDetails: "",
+    });
+    setUploadedFiles([]);
+  };
+
+  // Dynamic font size scaling based on text length to prevent simulator overflow
+  const getSimulatedTextSize = () => {
+    const len = formData.engravingText.length;
+    if (len > 35) return "text-sm md:text-base leading-snug";
+    if (len > 20) return "text-lg md:text-xl";
+    return "text-2xl md:text-3xl";
+  };
+
+  const isSublimation = product.categoryId === "sublimation";
+  const isPipeCleaner = product.categoryId === "pipecleaner";
+  const isEngraving = !isSublimation && !isPipeCleaner;
+  const hasVisualizer = product.hasVisualizer !== false && !isPipeCleaner;
+  const hasEngravingText = product.hasEngravingText !== undefined ? product.hasEngravingText : hasVisualizer;
+  const hasTypography = hasEngravingText;
+
+  return (
+    <div id="product-detail-view" className="space-y-8 animate-fade-in max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      {/* Back to discover */}
+      <div>
+        <button
+          onClick={onBack}
+          className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-brand-muted hover:text-brand-primary cursor-pointer transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" /> Back to Discover Catalog
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+        {/* Left Column: Image Gallery, Custom Engraving Visualizer, and Trust Assurances */}
+        <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-24">
+          <div className="relative aspect-4/3 bg-brand-highlight rounded-[24px] overflow-hidden border border-brand-border shadow-xs">
+            <img
+              src={product.images[activeImageIndex] || "https://images.unsplash.com/photo-1544982503-9f984c14501a?auto=format&fit=crop&q=80&w=600"}
+              alt={product.name}
+              className="w-full h-full object-cover"
+              referrerPolicy="no-referrer"
+            />
+            <div className="absolute top-4 left-4 flex flex-col gap-1.5">
+              <span className="bg-brand-dark/95 backdrop-blur-xs text-white text-[9px] tracking-widest uppercase font-bold px-3 py-1 rounded-full">
+                {categoryName}
+              </span>
+              {hasPromo && (
+                <span className="bg-brand-primary text-white text-[9px] tracking-widest uppercase font-bold px-3 py-1 rounded-full">
+                  -{discountPercent}% Special Offer
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Gallery Thumbnails */}
+          {product.images.length > 1 && (
+            <div className="flex gap-3">
+              {product.images.map((img, i) => (
+                <button
+                  key={i}
+                  onClick={() => setActiveImageIndex(i)}
+                  className={`relative aspect-4/3 w-20 rounded-[12px] overflow-hidden border cursor-pointer transition-all ${
+                    activeImageIndex === i
+                      ? "border-brand-primary ring-2 ring-brand-primary/10"
+                      : "border-brand-border hover:border-brand-primary/40"
+                  }`}
+                >
+                  <img src={img} alt={`Thumbnail ${i}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Premium Live Personalization Simulation Panel */}
+          {hasVisualizer && (
+            <div className="bg-white text-brand-dark rounded-[24px] p-5 border border-brand-border shadow-2xs space-y-4">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4.5 w-4.5 text-brand-primary animate-pulse" />
+                <h4 className="font-serif font-bold text-sm text-brand-dark">Live Personalization Visualizer</h4>
+              </div>
+
+              <div className={`relative h-44 rounded-[16px] border flex flex-col items-center justify-center p-5 text-center transition-all duration-300 overflow-hidden ${getVisualizerBg()}`}>
+                {/* Material Badge */}
+                <span className="absolute bottom-2 right-2 text-[8px] tracking-widest uppercase font-bold text-white/50 bg-black/40 px-2 py-0.5 rounded-sm">
+                  {getVisualizerLabel()}
+                </span>
+
+                {formData.engravingText.trim() ? (
+                  <div className="space-y-1 max-w-full px-2">
+                    <span className="text-[9px] uppercase tracking-widest text-white/40 block font-semibold">
+                      {isSublimation ? "Simulated Print Output" : "Simulated Etch Output"}
+                    </span>
+                    <p
+                      style={{ fontFamily: getSelectedFontFamily() }}
+                      className={`tracking-wide select-none drop-shadow-[0_1px_1px_rgba(0,0,0,0.85)] filter contrast-125 break-words max-w-full ${getSimulatedTextSize()} ${getSelectedFontClass()}`}
+                    >
+                      {formData.engravingText}
+                    </p>
+                    <p className="text-[9px] opacity-65 italic">
+                      applying to: {product.name}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1 opacity-50 px-3">
+                    <PenTool className="h-6 w-6 mx-auto stroke-1 text-white/70" />
+                    <p className="text-xs font-semibold text-white/90">{isSublimation ? "Enter Sublimation Text" : "Enter Personalization Text"}</p>
+                    <p className="text-[9px] text-white/60">
+                      {isSublimation 
+                        ? "Live print mockup will appear here styled in your chosen typography." 
+                        : "Live engraving mockup will appear here styled in your chosen typography."}
+                    </p>
+                  </div>
+                )}
+              </div>
+              
+              <p className="text-[10px] text-brand-muted text-center font-light leading-normal">
+                *This is a 2D preview. Adjustments and a final mockup will be shown to you before creating your item.
+              </p>
+            </div>
+          )}
+
+
+        </div>
+
+        {/* Right Column: Details Info & Elegant Direct Configurator Form */}
+        <div className="lg:col-span-7 space-y-6">
+          <div className="space-y-2">
+            <h1 className="font-serif font-bold text-3xl md:text-4xl text-brand-dark tracking-tight leading-tight">
+              {product.name}
+            </h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[9px] bg-brand-highlight text-brand-primary border border-brand-border/80 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">
+                {product.badge || material.badge}
+              </span>
+              <span className="text-[9px] bg-amber-800/10 text-amber-800 border border-amber-800/20 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">
+                {product.seal || material.seal}
+              </span>
+              {product.leadTime && (
+                <span className="text-[9px] bg-stone-100 text-stone-800 border border-stone-200 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider flex items-center gap-1">
+                  <Clock className="h-3 w-3 text-brand-primary" /> {product.leadTime}
+                </span>
+              )}
+              {product.dimensions && (
+                <span className="text-[9px] bg-stone-100 text-stone-800 border border-stone-200 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider flex items-center gap-1">
+                  <Ruler className="h-3 w-3 text-brand-primary" /> {product.dimensions}
+                </span>
+              )}
+              <div className="flex items-center gap-1.5 text-xs text-brand-primary">
+                {product.inStock ? (
+                  <span className="flex items-center gap-1 font-semibold text-[11px]">
+                    <CheckCircle className="h-3.5 w-3.5" /> {isSublimation ? "Ready for Custom Printing" : isPipeCleaner ? "Ready for Custom Design" : "Ready for Custom Engraving"}
+                  </span>
+                ) : (
+                  <span className="text-brand-muted flex items-center gap-1 font-semibold text-[11px]">
+                    <AlertTriangle className="h-3.5 w-3.5" /> Custom Workshop Only
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Pricing Box & Transparent Fee Breakdown */}
+          <div className="bg-brand-highlight border border-brand-border rounded-[24px] p-5 space-y-3.5">
+            <div className="flex justify-between items-center border-b border-brand-border/60 pb-3">
+              <div>
+                <span className="text-[10px] text-brand-muted font-bold uppercase tracking-widest block mb-0.5">
+                  Transparent Price Range
+                </span>
+                <div className="flex items-baseline gap-2">
+                  {hasPromo ? (
+                    <>
+                      <span className="text-red-700 font-serif font-bold text-2xl md:text-3xl">
+                        {product.maxPrice 
+                          ? `$${product.promoPrice} - $${Math.round((product.promoPrice ?? 0) * (product.maxPrice / product.price))}`
+                          : `$${product.promoPrice}`
+                        }
+                      </span>
+                      <span className="text-brand-muted line-through text-xs font-medium">
+                        {product.maxPrice ? `$${product.price} - $${product.maxPrice}` : `$${product.price}`}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-brand-dark font-serif font-bold text-2xl md:text-3xl">
+                      {product.maxPrice ? `$${product.price} - $${product.maxPrice}` : `$${product.price}`}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <span className="text-[8px] bg-emerald-600/10 text-emerald-700 border border-emerald-600/20 px-2.5 py-1.5 rounded-full font-bold uppercase tracking-wider">
+                All-Inclusive Setup
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-[10px] text-brand-dark font-medium">
+              {product.includedNotes && product.includedNotes.length > 0 ? (
+                product.includedNotes.map((note, idx) => (
+                  <div key={idx} className="flex items-center gap-1.5">
+                    <CheckCircle className="h-3.5 w-3.5 text-brand-primary shrink-0" />
+                    <span>{note}</span>
+                  </div>
+                ))
+              ) : (
+                <>
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle className="h-3.5 w-3.5 text-brand-primary shrink-0" />
+                    <span>{isSublimation ? "Base Product Item Included" : isPipeCleaner ? "Felt & Pipe Cleaner Stems" : "Base Wood/Craft Included"}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle className="h-3.5 w-3.5 text-brand-primary shrink-0" />
+                    <span>{isSublimation ? "Free Print Setup & Align" : isPipeCleaner ? "Complimentary Arrangement" : "Free Font Engravings"}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle className="h-3.5 w-3.5 text-brand-primary shrink-0" />
+                    <span>{isSublimation ? "Free Print Layout Proof" : isPipeCleaner ? "Gift Inscription Card" : "Free Digital Layout Mockup"}</span>
+                  </div>
+                </>
+              )}
+            </div>
+            <p className="text-[10px] text-brand-muted leading-relaxed font-light">
+              {product.pricingNotice || "*The final cost will be calculated and sent by the crafter after reviewing your order details."}
+            </p>
+          </div>
+
+          {/* Custom Options Display */}
+          {!product.hideCustomOptions && !product.hideOptionsAvailable && product.customOptions && product.customOptions.length > 0 && (
+            <div className="space-y-2">
+              <span className="text-[10px] text-brand-muted font-bold tracking-widest uppercase block border-b border-brand-border pb-1">
+                Options Available:
+              </span>
+              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
+                {product.customOptions.map((opt, i) => (
+                  <li key={i} className="flex items-center gap-1.5 text-brand-text font-light">
+                    <CheckCircle className="h-3.5 w-3.5 text-brand-primary shrink-0" />
+                    <span>{opt}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Description Block */}
+          <div className="space-y-1.5 border-t border-brand-border pt-4">
+            <h4 className="font-serif font-bold text-brand-dark text-base">Description</h4>
+            <p className="text-brand-muted text-xs leading-relaxed font-light whitespace-pre-line">
+              {product.description}
+            </p>
+          </div>
+
+          {/* Premium Direct Configurator Form Section */}
+          <div className="border-t border-brand-border pt-6 space-y-6">
+            <div className="bg-brand-highlight/30 border border-brand-border rounded-[28px] p-5 md:p-6 space-y-5">
+              <div className="space-y-1.5 border-b border-brand-border pb-4">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-brand-primary animate-pulse" />
+                  <h3 className="font-serif font-bold text-lg text-brand-dark">
+                    {isSublimation ? "Personalize This Creation" : isPipeCleaner ? "Customize Your Floral Arrangement" : "Personalize This Creation"}
+                  </h3>
+                </div>
+                <p className="text-brand-muted text-[11px] leading-relaxed font-light">
+                  Fill in your custom details below. The crafter will review your order and contact you soon.
+                </p>
+              </div>
+
+              <form onSubmit={handleSubmitQuoteForm} className="space-y-4">
+                {/* Contact Fields */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="customerName" className="text-[10px] font-bold text-brand-muted uppercase tracking-wider">
+                      Your Full Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      id="customerName"
+                      name="customerName"
+                      type="text"
+                      value={formData.customerName}
+                      onChange={handleInputChange}
+                      placeholder="Eleanor Vance"
+                      className={`bg-white border rounded-[8px] py-2 px-3 text-brand-text text-xs focus:outline-none focus:ring-1 focus:ring-brand-primary ${errors.customerName ? "border-red-500" : "border-brand-border"}`}
+                    />
+                    {errors.customerName && (
+                      <span className="text-[9px] text-red-600 font-medium">{errors.customerName}</span>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="customerEmail" className="text-[10px] font-bold text-brand-muted uppercase tracking-wider">
+                      Email Address <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      id="customerEmail"
+                      name="customerEmail"
+                      type="email"
+                      value={formData.customerEmail}
+                      onChange={handleInputChange}
+                      placeholder="eleanor@example.com"
+                      className={`bg-white border rounded-[8px] py-2 px-3 text-brand-text text-xs focus:outline-none focus:ring-1 focus:ring-brand-primary ${errors.customerEmail ? "border-red-500" : "border-brand-border"}`}
+                    />
+                    {errors.customerEmail && (
+                      <span className="text-[9px] text-red-600 font-medium">{errors.customerEmail}</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="customerPhone" className="text-[10px] font-bold text-brand-muted uppercase tracking-wider">
+                      Phone Number (Optional)
+                    </label>
+                    <input
+                      id="customerPhone"
+                      name="customerPhone"
+                      type="text"
+                      value={formData.customerPhone}
+                      onChange={handleInputChange}
+                      placeholder="(503) 555-0199"
+                      className="bg-white border border-brand-border rounded-[8px] py-2 px-3 text-brand-text text-xs focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="quantity" className="text-[10px] font-bold text-brand-muted uppercase tracking-wider">
+                      Quantity Required <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      id="quantity"
+                      name="quantity"
+                      type="number"
+                      min="1"
+                      value={formData.quantity}
+                      onChange={handleInputChange}
+                      className="bg-white border border-brand-border rounded-[8px] py-2 px-3 text-brand-text text-xs focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="deadline" className="text-[10px] font-bold text-brand-muted uppercase tracking-wider flex items-center gap-1">
+                      <Calendar className="h-3 w-3 text-brand-primary" /> Target Deadline
+                    </label>
+                    <input
+                      id="deadline"
+                      name="deadline"
+                      type="date"
+                      value={formData.deadline}
+                      onChange={handleInputChange}
+                      min={new Date().toISOString().split("T")[0]}
+                      className="bg-white border border-brand-border rounded-[8px] py-2 px-3 text-brand-text text-xs focus:outline-none focus:ring-1 focus:ring-brand-primary cursor-pointer"
+                    />
+                  </div>
+                </div>
+
+                {/* Custom Text/Typography Inputs */}
+                {hasEngravingText && (
+                  <div className="flex flex-col gap-1.5 border-t border-brand-border/40 pt-4 mt-2">
+                    <div className="flex justify-between items-center">
+                      <label htmlFor="engravingText" className="text-[10px] font-bold text-brand-primary uppercase tracking-widest flex items-center gap-1">
+                        <PenTool className="h-3.5 w-3.5" /> {isSublimation ? "Custom Text to Print on Item" : "Text to Engrave"}
+                      </label>
+                      <span className="text-[9px] text-brand-muted font-mono font-medium">
+                        {formData.engravingText.length}/100 chars
+                      </span>
+                    </div>
+                    <input
+                      id="engravingText"
+                      name="engravingText"
+                      type="text"
+                      maxLength={100}
+                      value={formData.engravingText}
+                      onChange={handleInputChange}
+                      placeholder={isSublimation ? "e.g. Happy Birthday, Dad! / Family Photo 2026" : "The Vance Family, Est. 2026"}
+                      className="bg-white border border-brand-border rounded-[8px] py-2.5 px-3.5 text-brand-text text-xs focus:outline-none focus:ring-1 focus:ring-brand-primary font-medium"
+                    />
+                    {!isSublimation && (
+                      <span className="text-[9px] text-brand-muted font-light">
+                        *Type your phrase above. The simulation preview in the left column will render live.
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {hasTypography && (
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="fontPreference" className="text-[10px] font-bold text-brand-muted uppercase tracking-wider block">
+                      {isSublimation ? "Printed Font Style" : "Typography Style"}
+                    </label>
+                    <div className="relative">
+                      <select
+                        id="fontPreference"
+                        name="fontPreference"
+                        value={formData.fontPreference}
+                        onChange={handleInputChange}
+                        className="w-full bg-white border border-brand-border rounded-[8px] py-2.5 px-3.5 text-brand-text text-xs focus:outline-none focus:ring-1 focus:ring-brand-primary cursor-pointer appearance-none font-medium"
+                      >
+                        {fontOptions.map((font) => (
+                          <option key={font.name} value={font.name}>
+                            {font.name}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-brand-muted text-xs">
+                        ▼
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Similar or Alternative Craft Request Toggle */}
+                <div className="bg-amber-50/60 border border-amber-200 p-4 rounded-[16px] space-y-3 mt-4">
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      name="alternativeRequest"
+                      checked={formData.alternativeRequest}
+                      onChange={(e) => setFormData(prev => ({ ...prev, alternativeRequest: e.target.checked }))}
+                      className="rounded border-amber-300 text-amber-800 focus:ring-amber-500 h-4.5 w-4.5 cursor-pointer mt-0.5 shrink-0"
+                    />
+                    <div className="space-y-0.5">
+                      <span className="font-serif font-bold text-brand-dark text-sm block">Request a Similar or Alternative Craft?</span>
+                      <span className="text-xs text-brand-muted leading-relaxed block font-light">
+                        {product.alternativeRequestText || (
+                          isPipeCleaner 
+                            ? "If you want a custom rose, lavender, or customized bouquet instead of this specific piece, check this box to tell us what you'd like! We will quote a custom price."
+                            : isSublimation
+                              ? "Would you like a similar sublimation item (e.g. custom size mug, alternative button style) not listed in our standard options? Check here to describe it!"
+                              : "If you want a different species of hardwood, specialized sizing, or similar items not in our standard list, check this box to specify! We will quote a custom price."
+                        )}
+                      </span>
+                    </div>
+                  </label>
+                  
+                  {formData.alternativeRequest && (
+                    <div className="space-y-2 pl-7 animate-fade-in">
+                      <label className="text-[10px] font-bold text-amber-900 uppercase tracking-wider block">
+                        Describe what you would like instead (and ask for a price quote):
+                      </label>
+                      <textarea
+                        name="alternativeDetails"
+                        rows={2}
+                        value={formData.alternativeDetails}
+                        onChange={(e) => setFormData(prev => ({ ...prev, alternativeDetails: e.target.value }))}
+                        placeholder={isPipeCleaner ? "e.g. Can I request a hand-made Lavender and Rose bouquet instead of the Sunflower? Please provide pricing for 3 stems..." : "e.g. Can I request this printed on an 11oz gloss porcelain mug instead of the ceramic one?"}
+                        className="w-full bg-white border border-amber-300 rounded-[8px] py-2 px-3 text-brand-text text-sm focus:outline-none focus:ring-1 focus:ring-amber-800 focus:border-amber-800"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Special instructions */}
+                <div className="flex flex-col gap-1.5 border-t border-brand-border/40 pt-4 mt-2">
+                  <label htmlFor="specialInstructions" className="text-[10px] font-bold text-brand-muted uppercase tracking-wider">
+                    {isSublimation ? "Additional Customization Preferences" : isPipeCleaner ? "Bouquet Wrapping & Packaging Preferences" : "Special Design Instructions or Sizing Ideas"}
+                  </label>
+                  <textarea
+                    id="specialInstructions"
+                    name="specialInstructions"
+                    rows={2.5}
+                    value={formData.specialInstructions}
+                    onChange={handleInputChange}
+                    placeholder={isSublimation ? "Describe any background colors, placement of your image, or specific print details..." : isPipeCleaner ? "Request specific ribbon colors, wrapping paper styles, or card notes..." : "E.g., Please align the engraving in the lower right-hand corner. Wood oil coat finishes only..."}
+                    className="bg-white border border-brand-border rounded-[8px] py-2 px-3 text-brand-text text-xs focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                  />
+                </div>
+
+                {/* Secure, optional file drag upload */}
+                <div className="flex flex-col gap-1.5 border-t border-brand-border/40 pt-4 mt-2">
+                  <label className="text-[10px] font-bold text-brand-muted uppercase tracking-wider flex items-center gap-1">
+                    <Upload className="h-3.5 w-3.5 text-brand-primary" /> {isSublimation ? "Upload Custom Image or Photo to Print" : "Inspiration Sketches or Logos (Optional)"}
+                  </label>
+                  <p className="text-[10px] text-brand-muted font-light">
+                    {isSublimation ? "Drag & drop the high-quality photo or design you want printed on your item, or click to choose." : "Have an inspiration sketch, custom monogram, or reference image? Drag it below, or click to upload."}
+                  </p>
+
+                  {isSublimation && (
+                    <div className="bg-purple-50/70 border border-purple-200 text-purple-950 p-4 rounded-[12px] text-xs flex items-start gap-2.5 animate-fade-in mb-2 mt-1">
+                      <span className="text-base shrink-0">📸</span>
+                      <div>
+                        <p className="font-bold">Sublimation Photo Recommendation!</p>
+                        <p className="text-purple-800 text-[11px] leading-relaxed mt-0.5 font-light">
+                          For full-color mugs, puzzles, tumblers, or keychains, we recommend a high-resolution JPEG or PNG. Our crafters will automatically center and fit your image to the item's print area before sharing a visual mockup!
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div
+                    onDragEnter={handleDrag}
+                    onDragOver={handleDrag}
+                    onDragLeave={handleDrag}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`border border-dashed rounded-[14px] p-3.5 text-center cursor-pointer transition-all ${
+                      dragActive
+                        ? "border-brand-primary bg-brand-primary/5"
+                        : "border-brand-border bg-white hover:border-brand-primary/50 hover:bg-brand-highlight/20"
+                    }`}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      onChange={handleFileChange}
+                      className="hidden"
+                      accept="image/*,application/pdf"
+                    />
+                    <Upload className="h-4.5 w-4.5 text-brand-primary/70 mx-auto mb-1 animate-pulse" />
+                    <p className="text-[11px] font-semibold text-brand-dark">
+                      Click to <span className="text-brand-primary underline">browse</span> or drag sketch here
+                    </p>
+                    <p className="text-[8px] text-brand-muted mt-0.5">
+                      PNG, JPG, JPEG, or PDF up to 10MB
+                    </p>
+                  </div>
+
+                  {uploadingFiles && (
+                    <div className="text-[10px] text-brand-primary font-medium flex items-center justify-center gap-1.5 animate-pulse pt-1">
+                      <div className="animate-spin rounded-full h-3 w-3 border-2 border-brand-primary border-t-transparent"></div>
+                      Encrypting &amp; uploading design asset...
+                    </div>
+                  )}
+
+                  {uploadError && (
+                    <div className="p-2 bg-red-50 border border-red-200 text-red-700 rounded-[10px] text-[10px] font-medium text-center">
+                      ⚠️ {uploadError}
+                    </div>
+                  )}
+
+                  {/* Uploaded assets list */}
+                  {uploadedFiles.length > 0 && (
+                    <div className="space-y-1.5 pt-1.5">
+                      <span className="text-[8px] font-bold text-brand-muted uppercase tracking-wider block">
+                        Uploaded Assets ({uploadedFiles.length})
+                      </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {uploadedFiles.map((file, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center justify-between border border-brand-border bg-white p-2 rounded-[10px] text-[11px] shadow-3xs"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              {file.url ? (
+                                <img
+                                  src={file.url}
+                                  alt="preview"
+                                  className="h-7 w-7 rounded-md object-cover border border-brand-border shrink-0"
+                                  referrerPolicy="no-referrer"
+                                />
+                              ) : (
+                                <div className="h-7 w-7 bg-brand-highlight text-brand-primary rounded-md flex items-center justify-center shrink-0 border border-brand-border">
+                                  <Paperclip className="h-3 w-3" />
+                                </div>
+                              )}
+                              <span className="truncate max-w-[120px] font-medium text-brand-dark">{file.name}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeFile(idx);
+                              }}
+                              className="text-brand-muted hover:text-red-600 p-1 rounded-full hover:bg-red-50 transition-colors"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full bg-brand-primary hover:bg-brand-primary-hover text-white font-sans font-bold py-3.5 px-4 rounded-full transition-colors text-[10px] uppercase tracking-widest shadow-xs flex items-center justify-center gap-2 cursor-pointer mt-4"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  Submit Customized Quote Request
+                </button>
+
+                {submitted && (
+                  <div
+                    id="inline-quote-success"
+                    className="mt-4 p-4 bg-emerald-50 border border-emerald-200 text-emerald-950 rounded-[16px] text-xs space-y-1.5 animate-fade-in shadow-xs"
+                  >
+                    <div className="flex items-center gap-2 font-bold text-emerald-800 text-sm">
+                      <CheckCircle className="h-4.5 w-4.5 text-emerald-600 shrink-0" />
+                      <span>Request Received Successfully!</span>
+                    </div>
+                    <p className="font-normal text-emerald-800 text-xs leading-relaxed">
+                      Thank you for submitting your custom quote request! We have received your details and our team will get back to you soon with your quote and design mockup.
+                    </p>
+                  </div>
+                )}
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

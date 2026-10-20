@@ -1,0 +1,179 @@
+{
+  "categories": [],
+  "products": [],
+  "testimonials": [],
+  "announcements": [],
+  "quotes": [],
+  "analytics": {
+    "totalViews": 0,
+    "productViews": {},
+    "searches": {},
+    "promoViews": {},
+    "announcementClicks": {}
+  },
+  "customization": {
+    "logoText": "Nicoletta",
+    "logoSubtext": "Crafts & Decor",
+    "logoImageUrl": "/uploads/artisan_394acdc2da743ca35c5bc9fd7b47052a.png",
+    "logoShowText": true,
+    "logoSize": 112,
+    "logoHideBorder": true,
+    "philosophyQuote": "An engraving isn't just marks burnt into surface; it's the transfer of a family signature across generations.",
+    "philosophyAuthor": "Nicoletta, Founder & Creative Director",
+    "sections": [
+      {
+        "id": "home-hero",
+        "page": "home",
+        "title": "Turn Moments Into Memories",
+        "subtitle": "Where Your Ideas Become Keepsakes",
+        "description": "The best gifts are the ones that tell a story. At Nicoletta, we create personalized keepsakes and custom designs made around your ideas, your memories, and the people you love. From engraved pieces to unique handmade creations, every item is crafted with love to make your special moments unforgettable.",
+        "visible": true,
+        "order": 1,
+        "buttonText1": "Browse Collections",
+        "buttonText2": "Request Custom Quote",
+        "imageUrl": "/uploads/artisan_bcfb03b127a83119e4f588c0ba497f1b.jpg",
+        "imageUrls": [
+          "/uploads/artisan_bcfb03b127a83119e4f588c0ba497f1b.jpg",
+          "/uploads/artisan_173f9b4474adf8e8be7a6c88d8d52a95.jpg",
+          "/uploads/artisan_6e84e548f7d73d83f8140662fbd98f84.jpg",
+          "/uploads/artisan_36514e4c1b3fb24869df8bc4c1ecebc4.jpg",
+          "/uploads/artisan_c287ea393419a8e96e764b3f961ab92b.jpg",
+          "/uploads/artisan_4a175707e4f0950f44ef33ff6bd6f3f1.jpg",
+          "/uploads/artisan_986c0a631a289bb5e8284f36c65aef31.jpg",
+          "/uploads/artisan_0adb6e6b7dc3feea097d8a14b397c2b7.jpg",
+          "/uploads/artisan_6aaf74e81aa1173ec417bebe979013d4.jpg"
+        ]
+      },
+      {
+        "id": "home-categories",
+        "page": "home",
+        "title": "Categories",
+        "subtitle": "Explore Our Collections",
+        "description": "Browse our handcrafted products by category and find the right option for your next custom creation.",
+        "visible": true,
+        "order": 2
+      },
+      {
+        "id": "home-featured",
+        "page": "home",
+        "title": "Our Featured Pieces",
+        "subtitle": "Browse Our Most Popular Creations",
+        "description": "Explore a selection of our personalized creations, custom engravings, and handcrafted gifts.",
+        "visible": true,
+        "order": 3,
+        "buttonText1": "View All Products"
+      },
+      {
+        "id": "home-difference",
+        "page": "home",
+        "title": "The Nicoletta Difference",
+        "subtitle": "Handmade with Love",
+        "description": "",
+        "visible": true,
+        "order": 4,
+        "step1Title": "Made With Care, Made For You",
+        "step1Desc": "We create personalized gifts and custom pieces for the moments you want to remember. Whether it’s a birthday, wedding, anniversary, new home, or just a little something for someone special, we help turn your ideas into meaningful keepsakes.",
+        "step2Title": "The Best Gifts Are Personal",
+        "step2Desc": "A name, a date, a special message, or a unique design can turn an everyday item into something unforgettable. We create custom pieces with your story in mind, using engraving and personalized details on wood, glass, acrylic, leather, and more.",
+        "step3Title": "Have Something In Mind? Let’s Create It",
+        "step3Desc": "Whether you know exactly what you want or need a little inspiration, we’re here to help bring your idea to life. Every piece is made with care and created to make someone smile."
+      },
+      {
+        "id": "home-announcements",
+        "page": "home",
+        "title": "What's New at Nicoletta",
+        "subtitle": "Latest News, Markets & Offers",
+        "description": "Stay up to date with our latest news, upcoming local craft fairs, pop-up events, and limited-time offers.",
+        "visible": true,
+        "order": 5
+      },
+      {
+        "id": "home-testimonials",
+        "page": "home",
+        "title": "Reviews",
+        "subtitle": "Real Stories From Our Customers",
+        "description": "Hear from the people who trusted us to create something meaningful for their special moments.",
+        "visible": true,
+        "order": 6,
+        "buttonText1": "See All Verified Reviews"
+      },
+      {
+        "id": "home-about",
+        "page": "home",
+        "title": "Nicoletta Decor",
+        "subtitle": "Meet the Crafter",
+        "description": "Founded in Portland, Oregon in 2021 by artisan Nicoletta, our shop was born out of a deep reverence for organic materials and classic design. We select local, sustainably-cut timber and cure each board by hand.",
+        "extraText1": "Every laser brand and sandblast carving is executed one-by-one with surgical attention to grain and texture. We never treat your project as generic manufacture; we create future heirlooms destined to outlast us all.",
+        "extraText2": "Tannia Chevez",
+        "extraText3": "Founder &  Engraver",
+        "imageUrl1": "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&q=80&w=400",
+        "imageUrl2": "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&q=80&w=400",
+        "visible": false,
+        "order": 7
+      },
+      {
+        "id": "home-cta",
+        "page": "home",
+        "title": "Let’s Create Something Unique",
+        "subtitle": "",
+        "description": "Have an idea you don’t see anywhere else? We love creating personalized gifts, event pieces, and custom orders tailored to your ideas. Let’s bring your vision to life.",
+        "visible": true,
+        "order": 8,
+        "buttonText1": "Submit Quote Request"
+      },
+      {
+        "id": "catalog-header",
+        "page": "catalog",
+        "title": "Our Collections",
+        "subtitle": "",
+        "description": "Filter our signature collection categories. Select an item to submit your specific engraving guidelines.",
+        "visible": true,
+        "order": 1
+      },
+      {
+        "id": "catalog-process",
+        "page": "catalog",
+        "title": "How Ordering Works",
+        "subtitle": "",
+        "description": "",
+        "visible": true,
+        "order": 2
+      },
+      {
+        "id": "quote-header",
+        "page": "quote",
+        "title": "Submit Your Custom Request",
+        "subtitle": "Personalize Your Item",
+        "description": "Every personalized item starts with your vision. Share your names, messages, colors, images, logos, or design ideas, and we'll prepare a custom design for your approval before we begin crafting your order.",
+        "visible": true,
+        "order": 1
+      },
+      {
+        "id": "testimonials-header",
+        "page": "testimonials",
+        "title": "Stories from our Costumers",
+        "subtitle": "Reviews & Experience",
+        "description": "Verified reviews left by our amazing customers. Submit your own review below.",
+        "visible": true,
+        "order": 1
+      },
+      {
+        "id": "contact-header",
+        "page": "contact",
+        "title": "Connect with Us",
+        "subtitle": "Can't find exactly what you're looking for?",
+        "description": "We'd love to help! Send us your idea, inspiration, or a custom request, and we'll let you know if we can create it. If it's possible, we'll work with you to design a personalized piece that's exactly what you had in mind.",
+        "extraText1": "Nicoletta Crafts & Decor",
+        "extraText2": "Located near Village Mall. Full location shared once your order is confirmed.",
+        "extraText3": "(709) 763 1315",
+        "extraText": "tnchevez@mun.ca",
+        "visible": true,
+        "order": 1
+      }
+    ]
+  },
+  "adminCredentials": {
+    "hash": "8308b59bdd73f2666e4eaf8ec47d93cc7b3870e3221612324d543b2c96a9ddee3291be39da897901d26651f9474846051684926ef7710a74cd3240b75e401502",
+    "salt": "e6ebaa64254a7b8713e0c7c9b526f394"
+  }
+}

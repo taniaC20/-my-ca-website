@@ -1,0 +1,296 @@
+{
+  "entities": {
+    "Customer": {
+      "title": "Customer Profile",
+      "description": "Represents a registered customer's public profile and contact details.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Unique Firebase Authentication UID."
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100,
+          "description": "Full display name of the customer."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Customer contact email address."
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "Profile picture URL."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 server timestamp of profile creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 server timestamp of last update."
+        }
+      },
+      "required": ["uid", "displayName", "email", "createdAt", "updatedAt"]
+    },
+    "Product": {
+      "title": "Artisan Product",
+      "description": "Heirloom product bases, custom sizes, and items available for etching or customization.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique product alphanumeric ID."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 120,
+          "description": "Name of the artisan item (e.g., Live-Edge Walnut Board)."
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "In-depth description of dimensions, materials, and oil finishes."
+        },
+        "category": {
+          "type": "string",
+          "enum": ["wood", "leather", "glass", "slate"],
+          "description": "Artisan material category."
+        },
+        "imageUrls": {
+          "type": "array",
+          "description": "List of high-resolution asset paths for visual carousel showcases."
+        },
+        "priceMin": {
+          "type": "number",
+          "description": "Minimum custom estimate base pricing."
+        },
+        "priceMax": {
+          "type": "number",
+          "description": "Maximum premium sizing base pricing."
+        },
+        "customizationOptions": {
+          "type": "array",
+          "description": "Available personalization fields (e.g. ['Monogram', 'Custom Engraving', 'Sizing'])."
+        },
+        "inStock": {
+          "type": "boolean",
+          "description": "Availability status of raw timber or blanks in the Portland workshop."
+        },
+        "featured": {
+          "type": "boolean",
+          "description": "Whether the product is highlighted in the primary website carousel showcase."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when catalog entry was created."
+        }
+      },
+      "required": ["id", "name", "category", "priceMin", "priceMax", "inStock", "featured"]
+    },
+    "Review": {
+      "title": "Bespoke Patron Review",
+      "description": "Verified patron feedback and rating systems, subject to admin moderation.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique review ID."
+        },
+        "customerUid": {
+          "type": "string",
+          "description": "UID of the registered customer author."
+        },
+        "customerName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100,
+          "description": "Name displayed publicly with the review."
+        },
+        "rating": {
+          "type": "integer",
+          "description": "Artisan rating scale from 1 (poor) to 5 (excellent)."
+        },
+        "comment": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 1000,
+          "description": "Authentic testimonial feedback comments."
+        },
+        "approved": {
+          "type": "boolean",
+          "description": "Moderation status; only approved reviews are displayed publicly."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Submission date and time."
+        }
+      },
+      "required": ["id", "customerUid", "customerName", "rating", "comment", "approved", "createdAt"]
+    },
+    "Announcement": {
+      "title": "Workshop Announcement",
+      "description": "Marketing promotions, workshop events, and holiday order cut-off notices.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique announcement ID."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 150,
+          "description": "Title of the announcement bar or header banner."
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Content of the announcement alert message."
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "Optional illustration or promotional badge URL."
+        },
+        "eventDate": {
+          "type": "string",
+          "format": "date",
+          "description": "Optional scheduled calendar date associated with the event."
+        },
+        "expirationDate": {
+          "type": "string",
+          "format": "date",
+          "description": "The date after which this alert is hidden."
+        },
+        "active": {
+          "type": "boolean",
+          "description": "Toggle switch to manually enable or disable the banner."
+        }
+      },
+      "required": ["id", "title", "expirationDate", "active"]
+    },
+    "QuoteRequest": {
+      "title": "Bespoke Engraving Quote Request",
+      "description": "Custom orders submitted by clients, including dimensions, engravings, and uploaded mockups.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique invoice-style alphanumeric ID."
+        },
+        "customerUid": {
+          "type": "string",
+          "description": "Optional registered user UID (supports anonymous & signed-in users)."
+        },
+        "customerName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100,
+          "description": "Contact full name."
+        },
+        "customerEmail": {
+          "type": "string",
+          "format": "email",
+          "description": "Contact notification email."
+        },
+        "customerPhone": {
+          "type": "string",
+          "pattern": "^\\+?[0-9\\s\\-\\(\\)]{7,20}$",
+          "description": "Contact phone number."
+        },
+        "productId": {
+          "type": "string",
+          "description": "Target base product ID selected from catalog."
+        },
+        "productName": {
+          "type": "string",
+          "description": "Target product name (snapshot at time of quote)."
+        },
+        "customizationDetails": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 5000,
+          "description": "Detailed engraving requests, monogram text, preferred fonts, and sizing."
+        },
+        "inspirationUrls": {
+          "type": "array",
+          "description": "List of uploaded image URLs (references in Cloud Storage)."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "reviewed", "quoted", "approved", "completed", "cancelled"],
+          "description": "Current workflow state of the bespoke project."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when request was filed."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when status or notes were last modified."
+        }
+      },
+      "required": ["id", "customerName", "customerEmail", "customerPhone", "productId", "productName", "customizationDetails", "status", "createdAt", "updatedAt"]
+    },
+    "Admin": {
+      "title": "Admin Role Definition",
+      "description": "Stores security clearances and roles for business operations.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Authentication User UID."
+        },
+        "email": {
+          "type": "string",
+          "description": "Registered business email address."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin", "super_admin"],
+          "description": "Operational authority tier."
+        },
+        "permissions": {
+          "type": "array",
+          "description": "Granular action permissions (e.g. ['approve_reviews', 'edit_catalog', 'adjust_quotes'])."
+        }
+      },
+      "required": ["uid", "email", "role"]
+    }
+  },
+  "firestore": {
+    "/customers/{customerUid}": {
+      "schema": "Customer",
+      "description": "User profiles for private/public dashboard settings."
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Artisan custom decor and premium wood/leather/glass catalog items."
+    },
+    "/reviews/{reviewId}": {
+      "schema": "Review",
+      "description": "Customer feedback and star ratings displayed on showcase sections."
+    },
+    "/announcements/{announcementId}": {
+      "schema": "Announcement",
+      "description": "Active banner alerts, promotion alerts, and timeline updates."
+    },
+    "/quoteRequests/{quoteRequestId}": {
+      "schema": "QuoteRequest",
+      "description": "Client quote inquiries, monogram details, files, and workshop status indicators."
+    },
+    "/admins/{adminUid}": {
+      "schema": "Admin",
+      "description": "Restricted document storage containing admin verification records."
+    }
+  }
+}

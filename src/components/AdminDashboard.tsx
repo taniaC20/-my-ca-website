@@ -1,0 +1,5418 @@
+import React, { useState } from "react";
+import * as LucideIcons from "lucide-react";
+import {
+  TrendingUp,
+  FileText,
+  Plus,
+  Edit,
+  Trash2,
+  Check,
+  X,
+  AlertCircle,
+  FolderPlus,
+  Sliders,
+  DollarSign,
+  Briefcase,
+  Layers,
+  Award,
+  BellRing,
+  Eye,
+  Info,
+  BadgeDollarSign,
+  Star,
+  Upload,
+  Mail,
+  Send,
+  Sparkles,
+  Type,
+  Lock,
+  Quote,
+  Paperclip,
+  MessageSquare,
+  Image,
+  Search,
+  Megaphone
+} from "lucide-react";
+import { Product, Category, Testimonial, Announcement, QuoteRequest, AnalyticsSummary, CustomizationSettings, CustomSection } from "../types";
+import { NicolettaLogo } from "./NicolettaLogo";
+
+interface AdminDashboardProps {
+  products: Product[];
+  categories: Category[];
+  testimonials: Testimonial[];
+  announcements: Announcement[];
+  quotes: QuoteRequest[];
+  analytics: AnalyticsSummary;
+  token: string | null;
+  customization: CustomizationSettings;
+  onUpdateCustomization: (customization: CustomizationSettings) => void;
+  onUpdateProducts: (products: Product[]) => void;
+  onUpdateCategories: (categories: Category[]) => void;
+  onUpdateTestimonials: (testimonials: Testimonial[]) => void;
+  onUpdateAnnouncements: (announcements: Announcement[]) => void;
+  onUpdateQuotes: (quotes: QuoteRequest[]) => void;
+}
+
+type AdminTab = "analytics" | "products" | "categories" | "testimonials" | "quotes" | "messages" | "announcements" | "site-customizer" | "security";
+
+export default function AdminDashboard({
+  products,
+  categories,
+  testimonials,
+  announcements,
+  quotes,
+  analytics,
+  token,
+  customization,
+  onUpdateCustomization,
+  onUpdateProducts,
+  onUpdateCategories,
+  onUpdateTestimonials,
+  onUpdateAnnouncements,
+  onUpdateQuotes
+}: AdminDashboardProps) {
+  const [activeTab, setActiveTab] = useState<AdminTab>("site-customizer");
+
+  // Rich analytics BI report state
+  const [richAnalytics, setRichAnalytics] = useState<any | null>(null);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+
+  React.useEffect(() => {
+    if (activeTab === "analytics" && token) {
+      setLoadingAnalytics(true);
+      fetch("/api/admin/analytics", {
+        headers: { "Authorization": `Bearer ${token}` }
+      })
+        .then(res => {
+          if (!res.ok) throw new Error("HTTP error " + res.status);
+          return res.json();
+        })
+        .then(data => {
+          setRichAnalytics(data);
+          setLoadingAnalytics(false);
+        })
+        .catch(err => {
+          console.error("Failed to fetch rich analytics:", err);
+          setLoadingAnalytics(false);
+        });
+    }
+  }, [activeTab, token, quotes]);
+
+  // Site Customizer States
+  const [logoText, setLogoText] = useState(customization?.logoText || "Nicoletta");
+  const [logoSubtext, setLogoSubtext] = useState(customization?.logoSubtext || "Crafts & Decor");
+  const [logoImageUrl, setLogoImageUrl] = useState(customization?.logoImageUrl || "");
+  const [logoShowText, setLogoShowText] = useState(customization?.logoShowText !== false);
+  const [logoSize, setLogoSize] = useState(customization?.logoSize || 48);
+  const [logoHideBorder, setLogoHideBorder] = useState(customization?.logoHideBorder !== false);
+  const [philosophyQuote, setPhilosophyQuote] = useState(customization?.philosophyQuote || "An engraving isn't just marks burnt into surface; it's the transfer of a family signature across generations.");
+  const [philosophyAuthor, setPhilosophyAuthor] = useState(customization?.philosophyAuthor || "Nicoletta, Founder & Creative Director");
+  const [activeSectionTab, setActiveSectionTab] = useState<"home" | "catalog" | "quote" | "reviews" | "workshop">("home");
+  const [sections, setSections] = useState<CustomSection[]>(() => {
+    return customization?.sections && customization?.sections.length > 0
+      ? [...customization.sections]
+      : [];
+  });
+
+  // Change Password States
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordStatus, setPasswordStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordStatus(null);
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordStatus({ type: "error", message: "All password fields are required." });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordStatus({ type: "error", message: "New password and confirmation password do not match." });
+      return;
+    }
+
+    if (newPassword.length < 4) {
+      setPasswordStatus({ type: "error", message: "New password must be at least 4 characters long." });
+      return;
+    }
+
+    setIsUpdatingPassword(true);
+    try {
+      const response = await fetch("/api/admin/change-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to update password.");
+      }
+
+      localStorage.setItem("nicoletta_admin_custom_password", newPassword);
+      setPasswordStatus({ type: "success", message: "Your admin portal password has been changed successfully." });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err: any) {
+      setPasswordStatus({ type: "error", message: err.message || "An unexpected error occurred." });
+    } finally {
+      setIsUpdatingPassword(false);
+    }
+  };
+
+  // Sync state if prop changes
+  React.useEffect(() => {
+    if (customization) {
+      setLogoText(customization.logoText || "Nicoletta");
+      setLogoSubtext(customization.logoSubtext || "Crafts & Decor");
+      setLogoImageUrl(customization.logoImageUrl || "");
+      setLogoShowText(customization.logoShowText !== false);
+      setLogoSize(customization.logoSize || 48);
+      setLogoHideBorder(customization.logoHideBorder !== false);
+      setPhilosophyQuote(customization.philosophyQuote || "An engraving isn't just marks burnt into surface; it's the transfer of a family signature across generations.");
+      setPhilosophyAuthor(customization.philosophyAuthor || "Nicoletta, Founder & Creative Director");
+      if (customization.sections) {
+        setSections([...customization.sections]);
+      }
+    }
+  }, [customization]);
+
+  const [isAddingSection, setIsAddingSection] = useState(false);
+  const [newSecTitle, setNewSecTitle] = useState("");
+  const [newSecSubtitle, setNewSecSubtitle] = useState("");
+  const [newSecDesc, setNewSecDesc] = useState("");
+  const [newSecBtnText, setNewSecBtnText] = useState("");
+  const [newSecImage, setNewSecImage] = useState("");
+
+  const [isSavingCustomizer, setIsSavingCustomizer] = useState(false);
+  const [customizerSuccess, setCustomizerSuccess] = useState<string | null>(null);
+
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoUploadError, setLogoUploadError] = useState("");
+  const [logoDragActive, setLogoDragActive] = useState(false);
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    uploadLogoFile(file);
+  };
+
+  const uploadLogoFile = (file: File) => {
+    if (file.size > 10 * 1024 * 1024) {
+      setLogoUploadError("Logo file size exceeds the 10MB limit.");
+      return;
+    }
+
+    setLogoUploading(true);
+    setLogoUploadError("");
+
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      const base64Data = reader.result as string;
+      fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: file.name,
+          type: file.type,
+          data: base64Data
+        })
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error("Upload failed");
+          return res.json();
+        })
+        .then((data) => {
+          setLogoImageUrl(data.url);
+          setLogoUploading(false);
+        })
+        .catch((err) => {
+          console.error("Logo upload error:", err);
+          setLogoUploadError("Failed to upload logo image. Please try again.");
+          setLogoUploading(false);
+        });
+    };
+    reader.onerror = () => {
+      setLogoUploadError("Error reading file.");
+      setLogoUploading(false);
+    };
+  };
+
+  const handleSaveCustomizer = async (e?: React.FormEvent, sectionsOverride?: CustomSection[]) => {
+    if (e) e.preventDefault();
+    setIsSavingCustomizer(true);
+    setCustomizerSuccess(null);
+    try {
+      const targetSections = sectionsOverride || sections;
+      const res = await fetch("/api/admin/customization", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          logoText,
+          logoSubtext,
+          logoImageUrl,
+          logoShowText,
+          logoSize,
+          logoHideBorder,
+          philosophyQuote,
+          philosophyAuthor,
+          sections: targetSections
+        })
+      });
+
+      if (res.ok) {
+        const updated = await res.json();
+        onUpdateCustomization(updated);
+        setCustomizerSuccess("Site settings and logo customization saved successfully to cloud!");
+        setTimeout(() => setCustomizerSuccess(null), 4000);
+      } else {
+        const err = await res.json();
+        alert("Failed to save customization: " + (err.error || "Unknown server error"));
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Network failure saving site customization.");
+    } finally {
+      setIsSavingCustomizer(false);
+    }
+  };
+
+  const moveSection = (index: number, direction: "up" | "down") => {
+    const newIndex = direction === "up" ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= sections.length) return;
+    
+    const updated = [...sections];
+    const temp = updated[index];
+    updated[index] = updated[newIndex];
+    updated[newIndex] = temp;
+    
+    // Recalculate orders
+    const final = updated.map((sec, idx) => ({ ...sec, order: idx }));
+    setSections(final);
+    // Auto save the new order immediately to feel extremely responsive!
+    handleSaveCustomizer(undefined, final);
+  };
+
+  const moveSectionInTab = (secId: string, direction: "up" | "down") => {
+    const sortedAll = [...sections].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    
+    const isOfActiveTab = (sec: CustomSection) => {
+      if (activeSectionTab === "home") {
+        return sec.page === "home" || sec.id.startsWith("home-") || sec.id.startsWith("custom_");
+      }
+      if (activeSectionTab === "catalog") {
+        return sec.id === "catalog-header" || sec.id === "catalog-process" || sec.id.startsWith("catalog-");
+      }
+      if (activeSectionTab === "quote") {
+        return sec.id === "quote-header" || sec.id.startsWith("quote-");
+      }
+      if (activeSectionTab === "reviews") {
+        return sec.id === "testimonials-header" || sec.id.startsWith("testimonials-");
+      }
+      if (activeSectionTab === "workshop") {
+        return sec.id === "contact-header" || sec.id.startsWith("contact-");
+      }
+      return false;
+    };
+
+    const filtered = sortedAll.filter(isOfActiveTab);
+    const indexInFiltered = filtered.findIndex(s => s.id === secId);
+    if (indexInFiltered === -1) return;
+
+    const targetIndexInFiltered = direction === "up" ? indexInFiltered - 1 : indexInFiltered + 1;
+    if (targetIndexInFiltered < 0 || targetIndexInFiltered >= filtered.length) return;
+
+    const itemA = filtered[indexInFiltered];
+    const itemB = filtered[targetIndexInFiltered];
+
+    const idxA = sortedAll.findIndex(s => s.id === itemA.id);
+    const idxB = sortedAll.findIndex(s => s.id === itemB.id);
+
+    if (idxA !== -1 && idxB !== -1) {
+      const temp = sortedAll[idxA];
+      sortedAll[idxA] = sortedAll[idxB];
+      sortedAll[idxB] = temp;
+    }
+
+    const final = sortedAll.map((sec, idx) => ({ ...sec, order: idx }));
+    setSections(final);
+    handleSaveCustomizer(undefined, final);
+  };
+
+  const toggleSectionVisibility = (id: string) => {
+    const final = sections.map((sec) =>
+      sec.id === id ? { ...sec, visible: sec.visible === false ? true : false } : sec
+    );
+    setSections(final);
+    handleSaveCustomizer(undefined, final);
+  };
+
+  const deleteSection = (id: string) => {
+    if (confirm("Are you sure you want to permanently delete this custom section?")) {
+      const final = sections.filter((sec) => sec.id !== id);
+      setSections(final);
+      handleSaveCustomizer(undefined, final);
+    }
+  };
+
+  const updateSectionText = (id: string, field: keyof CustomSection | Partial<CustomSection>, value?: any) => {
+    setSections((prev) =>
+      prev.map((sec) => {
+        if (sec.id === id) {
+          if (typeof field === "object" && field !== null) {
+            return { ...sec, ...field };
+          } else {
+            return { ...sec, [field as keyof CustomSection]: value };
+          }
+        }
+        return sec;
+      })
+    );
+  };
+
+  const handleAddCustomSection = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSecTitle.trim()) {
+      alert("Title is required for custom sections");
+      return;
+    }
+    const newSec: CustomSection = {
+      id: "custom_" + Date.now(),
+      page: "home",
+      name: `Custom: ${newSecTitle.trim()}`,
+      title: newSecTitle.trim(),
+      subtitle: newSecSubtitle.trim(),
+      description: newSecDesc.trim(),
+      buttonText: newSecBtnText.trim() || undefined,
+      imageUrl: newSecImage.trim() || undefined,
+      order: sections.length,
+      visible: true
+    };
+    const final = [...sections, newSec];
+    setSections(final);
+    setIsAddingSection(false);
+    // Clear fields
+    setNewSecTitle("");
+    setNewSecSubtitle("");
+    setNewSecDesc("");
+    setNewSecBtnText("");
+    setNewSecImage("");
+    // Save to server
+    handleSaveCustomizer(undefined, final);
+  };
+
+  // Edit / Creation states
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isAddingProduct, setIsAddingProduct] = useState(false);
+  const [productForm, setProductForm] = useState({
+    name: "",
+    description: "",
+    categoryId: "",
+    price: 0,
+    maxPrice: "",
+    promoPrice: "",
+    image: "",
+    featured: false,
+    inStock: true,
+    customOptions: "",
+    hideCustomOptions: false,
+    hasVisualizer: true,
+    hasEngravingText: true,
+    hasTypography: true,
+    leadTime: "",
+    dimensions: "",
+    badge: "",
+    seal: "",
+    includedNotes: "",
+    materialDetails: "",
+    pricingNotice: "",
+    alternativeRequestText: ""
+  });
+
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [categoryForm, setCategoryForm] = useState({
+    name: "",
+    description: "",
+    image: ""
+  });
+
+  const [isAddingAnnouncement, setIsAddingAnnouncement] = useState(false);
+  const [announcementForm, setAnnouncementForm] = useState({
+    title: "",
+    content: "",
+    type: "info" as "info" | "promo" | "urgent",
+    active: true
+  });
+
+  const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
+  const [quoteNotes, setQuoteNotes] = useState("");
+  const [quotePrice, setQuotePrice] = useState(0);
+  const [quotePhotos, setQuotePhotos] = useState<{ name: string; url: string; size?: number }[]>([]);
+  const [uploadingAdminPhoto, setUploadingAdminPhoto] = useState(false);
+  const [adminPhotoError, setAdminPhotoError] = useState("");
+  const [drawerStatus, setDrawerStatus] = useState<QuoteRequest["status"]>("quoted");
+
+  // Custom Image Upload states
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const [dragActive, setDragActive] = useState(false);
+
+  // Section Image Upload states
+  const [uploadingSectionId, setUploadingSectionId] = useState<string | null>(null);
+  const [uploadingSlideIndex, setUploadingSlideIndex] = useState<{ sectionId: string; index: number } | null>(null);
+  const [sectionUploadError, setSectionUploadError] = useState<string>("");
+
+  // Filter states
+  const [quotesFilter, setQuotesFilter] = useState<"all" | "pending" | "reviewing" | "quoted" | "approved" | "completed" | "rejected">("all");
+  const [messagesFilter, setMessagesFilter] = useState<"all" | "pending" | "reviewing" | "quoted" | "approved" | "completed" | "rejected">("all");
+  const [isAddingTestimonial, setIsAddingTestimonial] = useState(false);
+  const [testimonialForm, setTestimonialForm] = useState({
+    author: "",
+    rating: 5,
+    content: "",
+    company: ""
+  });
+  const [promoProductId, setPromoProductId] = useState<string>("");
+  const [promoDiscountPercent, setPromoDiscountPercent] = useState<number>(15);
+
+  // Email Proposal States
+  const [emailQuote, setEmailQuote] = useState<QuoteRequest | null>(null);
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [emailStatus, setEmailStatus] = useState<"idle" | "sending" | "sent">("idle");
+
+  const handleOpenEmailCompose = (q: QuoteRequest) => {
+    const currentPrice = q.quoteAmount || quotePrice || (q.productId ? products.find((p) => p.id === q.productId)?.price || 85 : 85);
+    const defaultSubject = `Custom Design Quote Proposal - ${q.productName} [Nicoletta Artisan Studio]`;
+    const defaultBody = `Hi ${q.customerName},\n\nThank you for your interest in Nicoletta Artisan Studio! We have reviewed your custom personalization request for the "${q.productName}".\n\nBased on your design details:\n- Custom Text/Message: ${q.engravingText ? `"${q.engravingText}"` : "[No custom text requested]"}\n- Typography Preference: ${q.fontPreference || "Serif Classic"}\n- Quantity: ${q.quantity} unit(s)\n- Customization Details & Notes: ${q.specialInstructions || "None"}\n\nWe have generated a custom estimate for your project:\n👉 Total Quote Estimate: $${currentPrice} USD\n\nAll of our materials are of premium quality, crafted with custom care and precision in our studio. If this estimate looks good, let us know and we will lock in your design and begin crafting your personalized order!\n\nWarmest regards,\nNicoletta & Co.\nArtisan Studio & Custom Crafts`;
+    
+    setEmailQuote(q);
+    setEmailSubject(defaultSubject);
+    setEmailBody(defaultBody);
+    setEmailStatus("idle");
+  };
+
+  const handleSendEmailSimulated = () => {
+    if (!emailQuote) return;
+    setEmailStatus("sending");
+    
+    // Simulate sending email api
+    setTimeout(() => {
+      setEmailStatus("sent");
+      
+      // Update status to quoted and save
+      const currentPrice = emailQuote.quoteAmount || quotePrice || (emailQuote.productId ? products.find((p) => p.id === emailQuote.productId)?.price || 85 : 85);
+      const updated = quotes.map((q) =>
+        q.id === emailQuote.id
+          ? {
+              ...q,
+              status: "quoted" as const,
+              quoteAmount: Number(currentPrice),
+              adminNotes: `${q.adminNotes || ""}\n[System: Sent customized email quote proposal on ${new Date().toLocaleDateString()}]`.trim(),
+              updatedAt: new Date().toISOString()
+            }
+          : q
+      );
+      onUpdateQuotes(updated);
+      
+      setTimeout(() => {
+        setEmailQuote(null);
+        setSelectedQuoteId(null);
+      }, 1500);
+    }, 1200);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadError("Image file exceeds the 10MB limit.");
+      return;
+    }
+
+    setUploadingImage(true);
+    setUploadError("");
+
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      const base64Data = reader.result as string;
+      fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: file.name,
+          type: file.type,
+          data: base64Data
+        })
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error("Upload failed");
+          return res.json();
+        })
+        .then((data) => {
+          setProductForm((prev) => ({ ...prev, image: data.url }));
+          setUploadingImage(false);
+        })
+        .catch((err) => {
+          console.error("Upload error:", err);
+          setUploadError("Failed to upload image. Please try again.");
+          setUploadingImage(false);
+        });
+    };
+    reader.onerror = () => {
+      setUploadError("Error reading file.");
+      setUploadingImage(false);
+    };
+  };
+
+  const handleSectionImageUpload = (e: React.ChangeEvent<HTMLInputElement>, sectionId: string, slideIndex?: number) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      setSectionUploadError("Image file exceeds the 10MB limit.");
+      return;
+    }
+
+    if (slideIndex !== undefined) {
+      setUploadingSlideIndex({ sectionId, index: slideIndex });
+    } else {
+      setUploadingSectionId(sectionId);
+    }
+    setSectionUploadError("");
+
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      const base64Data = reader.result as string;
+      fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: file.name,
+          type: file.type,
+          data: base64Data
+        })
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error("Upload failed");
+          return res.json();
+        })
+        .then((data) => {
+          if (sectionId === "home-hero") {
+            const currentSec = sections.find((s) => s.id === sectionId);
+            const currentUrls = currentSec?.imageUrls && currentSec.imageUrls.length > 0
+              ? [...currentSec.imageUrls]
+              : (currentSec?.imageUrl ? [currentSec.imageUrl] : []);
+            
+            if (slideIndex !== undefined) {
+              currentUrls[slideIndex] = data.url;
+            } else {
+              currentUrls.push(data.url);
+            }
+            
+            const updatedSections = sections.map((s) =>
+              s.id === sectionId ? { ...s, imageUrl: currentUrls[0] || "", imageUrls: currentUrls } : s
+            );
+            setSections(updatedSections);
+          } else {
+            updateSectionText(sectionId, "imageUrl", data.url);
+          }
+          setUploadingSectionId(null);
+          setUploadingSlideIndex(null);
+        })
+        .catch((err) => {
+          console.error("Upload error:", err);
+          setSectionUploadError("Failed to upload image. Please try again.");
+          setUploadingSectionId(null);
+          setUploadingSlideIndex(null);
+        });
+    };
+    reader.onerror = () => {
+      setSectionUploadError("Error reading file.");
+      setUploadingSectionId(null);
+      setUploadingSlideIndex(null);
+    };
+  };
+
+  // PRESET PRODUCTS IMAGES library for convenience
+  const imagePresets = [
+    { name: "Walnut Cutting Board", url: "https://images.unsplash.com/photo-1544982503-9f984c14501a?auto=format&fit=crop&q=80&w=600" },
+    { name: "Leather Journal", url: "https://images.unsplash.com/photo-1517842645767-c639042777db?auto=format&fit=crop&q=80&w=600" },
+    { name: "Whiskey Decanter", url: "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&q=80&w=600" },
+    { name: "Slate Coasters", url: "https://images.unsplash.com/photo-1616046229478-9901c5536a45?auto=format&fit=crop&q=80&w=600" },
+    { name: "Wood Tray", url: "https://images.unsplash.com/photo-1590736969955-71cb94801759?auto=format&fit=crop&q=80&w=600" },
+    { name: "Leather Wallet", url: "https://images.unsplash.com/photo-1627123424574-724758594e93?auto=format&fit=crop&q=80&w=600" }
+  ];
+
+  // PRODUCT ACTIONS
+  const handleSaveProduct = (e: React.FormEvent) => {
+    e.preventDefault();
+    const optionsArray = productForm.customOptions
+      ? productForm.customOptions.split(",").map((o) => o.trim()).filter((o) => o.length > 0)
+      : [];
+    const includedArray = productForm.includedNotes
+      ? productForm.includedNotes.split(",").map((o) => o.trim()).filter((o) => o.length > 0)
+      : undefined;
+
+    const parsedPromo = productForm.promoPrice ? Number(productForm.promoPrice) : undefined;
+    const parsedMaxPrice = productForm.maxPrice ? Number(productForm.maxPrice) : undefined;
+
+    if (editingProduct) {
+      // Update
+      const updated = products.map((p) =>
+          p.id === editingProduct.id
+              ? {
+                ...p,
+                name: productForm.name,
+                description: productForm.description,
+                categoryId: productForm.categoryId,
+                price: Number(productForm.price),
+                maxPrice: parsedMaxPrice,
+                promoPrice: parsedPromo,
+                images: [productForm.image || p.images[0]],
+                featured: productForm.featured,
+                inStock: productForm.inStock,
+                customOptions: optionsArray,
+                hideCustomOptions: productForm.hideCustomOptions,
+                hideOptionsAvailable: productForm.hideCustomOptions,
+                hasVisualizer: productForm.hasVisualizer,
+                hasEngravingText: productForm.hasEngravingText,
+                hasTypography: productForm.hasTypography,
+                leadTime: productForm.leadTime || undefined,
+                dimensions: productForm.dimensions || undefined,
+                badge: productForm.badge || undefined,
+                seal: productForm.seal || undefined,
+                includedNotes: includedArray,
+                materialDetails: productForm.materialDetails || undefined,
+                pricingNotice: productForm.pricingNotice || undefined,
+                alternativeRequestText: productForm.alternativeRequestText || undefined
+              }
+              : p
+      );
+      onUpdateProducts(updated);
+      setEditingProduct(null);
+    } else {
+      // Create
+      const newProduct: Product = {
+        id: "p_" + Date.now(),
+        name: productForm.name,
+        description: productForm.description,
+        categoryId: productForm.categoryId || categories[0]?.id || "wood",
+        price: Number(productForm.price),
+        maxPrice: parsedMaxPrice,
+        promoPrice: parsedPromo,
+        images: [productForm.image || imagePresets[0].url],
+        featured: productForm.featured,
+        inStock: productForm.inStock,
+        customOptions: optionsArray,
+        hideCustomOptions: productForm.hideCustomOptions,
+        hideOptionsAvailable: productForm.hideCustomOptions,
+        hasVisualizer: productForm.hasVisualizer !== undefined ? productForm.hasVisualizer : true,
+        hasEngravingText: productForm.hasEngravingText !== undefined ? productForm.hasEngravingText : true,
+        hasTypography: productForm.hasTypography !== undefined ? productForm.hasTypography : true,
+        leadTime: productForm.leadTime || undefined,
+        dimensions: productForm.dimensions || undefined,
+        badge: productForm.badge || undefined,
+        seal: productForm.seal || undefined,
+        includedNotes: includedArray,
+        materialDetails: productForm.materialDetails || undefined,
+        pricingNotice: productForm.pricingNotice || undefined,
+        alternativeRequestText: productForm.alternativeRequestText || undefined
+      };
+      onUpdateProducts([...products, newProduct]);
+      setIsAddingProduct(false);
+    }
+
+    // Reset Form
+    setProductForm({
+      name: "",
+      description: "",
+      categoryId: "",
+      price: 0,
+      maxPrice: "",
+      promoPrice: "",
+      image: "",
+      featured: false,
+      inStock: true,
+      customOptions: "",
+      hideCustomOptions: false,
+      hasVisualizer: true,
+      hasEngravingText: true,
+      hasTypography: true,
+      leadTime: "",
+      dimensions: "",
+      badge: "",
+      seal: "",
+      includedNotes: "",
+      materialDetails: "",
+      pricingNotice: "",
+      alternativeRequestText: ""
+    });
+  };
+
+  const startEditProduct = (p: Product) => {
+    setEditingProduct(p);
+    setIsAddingProduct(false);
+    setProductForm({
+      name: p.name,
+      description: p.description,
+      categoryId: p.categoryId,
+      price: p.price,
+      maxPrice: p.maxPrice ? String(p.maxPrice) : "",
+      promoPrice: p.promoPrice ? String(p.promoPrice) : "",
+      image: p.images[0] || "",
+      featured: p.featured,
+      inStock: p.inStock,
+      customOptions: p.customOptions ? p.customOptions.join(", ") : "",
+      hideCustomOptions: !!(p.hideCustomOptions || p.hideOptionsAvailable),
+      hasVisualizer: p.hasVisualizer !== false,
+      hasEngravingText: p.hasEngravingText !== undefined ? p.hasEngravingText : (p.hasVisualizer !== false),
+      hasTypography: p.hasTypography !== undefined ? p.hasTypography : (p.hasVisualizer !== false),
+      leadTime: p.leadTime || "",
+      dimensions: p.dimensions || "",
+      badge: p.badge || "",
+      seal: p.seal || "",
+      includedNotes: p.includedNotes ? p.includedNotes.join(", ") : "",
+      materialDetails: p.materialDetails || "",
+      pricingNotice: p.pricingNotice || "",
+      alternativeRequestText: p.alternativeRequestText || ""
+    });
+  };
+
+  const handleDeleteProduct = (id: string) => {
+    if (confirm("Are you sure you want to delete this product?")) {
+      onUpdateProducts(products.filter((p) => p.id !== id));
+    }
+  };
+
+  // CATEGORY ACTIONS
+  const startEditCategory = (cat: Category) => {
+    setEditingCategory(cat);
+    setCategoryForm({
+      name: cat.name,
+      description: cat.description,
+      image: cat.image
+    });
+    setIsAddingCategory(true);
+  };
+
+  const handleSaveCategory = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingCategory) {
+      const updatedCats = categories.map((c) =>
+        c.id === editingCategory.id
+          ? {
+              ...c,
+              name: categoryForm.name,
+              description: categoryForm.description,
+              image: categoryForm.image || imagePresets[0].url
+            }
+          : c
+      );
+      onUpdateCategories(updatedCats);
+      setEditingCategory(null);
+    } else {
+      const newCat: Category = {
+        id: categoryForm.name.toLowerCase().replace(/[^a-z0-9]/g, "-"),
+        name: categoryForm.name,
+        slug: categoryForm.name.toLowerCase().replace(/[^a-z0-9]/g, "-"),
+        description: categoryForm.description,
+        image: categoryForm.image || imagePresets[0].url
+      };
+      onUpdateCategories([...categories, newCat]);
+    }
+    setIsAddingCategory(false);
+    setCategoryForm({ name: "", description: "", image: "" });
+  };
+
+  const handleDeleteCategory = (id: string) => {
+    if (confirm("Are you sure you want to delete this category? Products in this category will become uncategorized.")) {
+      onUpdateCategories(categories.filter((c) => c.id !== id));
+    }
+  };
+
+  // TESTIMONIAL ACTIONS
+  const handleApproveTestimonial = (id: string) => {
+    const updated = testimonials.map((t) => (t.id === id ? { ...t, approved: true } : t));
+    onUpdateTestimonials(updated);
+  };
+
+  const handleDeleteTestimonial = (id: string) => {
+    if (confirm("Are you sure you want to delete this testimonial?")) {
+      onUpdateTestimonials(testimonials.filter((t) => t.id !== id));
+    }
+  };
+
+  const handleSaveManualTestimonial = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!testimonialForm.author || !testimonialForm.content) {
+      alert("Author name and Review message are required.");
+      return;
+    }
+
+    const newTestimonial: Testimonial = {
+      id: "t_" + Date.now(),
+      author: testimonialForm.author,
+      rating: testimonialForm.rating,
+      content: testimonialForm.content,
+      company: testimonialForm.company || undefined,
+      approved: true, // Direct admin addition is pre-approved
+      date: new Date().toISOString().split("T")[0]
+    };
+
+    onUpdateTestimonials([...testimonials, newTestimonial]);
+    setIsAddingTestimonial(false);
+    setTestimonialForm({ author: "", rating: 5, content: "", company: "" });
+  };
+
+  // ANNOUNCEMENT ACTIONS
+  const handleSaveAnnouncement = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    let finalTitle = announcementForm.title;
+    let finalContent = announcementForm.content;
+
+    // Direct product promotion pricing syncer
+    if (announcementForm.type === "promo" && promoProductId) {
+      const targetProduct = products.find(p => p.id === promoProductId);
+      if (targetProduct) {
+        const calculatedPromoPrice = Math.round(targetProduct.price * (1 - promoDiscountPercent / 100));
+        
+        // Auto-update products promoPrice
+        const updatedProducts = products.map(p => 
+          p.id === promoProductId ? { ...p, promoPrice: calculatedPromoPrice } : p
+        );
+        onUpdateProducts(updatedProducts);
+
+        if (!finalTitle || finalTitle.trim() === "") {
+          finalTitle = `🎪 Craft Fair Promo: ${targetProduct.name}!`;
+        }
+        if (!finalContent || finalContent.trim() === "") {
+          finalContent = `Stop by our workshop or order online! Hand-finished ${targetProduct.name} is ${promoDiscountPercent}% off at only $${calculatedPromoPrice} USD!`;
+        }
+      }
+    }
+
+    const newAnn: Announcement = {
+      id: "a_" + Date.now(),
+      title: finalTitle || "Artisan Shop Announcement",
+      content: finalContent || "Limited time specialized crafting alert.",
+      type: announcementForm.type,
+      active: announcementForm.active,
+      date: new Date().toISOString().split("T")[0]
+    };
+
+    onUpdateAnnouncements([...announcements, newAnn]);
+    setIsAddingAnnouncement(false);
+    setAnnouncementForm({ title: "", content: "", type: "info", active: true });
+    setPromoProductId("");
+    setPromoDiscountPercent(15);
+  };
+
+  const handleToggleAnnouncement = (id: string) => {
+    const updated = announcements.map((a) => (a.id === id ? { ...a, active: !a.active } : a));
+    onUpdateAnnouncements(updated);
+  };
+
+  const handleDeleteAnnouncement = (id: string) => {
+    if (confirm("Are you sure you want to delete this announcement?")) {
+      onUpdateAnnouncements(announcements.filter((a) => a.id !== id));
+    }
+  };
+
+  // QUOTE & MESSAGE ACTIONS
+  const startReviewQuote = (q: QuoteRequest) => {
+    setSelectedQuoteId(q.id);
+    setQuoteNotes(q.adminNotes || "");
+    setQuotePrice(q.quoteAmount || (q.productId ? products.find((p) => p.id === q.productId)?.price || 50 : 50));
+    setQuotePhotos(q.adminPhotos || []);
+    setAdminPhotoError("");
+    setDrawerStatus(q.status === "pending" ? "reviewing" : q.status);
+
+    if (q.status === "pending") {
+      const updated = quotes.map((item) =>
+        item.id === q.id ? { ...item, status: "reviewing" as const, updatedAt: new Date().toISOString() } : item
+      );
+      onUpdateQuotes(updated);
+    }
+  };
+
+  const handleAdminPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setUploadingAdminPhoto(true);
+    setAdminPhotoError("");
+
+    let doneCount = 0;
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (file.size > 10 * 1024 * 1024) {
+        setAdminPhotoError(`File "${file.name}" exceeds 10MB limit.`);
+        doneCount++;
+        if (doneCount === files.length) setUploadingAdminPhoto(false);
+        continue;
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64Data = reader.result as string;
+        fetch("/api/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: file.name, type: file.type, data: base64Data })
+        })
+          .then((res) => {
+            if (!res.ok) throw new Error("Upload failed");
+            return res.json();
+          })
+          .then((data) => {
+            setQuotePhotos((prev) => [...prev, { name: data.name, url: data.url, size: data.size }]);
+          })
+          .catch((err) => {
+            console.error("Upload error:", err);
+            setAdminPhotoError(`Failed to upload "${file.name}".`);
+          })
+          .finally(() => {
+            doneCount++;
+            if (doneCount === files.length) setUploadingAdminPhoto(false);
+          });
+      };
+      reader.onerror = () => {
+        setAdminPhotoError(`Failed to read "${file.name}".`);
+        doneCount++;
+        if (doneCount === files.length) setUploadingAdminPhoto(false);
+      };
+      reader.readAsDataURL(file);
+    }
+    e.target.value = "";
+  };
+
+  const removeAdminPhoto = (idx: number) => {
+    setQuotePhotos((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleSaveQuoteStatus = async (id: string, status: QuoteRequest["status"]) => {
+    const updated = quotes.map((q) =>
+      q.id === id ? { ...q, status, updatedAt: new Date().toISOString() } : q
+    );
+    onUpdateQuotes(updated);
+
+    if (token) {
+      try {
+        await fetch(`/api/admin/quotes/${id}/status`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({ status })
+        });
+      } catch (e) {
+        console.error("Failed to update status on backend:", e);
+      }
+    }
+  };
+
+  const handleSaveQuoteDetails = async () => {
+    if (!selectedQuoteId) return;
+    const currentQuote = quotes.find((q) => q.id === selectedQuoteId);
+    const finalStatus = drawerStatus || (currentQuote?.status === "pending" || currentQuote?.status === "reviewing" ? "quoted" : currentQuote?.status || "quoted");
+
+    const updated = quotes.map((q) =>
+      q.id === selectedQuoteId
+        ? {
+            ...q,
+            adminNotes: quoteNotes,
+            quoteAmount: quotePrice,
+            adminPhotos: quotePhotos,
+            status: finalStatus,
+            updatedAt: new Date().toISOString()
+          }
+        : q
+    );
+    onUpdateQuotes(updated);
+
+    if (token) {
+      try {
+        await fetch(`/api/admin/quotes/${selectedQuoteId}/details`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            adminNotes: quoteNotes,
+            quoteAmount: quotePrice,
+            adminPhotos: quotePhotos,
+            status: finalStatus
+          })
+        });
+      } catch (e) {
+        console.error("Failed to sync details:", e);
+      }
+    }
+
+    setSelectedQuoteId(null);
+  };
+
+  // Categorize Quote Requests vs Contact Messages
+  const isContactMsg = (q: QuoteRequest) =>
+    q.type === "contact" ||
+    Boolean(q.productName && (q.productName.toLowerCase().startsWith("contact message") || q.productName.toLowerCase().includes("contact message")));
+
+  const isQuoteReq = (q: QuoteRequest) => !isContactMsg(q);
+
+  const quoteRequestsList = quotes.filter(isQuoteReq);
+  const contactMessagesList = quotes.filter(isContactMsg);
+
+  const pendingQuotes = quoteRequestsList.filter((q) => q.status === "pending").length;
+  const pendingMessages = contactMessagesList.filter((q) => q.status === "pending").length;
+  const totalApprovedTestimonials = testimonials.filter((t) => t.approved).length;
+  const totalPendingTestimonials = testimonials.filter((t) => !t.approved).length;
+
+  return (
+    <div id="admin-dashboard-container" className="bg-brand-bg border border-brand-border rounded-[24px] overflow-hidden grid grid-cols-1 md:grid-cols-12 min-h-[550px] font-sans">
+      {/* Sidebar Navigation */}
+      <div className="md:col-span-3 bg-brand-dark text-brand-muted p-5 space-y-1 border-r border-brand-border/10 rounded-l-[24px]">
+        <div className="px-2 py-4 mb-4 border-b border-brand-border/10 flex items-center gap-2">
+          <Sliders className="h-4.5 w-4.5 text-brand-primary" />
+          <span className="font-serif font-bold text-base text-brand-highlight uppercase tracking-wider">Artisan Portal</span>
+        </div>
+
+        <nav className="space-y-2">
+          <button
+            id="tab-btn-quotes"
+            onClick={() => setActiveTab("quotes")}
+            className={`w-full text-left py-2 px-3.5 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center justify-between transition-colors cursor-pointer ${activeTab === "quotes" ? "bg-brand-primary text-white" : "hover:bg-brand-primary/10 text-brand-muted"}`}
+          >
+            <span className="flex items-center gap-2">
+              <FileText className="h-3.5 w-3.5" /> Quote Requests
+            </span>
+            <div className="flex items-center gap-1">
+              <span className="text-[9px] font-mono opacity-80">({quoteRequestsList.length})</span>
+              {pendingQuotes > 0 && (
+                <span className="bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+                  {pendingQuotes} NEW
+                </span>
+              )}
+            </div>
+          </button>
+
+          <button
+            id="tab-btn-messages"
+            onClick={() => setActiveTab("messages")}
+            className={`w-full text-left py-2 px-3.5 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center justify-between transition-colors cursor-pointer ${activeTab === "messages" ? "bg-brand-primary text-white" : "hover:bg-brand-primary/10 text-brand-muted"}`}
+          >
+            <span className="flex items-center gap-2">
+              <MessageSquare className="h-3.5 w-3.5" /> Contact Messages
+            </span>
+            <div className="flex items-center gap-1">
+              <span className="text-[9px] font-mono opacity-80">({contactMessagesList.length})</span>
+              {pendingMessages > 0 && (
+                <span className="bg-amber-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+                  {pendingMessages} NEW
+                </span>
+              )}
+            </div>
+          </button>
+
+          <button
+            id="tab-btn-analytics"
+            onClick={() => setActiveTab("analytics")}
+            className={`w-full text-left py-2 px-3.5 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 transition-colors cursor-pointer ${activeTab === "analytics" ? "bg-brand-primary text-white" : "hover:bg-brand-primary/10 text-brand-muted"}`}
+          >
+            <TrendingUp className="h-3.5 w-3.5" /> Basic Analytics
+          </button>
+
+          <button
+            id="tab-btn-products"
+            onClick={() => setActiveTab("products")}
+            className={`w-full text-left py-2 px-3.5 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 transition-colors cursor-pointer ${activeTab === "products" ? "bg-brand-primary text-white" : "hover:bg-brand-primary/10 text-brand-muted"}`}
+          >
+            <Briefcase className="h-3.5 w-3.5" /> Manage Crafts
+          </button>
+
+          <button
+            id="tab-btn-categories"
+            onClick={() => setActiveTab("categories")}
+            className={`w-full text-left py-2 px-3.5 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 transition-colors cursor-pointer ${activeTab === "categories" ? "bg-brand-primary text-white" : "hover:bg-brand-primary/10 text-brand-muted"}`}
+          >
+            <Layers className="h-3.5 w-3.5" /> Categories
+          </button>
+
+          <button
+            id="tab-btn-testimonials"
+            onClick={() => setActiveTab("testimonials")}
+            className={`w-full text-left py-2 px-3.5 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center justify-between transition-colors cursor-pointer ${activeTab === "testimonials" ? "bg-brand-primary text-white" : "hover:bg-brand-primary/10 text-brand-muted"}`}
+          >
+            <span className="flex items-center gap-2">
+              <Award className="h-3.5 w-3.5" /> Testimonials
+            </span>
+            {totalPendingTestimonials > 0 && (
+              <span className="bg-brand-primary text-brand-dark text-[9px] font-bold px-1.5 py-0.5 rounded-sm">
+                {totalPendingTestimonials} Pend
+              </span>
+            )}
+          </button>
+
+          <button
+            id="tab-btn-site-customizer"
+            onClick={() => setActiveTab("site-customizer")}
+            className={`w-full text-left py-2 px-3.5 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 transition-colors cursor-pointer ${activeTab === "site-customizer" ? "bg-brand-primary text-white" : "hover:bg-brand-primary/10 text-brand-muted"}`}
+          >
+            <Sliders className="h-3.5 w-3.5" /> Site Editor &amp; Logo
+          </button>
+
+          <button
+            id="tab-btn-announcements"
+            onClick={() => setActiveTab("announcements")}
+            className={`w-full text-left py-2 px-3.5 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 transition-colors cursor-pointer ${activeTab === "announcements" ? "bg-brand-primary text-white" : "hover:bg-brand-primary/10 text-brand-muted"}`}
+          >
+            <BellRing className="h-3.5 w-3.5" /> Announcements &amp; Promos
+          </button>
+
+          <button
+            id="tab-btn-security"
+            onClick={() => setActiveTab("security")}
+            className={`w-full text-left py-2 px-3.5 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 transition-colors cursor-pointer ${activeTab === "security" ? "bg-brand-primary text-white" : "hover:bg-brand-primary/10 text-brand-muted"}`}
+          >
+            <Lock className="h-3.5 w-3.5" /> Security &amp; Password
+          </button>
+        </nav>
+      </div>
+
+      {/* Main Content Pane */}
+      <div className="md:col-span-9 bg-white p-6 md:p-8 rounded-r-[24px]">
+        {/* ==================== TABS 1: QUOTE REQUESTS ==================== */}
+        {activeTab === "quotes" && (
+          <div id="admin-tab-quotes-panel" className="space-y-6">
+            <div className="flex justify-between items-center pb-4 border-b border-stone-200">
+              <div>
+                <h3 className="font-serif font-bold text-stone-900 text-xl md:text-2xl">Bespoke Engraving Quote Requests</h3>
+                <p className="text-stone-500 text-xs">Review incoming catalog requests or custom ideas, calculate base estimates, and log comments.</p>
+              </div>
+              <span className="bg-amber-50 text-amber-900 text-xs font-bold px-3 py-1.5 border border-amber-200 rounded-sm">
+                Total Requests: {quoteRequestsList.length}
+              </span>
+            </div>
+
+            {/* Horizontal Status Filters */}
+            <div className="flex flex-wrap gap-1.5 pb-3 overflow-x-auto border-b border-stone-100">
+              {(["all", "pending", "reviewing", "quoted", "approved", "completed", "rejected"] as const).map((st) => {
+                const count = st === "all" ? quoteRequestsList.length : quoteRequestsList.filter(q => q.status === st).length;
+                return (
+                  <button
+                    key={st}
+                    onClick={() => setQuotesFilter(st)}
+                    className={`text-[10px] md:text-xs font-bold py-1.5 px-3.5 rounded-full border cursor-pointer transition-all flex items-center gap-1.5 shrink-0 ${
+                      quotesFilter === st
+                        ? "bg-stone-900 text-white border-stone-950 shadow-3xs"
+                        : "bg-stone-50 hover:bg-stone-100 text-stone-700 border-stone-200"
+                    }`}
+                  >
+                    <span className="capitalize">{st === "all" ? "All Requests" : st}</span>
+                    <span className={`text-[8px] font-mono rounded-full px-1.5 py-0.5 ${
+                      quotesFilter === st ? "bg-white/25 text-white font-bold" : "bg-stone-200 text-stone-700"
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* List of Quote Requests */}
+            {quoteRequestsList.filter(q => quotesFilter === "all" || q.status === quotesFilter).length === 0 ? (
+              <div className="text-center py-12 text-stone-400 space-y-2 bg-stone-50 border border-stone-100 rounded-lg">
+                <FileText className="h-10 w-10 mx-auto stroke-1 text-stone-300" />
+                <p className="text-sm font-medium">No quote requests matching "{quotesFilter}".</p>
+                <p className="text-xs">Adjust the status filters above to view other active quote submissions.</p>
+              </div>
+            ) : (
+              <div className="space-y-4 animate-fade-in">
+                {quoteRequestsList
+                  .filter(q => quotesFilter === "all" || q.status === quotesFilter)
+                  .map((q) => (
+                    <div
+                      key={q.id}
+                      id={`admin-quote-${q.id}`}
+                      className={`border rounded-lg overflow-hidden transition-all duration-200 ${selectedQuoteId === q.id ? "border-amber-800 ring-1 ring-amber-800 bg-amber-50/10" : "border-stone-200 bg-white"}`}
+                    >
+                      {/* Header Summary */}
+                      <div className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-stone-50">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-bold text-stone-900 text-sm">{q.customerName}</span>
+                            <span className="text-stone-400 font-mono text-[10px]">{q.customerEmail}</span>
+                          </div>
+                          <p className="text-xs text-stone-600">
+                            Item: <strong>{q.productName}</strong> (Qty: {q.quantity})
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-auto">
+                          <span className="text-[10px] text-stone-400 font-mono">{q.createdAt ? q.createdAt.split("T")[0] : ""}</span>
+                          {/* Status Badge */}
+                          <span
+                            className={`text-[9px] tracking-wider font-bold uppercase px-2 py-0.5 rounded-sm ${
+                              q.status === "rejected"
+                                ? "bg-red-100 text-red-800 border border-red-200"
+                                : q.status === "pending"
+                                ? "bg-amber-100 text-amber-900 border border-amber-200"
+                                : q.status === "reviewing"
+                                ? "bg-blue-100 text-blue-800 border border-blue-200"
+                                : q.status === "quoted"
+                                ? "bg-purple-100 text-purple-800 border border-purple-200"
+                                : q.status === "approved"
+                                ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                : q.status === "completed"
+                                ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                : "bg-red-100 text-red-800 border border-red-200"
+                            }`}
+                          >
+                            {q.status}
+                          </span>
+
+                          <button
+                            id={`email-compose-header-btn-${q.id}`}
+                            onClick={() => handleOpenEmailCompose(q)}
+                            className="bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-bold py-1 px-2.5 rounded-sm cursor-pointer transition-colors flex items-center gap-1 shadow-2xs"
+                            title="Compose Email Proposal"
+                          >
+                            <Mail className="h-3 w-3" /> Compose Email
+                          </button>
+
+                          <button
+                            id={`review-quote-btn-${q.id}`}
+                            onClick={() => startReviewQuote(q)}
+                            className={`text-[11px] font-bold py-1 px-3 rounded-sm cursor-pointer transition-colors ${
+                              selectedQuoteId === q.id
+                                ? "bg-amber-800 text-white ring-1 ring-amber-900"
+                                : "bg-stone-950 hover:bg-amber-800 text-white"
+                            }`}
+                          >
+                            {selectedQuoteId === q.id ? "Close Manager" : "Manage / Price"}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Detailed content for quote */}
+                      <div className="p-4 border-t border-stone-100 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                        <div className="space-y-1.5">
+                          <p className="text-stone-500 uppercase tracking-widest text-[9px] font-bold">Engraving Blueprint</p>
+                          <div className="bg-stone-900 text-amber-100 p-2.5 rounded-sm font-serif text-sm border-l-2 border-amber-500">
+                            {q.engravingText ? `"${q.engravingText}"` : "[No engraving requested]"}
+                          </div>
+                          <p className="text-stone-600">
+                            Font Style preference: <strong className="text-stone-800">{q.fontPreference || "Not specified"}</strong>
+                          </p>
+                          {q.customerPhone && (
+                            <p className="text-stone-600">
+                              Callback Phone: <strong className="text-stone-800">{q.customerPhone}</strong>
+                            </p>
+                          )}
+                          {q.specialInstructions && (
+                            <div className="mt-2 p-2 bg-stone-50 border border-stone-200 text-stone-600 rounded-sm">
+                              <strong>Note from client:</strong> {q.specialInstructions}
+                            </div>
+                          )}
+                          {q.uploadedFiles && q.uploadedFiles.length > 0 && (
+                            <div className="mt-3 space-y-1.5">
+                              <p className="text-stone-500 uppercase tracking-widest text-[9px] font-bold">Client Attachments ({q.uploadedFiles.length})</p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {q.uploadedFiles.map((f, idx) => (
+                                  <a
+                                    key={idx}
+                                    href={f.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-2 p-2 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-md transition-colors cursor-pointer group"
+                                  >
+                                    {f.url && (f.url.endsWith(".png") || f.url.endsWith(".jpg") || f.url.endsWith(".jpeg") || f.url.endsWith(".gif") || f.url.includes("data:image")) ? (
+                                      <img
+                                        src={f.url}
+                                        alt="attachment preview"
+                                        className="h-8 w-8 object-cover rounded border border-stone-300"
+                                        referrerPolicy="no-referrer"
+                                      />
+                                    ) : (
+                                      <div className="h-8 w-8 bg-stone-200 text-stone-600 rounded flex items-center justify-center border border-stone-300">
+                                        <Paperclip className="h-4 w-4" />
+                                      </div>
+                                    )}
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-[11px] font-medium text-stone-900 truncate group-hover:text-amber-800">{f.name}</p>
+                                      {f.size && <p className="text-[9px] text-stone-500">{Math.round(f.size / 1024)} KB</p>}
+                                    </div>
+                                  </a>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-3 border-t md:border-t-0 md:border-l border-stone-100 pt-3 md:pt-0 md:pl-4">
+                          <p className="text-stone-500 uppercase tracking-widest text-[9px] font-bold">Admin Details &amp; Pricing</p>
+
+                          <div className="space-y-2">
+                            {q.quoteAmount ? (
+                              <p className="text-stone-700 font-bold flex items-center gap-1.5 text-sm">
+                                <BadgeDollarSign className="h-4.5 w-4.5 text-emerald-600" />
+                                Active Price Quote: <span className="text-emerald-700">${q.quoteAmount} USD</span>
+                              </p>
+                            ) : (
+                              <p className="text-stone-500 italic text-xs">No price quoted yet.</p>
+                            )}
+                            <button
+                              id={`email-compose-btn-${q.id}`}
+                              onClick={() => handleOpenEmailCompose(q)}
+                              className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-1.5 px-3 rounded-md text-[10px] flex items-center gap-1.5 cursor-pointer transition-all uppercase tracking-wider shadow-xs"
+                            >
+                              <Mail className="h-3.5 w-3.5" /> Compose Email Proposal
+                            </button>
+                          </div>
+
+                          {q.adminNotes && (
+                            <div className="p-2 bg-amber-50 border border-amber-200 text-amber-950 rounded-sm italic text-xs">
+                              <strong>Private shop notes:</strong> {q.adminNotes}
+                            </div>
+                          )}
+
+                          {q.adminPhotos && q.adminPhotos.length > 0 && (
+                            <div className="space-y-1">
+                              <p className="text-[9px] font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1">
+                                <Image className="h-3 w-3" /> Workshop Photos/Mockups ({q.adminPhotos.length})
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {q.adminPhotos.map((photo, pIdx) => (
+                                  <a
+                                    key={pIdx}
+                                    href={photo.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded p-1 transition-colors"
+                                  >
+                                    <img src={photo.url} alt={photo.name} className="h-7 w-7 object-cover rounded border border-amber-300" referrerPolicy="no-referrer" />
+                                    <span className="text-[10px] text-amber-900 font-medium truncate max-w-[90px]">{photo.name}</span>
+                                  </a>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="flex gap-2 items-center">
+                            <span className="text-[10px] text-stone-500 font-bold">Status:</span>
+                            <select
+                              id={`status-select-${q.id}`}
+                              value={q.status}
+                              onChange={(e) => handleSaveQuoteStatus(q.id, e.target.value as QuoteRequest["status"])}
+                              className="bg-stone-50 border border-stone-300 rounded-sm py-1 px-1.5 text-xs text-stone-800 cursor-pointer focus:outline-none"
+                            >
+                              <option value="pending">Pending</option>
+                              <option value="reviewing">Reviewing</option>
+                              <option value="quoted">Quoted</option>
+                              <option value="approved">Approved (Approved by Client)</option>
+                              <option value="completed">Completed (Engraved &amp; Shipped)</option>
+                              <option value="rejected">Rejected</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* INLINE MANAGER EDITOR directly on the selected quote */}
+                      {selectedQuoteId === q.id && (
+                        <div id={`quote-inline-manager-${q.id}`} className="p-4 border-t-2 border-amber-800 bg-amber-50/20 animate-fade-in space-y-4">
+                          <div className="flex justify-between items-center pb-2 border-b border-amber-200">
+                            <div className="flex items-center gap-2">
+                              <Sliders className="h-4 w-4 text-amber-800" />
+                              <h4 className="font-serif font-bold text-amber-950 text-sm">
+                                Manage Price, Notes &amp; Workshop Photos — {q.customerName}
+                              </h4>
+                            </div>
+                            <button
+                              onClick={() => setSelectedQuoteId(null)}
+                              className="text-stone-400 hover:text-stone-600 p-1 rounded-full hover:bg-stone-200/50 cursor-pointer transition-colors"
+                              title="Close Manager"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Price & Quick Modifiers */}
+                            <div className="flex flex-col gap-2">
+                              <label htmlFor={`quotePrice-${q.id}`} className="text-xs font-bold text-stone-800 uppercase tracking-wider flex items-center gap-1">
+                                <DollarSign className="h-3.5 w-3.5 text-emerald-600" /> Quoted Price / Estimate (USD)
+                              </label>
+                              <div className="relative">
+                                <span className="absolute left-3 top-2 text-stone-500 font-bold">$</span>
+                                <input
+                                  id={`quotePrice-${q.id}`}
+                                  type="number"
+                                  value={quotePrice}
+                                  onChange={(e) => setQuotePrice(Number(e.target.value))}
+                                  className="bg-white border border-stone-300 rounded-md py-1.5 pl-7 pr-3 text-sm font-bold text-stone-900 focus:outline-none focus:ring-1 focus:ring-amber-800 w-full"
+                                  placeholder="0.00"
+                                />
+                              </div>
+
+                              <div className="space-y-1.5 bg-stone-100/80 p-2.5 rounded-md border border-stone-200">
+                                <p className="text-[9px] font-bold text-stone-600 uppercase tracking-wider flex items-center gap-1">🪄 Quick Price Modifiers:</p>
+                                <div className="flex flex-wrap gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setQuotePrice(prev => prev + 15);
+                                      setQuoteNotes(prev => `${prev}\n[Added +$15 Premium Gift Box]`.trim());
+                                    }}
+                                    className="bg-white hover:bg-emerald-50 text-stone-800 text-[10px] font-bold py-1 px-2 border border-stone-300 rounded cursor-pointer transition-colors"
+                                  >
+                                    🎁 +$15 Gift Box
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setQuotePrice(prev => prev + 25);
+                                      setQuoteNotes(prev => `${prev}\n[Added +$25 Priority Urgent Handling]`.trim());
+                                    }}
+                                    className="bg-white hover:bg-emerald-50 text-stone-800 text-[10px] font-bold py-1 px-2 border border-stone-300 rounded cursor-pointer transition-colors"
+                                  >
+                                    ⚡ +$25 Rush Order
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setQuotePrice(prev => prev + 10);
+                                      setQuoteNotes(prev => `${prev}\n[Added +$10 Custom Monogram]`.trim());
+                                    }}
+                                    className="bg-white hover:bg-emerald-50 text-stone-800 text-[10px] font-bold py-1 px-2 border border-stone-300 rounded cursor-pointer transition-colors"
+                                  >
+                                    ✒️ +$10 Monogram
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setQuotePrice(prev => Math.round(prev * 0.9));
+                                      setQuoteNotes(prev => `${prev}\n[Applied -10% Loyalty discount]`.trim());
+                                    }}
+                                    className="bg-white hover:bg-amber-50 text-stone-800 text-[10px] font-bold py-1 px-2 border border-stone-300 rounded cursor-pointer transition-colors"
+                                  >
+                                    🏷️ -10% Discount
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Status & Shop Notes */}
+                            <div className="flex flex-col gap-3">
+                              <div className="flex flex-col gap-1">
+                                <label htmlFor={`drawerStatusSelect-${q.id}`} className="text-xs font-bold text-stone-800 uppercase tracking-wider">
+                                  Update Status
+                                </label>
+                                <select
+                                  id={`drawerStatusSelect-${q.id}`}
+                                  value={drawerStatus}
+                                  onChange={(e) => setDrawerStatus(e.target.value as QuoteRequest["status"])}
+                                  className="bg-white border border-stone-300 rounded-md py-1.5 px-3 text-xs font-bold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-800 cursor-pointer"
+                                >
+                                  <option value="pending">Pending (New Inbound)</option>
+                                  <option value="reviewing">Reviewing (In Workshop Review)</option>
+                                  <option value="quoted">Quoted (Estimate Sent)</option>
+                                  <option value="approved">Approved (Approved by Client)</option>
+                                  <option value="completed">Completed (Crafted &amp; Shipped)</option>
+                                  <option value="rejected">Rejected / Cancelled</option>
+                                </select>
+                              </div>
+
+                              <div className="flex flex-col gap-1">
+                                <label htmlFor={`quoteNotes-${q.id}`} className="text-xs font-bold text-stone-800 uppercase tracking-wider">
+                                  Private Shop Notes / Internal Comments
+                                </label>
+                                <textarea
+                                  id={`quoteNotes-${q.id}`}
+                                  rows={3}
+                                  value={quoteNotes}
+                                  onChange={(e) => setQuoteNotes(e.target.value)}
+                                  placeholder="Log internal comments, wood batch notes, client approvals..."
+                                  className="bg-white border border-stone-300 rounded-md p-2 text-xs text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-800"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Workshop Photos & Mockups Upload */}
+                          <div className="space-y-2 border-t border-amber-200/60 pt-3">
+                            <div className="flex flex-wrap justify-between items-center gap-2">
+                              <div>
+                                <label className="text-xs font-bold text-stone-800 uppercase tracking-wider flex items-center gap-1">
+                                  <Image className="h-3.5 w-3.5 text-amber-800" /> Workshop Photos, Proofs &amp; Mockup Attachments
+                                </label>
+                                <p className="text-[10px] text-stone-500">Attach photos or design mockups directly to this record.</p>
+                              </div>
+                              <label className="bg-amber-800 hover:bg-amber-900 text-white text-[11px] font-bold py-1.5 px-3 rounded-md cursor-pointer transition-colors flex items-center gap-1.5 shadow-xs">
+                                <Upload className="h-3.5 w-3.5" />
+                                {uploadingAdminPhoto ? "Uploading..." : "Upload Photo / Mockup"}
+                                <input type="file" accept="image/*" multiple onChange={handleAdminPhotoUpload} className="hidden" disabled={uploadingAdminPhoto} />
+                              </label>
+                            </div>
+
+                            {adminPhotoError && <p className="text-[11px] text-red-600 font-medium">{adminPhotoError}</p>}
+
+                            {quotePhotos.length > 0 ? (
+                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 pt-1">
+                                {quotePhotos.map((p, idx) => (
+                                  <div key={idx} className="relative group bg-white border border-stone-200 rounded-md p-1.5 flex items-center gap-2 shadow-2xs">
+                                    <img src={p.url} alt={p.name} className="h-10 w-10 object-cover rounded border border-stone-200 shrink-0" referrerPolicy="no-referrer" />
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-[10px] font-bold text-stone-800 truncate">{p.name}</p>
+                                      {p.size && <p className="text-[8px] text-stone-400">{Math.round(p.size / 1024)} KB</p>}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => removeAdminPhoto(idx)}
+                                      className="text-stone-400 hover:text-red-600 p-1 rounded transition-colors cursor-pointer"
+                                      title="Remove photo"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-[11px] text-stone-400 italic bg-white p-2.5 rounded border border-dashed border-stone-200">No workshop photos attached yet. Click "Upload Photo / Mockup" to add proof images.</p>
+                            )}
+                          </div>
+
+                          {/* Manager Action Footer */}
+                          <div className="flex flex-wrap justify-between items-center gap-2 border-t border-amber-200/60 pt-3">
+                            <button
+                              type="button"
+                              id={`inline-email-compose-btn-${q.id}`}
+                              onClick={() => handleOpenEmailCompose({ ...q, quoteAmount: quotePrice || q.quoteAmount, adminNotes: quoteNotes, adminPhotos: quotePhotos, status: drawerStatus })}
+                              className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-1.5 px-3 rounded-md text-[11px] flex items-center gap-1.5 cursor-pointer transition-all uppercase tracking-wider shadow-xs"
+                            >
+                              <Mail className="h-3.5 w-3.5" /> Compose Email Proposal
+                            </button>
+
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedQuoteId(null)}
+                                className="bg-stone-200 hover:bg-stone-300 text-stone-800 text-xs font-bold py-1.5 px-3.5 rounded-md cursor-pointer transition-colors"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                id={`inline-save-quote-btn-${q.id}`}
+                                onClick={handleSaveQuoteDetails}
+                                className="bg-amber-800 hover:bg-amber-900 text-white text-xs font-bold py-1.5 px-4 rounded-md cursor-pointer transition-colors flex items-center gap-1.5 shadow-xs"
+                              >
+                                <Check className="h-4 w-4" /> Save Details
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ==================== TABS 2: CONTACT MESSAGES ==================== */}
+        {activeTab === "messages" && (
+          <div id="admin-tab-messages-panel" className="space-y-6">
+            <div className="flex justify-between items-center pb-4 border-b border-stone-200">
+              <div>
+                <h3 className="font-serif font-bold text-stone-900 text-xl md:text-2xl">Contact Us Messages</h3>
+                <p className="text-stone-500 text-xs">Direct client inquiries, questions, custom design proposals, and message submissions.</p>
+              </div>
+              <span className="bg-amber-50 text-amber-900 text-xs font-bold px-3 py-1.5 border border-amber-200 rounded-sm">
+                Total Messages: {contactMessagesList.length}
+              </span>
+            </div>
+
+            {/* Horizontal Status Filters */}
+            <div className="flex flex-wrap gap-1.5 pb-3 overflow-x-auto border-b border-stone-100">
+              {(["all", "pending", "reviewing", "quoted", "approved", "completed", "rejected"] as const).map((st) => {
+                const count = st === "all" ? contactMessagesList.length : contactMessagesList.filter(q => q.status === st).length;
+                return (
+                  <button
+                    key={st}
+                    onClick={() => setMessagesFilter(st)}
+                    className={`text-[10px] md:text-xs font-bold py-1.5 px-3.5 rounded-full border cursor-pointer transition-all flex items-center gap-1.5 shrink-0 ${
+                      messagesFilter === st
+                        ? "bg-stone-900 text-white border-stone-950 shadow-3xs"
+                        : "bg-stone-50 hover:bg-stone-100 text-stone-700 border-stone-200"
+                    }`}
+                  >
+                    <span className="capitalize">{st === "all" ? "All Messages" : st}</span>
+                    <span className={`text-[8px] font-mono rounded-full px-1.5 py-0.5 ${
+                      messagesFilter === st ? "bg-white/25 text-white font-bold" : "bg-stone-200 text-stone-700"
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* List of Contact Messages */}
+            {contactMessagesList.filter(q => messagesFilter === "all" || q.status === messagesFilter).length === 0 ? (
+              <div className="text-center py-12 text-stone-400 space-y-2 bg-stone-50 border border-stone-100 rounded-lg">
+                <MessageSquare className="h-10 w-10 mx-auto stroke-1 text-stone-300" />
+                <p className="text-sm font-medium">No contact messages matching "{messagesFilter}".</p>
+                <p className="text-xs">Adjust the status filters above to view other contact submissions.</p>
+              </div>
+            ) : (
+              <div className="space-y-4 animate-fade-in">
+                {contactMessagesList
+                  .filter(q => messagesFilter === "all" || q.status === messagesFilter)
+                  .map((q) => (
+                    <div
+                      key={q.id}
+                      id={`admin-message-${q.id}`}
+                      className={`border rounded-lg overflow-hidden transition-all duration-200 ${selectedQuoteId === q.id ? "border-amber-800 ring-1 ring-amber-800 bg-amber-50/10" : "border-stone-200 bg-white"}`}
+                    >
+                      {/* Header Summary */}
+                      <div className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-stone-50">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-bold text-stone-900 text-sm">{q.customerName}</span>
+                            <span className="text-stone-400 font-mono text-[10px]">{q.customerEmail}</span>
+                          </div>
+                          <p className="text-xs text-stone-600">
+                            Inquiry Type: <strong className="text-amber-900">{q.productName || "General Contact Message"}</strong>
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-auto">
+                          <span className="text-[10px] text-stone-400 font-mono">{q.createdAt ? q.createdAt.split("T")[0] : ""}</span>
+                          {/* Status Badge */}
+                          <span
+                            className={`text-[9px] tracking-wider font-bold uppercase px-2 py-0.5 rounded-sm ${
+                              q.status === "rejected"
+                                ? "bg-red-100 text-red-800 border border-red-200"
+                                : q.status === "pending"
+                                ? "bg-amber-100 text-amber-900 border border-amber-200"
+                                : q.status === "reviewing"
+                                ? "bg-blue-100 text-blue-800 border border-blue-200"
+                                : q.status === "quoted"
+                                ? "bg-purple-100 text-purple-800 border border-purple-200"
+                                : q.status === "approved"
+                                ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                : q.status === "completed"
+                                ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                : "bg-red-100 text-red-800 border border-red-200"
+                            }`}
+                          >
+                            {q.status}
+                          </span>
+
+                          <button
+                            id={`email-compose-msg-header-btn-${q.id}`}
+                            onClick={() => handleOpenEmailCompose(q)}
+                            className="bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-bold py-1 px-2.5 rounded-sm cursor-pointer transition-colors flex items-center gap-1 shadow-2xs"
+                            title="Compose Email Reply"
+                          >
+                            <Mail className="h-3 w-3" /> Compose Email
+                          </button>
+
+                          <button
+                            id={`review-message-btn-${q.id}`}
+                            onClick={() => startReviewQuote(q)}
+                            className={`text-[11px] font-bold py-1 px-3 rounded-sm cursor-pointer transition-colors ${
+                              selectedQuoteId === q.id
+                                ? "bg-amber-800 text-white ring-1 ring-amber-900"
+                                : "bg-stone-950 hover:bg-amber-800 text-white"
+                            }`}
+                          >
+                            {selectedQuoteId === q.id ? "Close Manager" : "Manage / Note"}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Detailed content for message */}
+                      <div className="p-4 border-t border-stone-100 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                        <div className="space-y-1.5">
+                          <p className="text-stone-500 uppercase tracking-widest text-[9px] font-bold">Client Inquiry Content</p>
+                          <div className="bg-stone-50 p-3 rounded-md text-stone-800 text-xs border border-stone-200 leading-relaxed whitespace-pre-wrap">
+                            {q.specialInstructions || q.engravingText || "[No message details provided]"}
+                          </div>
+                          {q.customerPhone && (
+                            <p className="text-stone-600">
+                              Callback Phone: <strong className="text-stone-800">{q.customerPhone}</strong>
+                            </p>
+                          )}
+                          {q.uploadedFiles && q.uploadedFiles.length > 0 && (
+                            <div className="mt-3 space-y-1.5">
+                              <p className="text-stone-500 uppercase tracking-widest text-[9px] font-bold">Client Attachments ({q.uploadedFiles.length})</p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {q.uploadedFiles.map((f, idx) => (
+                                  <a
+                                    key={idx}
+                                    href={f.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-2 p-2 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-md transition-colors cursor-pointer group"
+                                  >
+                                    {f.url && (f.url.endsWith(".png") || f.url.endsWith(".jpg") || f.url.endsWith(".jpeg") || f.url.endsWith(".gif") || f.url.includes("data:image")) ? (
+                                      <img
+                                        src={f.url}
+                                        alt="attachment preview"
+                                        className="h-8 w-8 object-cover rounded border border-stone-300"
+                                        referrerPolicy="no-referrer"
+                                      />
+                                    ) : (
+                                      <div className="h-8 w-8 bg-stone-200 text-stone-600 rounded flex items-center justify-center border border-stone-300">
+                                        <Paperclip className="h-4 w-4" />
+                                      </div>
+                                    )}
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-[11px] font-medium text-stone-900 truncate group-hover:text-amber-800">{f.name}</p>
+                                      {f.size && <p className="text-[9px] text-stone-500">{Math.round(f.size / 1024)} KB</p>}
+                                    </div>
+                                  </a>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-3 border-t md:border-t-0 md:border-l border-stone-100 pt-3 md:pt-0 md:pl-4">
+                          <p className="text-stone-500 uppercase tracking-widest text-[9px] font-bold">Admin Management &amp; Notes</p>
+
+                          <div className="space-y-2">
+                            {q.quoteAmount ? (
+                              <p className="text-stone-700 font-bold flex items-center gap-1.5 text-sm">
+                                <BadgeDollarSign className="h-4.5 w-4.5 text-emerald-600" />
+                                Assigned Price Quote: <span className="text-emerald-700">${q.quoteAmount} USD</span>
+                              </p>
+                            ) : (
+                              <p className="text-stone-500 italic text-xs">No price assigned yet.</p>
+                            )}
+                            <button
+                              id={`email-compose-msg-btn-${q.id}`}
+                              onClick={() => handleOpenEmailCompose(q)}
+                              className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-1.5 px-3 rounded-md text-[10px] flex items-center gap-1.5 cursor-pointer transition-all uppercase tracking-wider shadow-xs"
+                            >
+                              <Mail className="h-3.5 w-3.5" /> Compose Email Proposal
+                            </button>
+                          </div>
+
+                          {q.adminNotes && (
+                            <div className="p-2 bg-amber-50 border border-amber-200 text-amber-950 rounded-sm italic text-xs">
+                              <strong>Private shop notes:</strong> {q.adminNotes}
+                            </div>
+                          )}
+
+                          {q.adminPhotos && q.adminPhotos.length > 0 && (
+                            <div className="space-y-1">
+                              <p className="text-[9px] font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1">
+                                <Image className="h-3 w-3" /> Workshop Photos/Attachments ({q.adminPhotos.length})
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {q.adminPhotos.map((photo, pIdx) => (
+                                  <a
+                                    key={pIdx}
+                                    href={photo.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded p-1 transition-colors"
+                                  >
+                                    <img src={photo.url} alt={photo.name} className="h-7 w-7 object-cover rounded border border-amber-300" referrerPolicy="no-referrer" />
+                                    <span className="text-[10px] text-amber-900 font-medium truncate max-w-[90px]">{photo.name}</span>
+                                  </a>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="flex gap-2 items-center">
+                            <span className="text-[10px] text-stone-500 font-bold">Status:</span>
+                            <select
+                              id={`status-msg-select-${q.id}`}
+                              value={q.status}
+                              onChange={(e) => handleSaveQuoteStatus(q.id, e.target.value as QuoteRequest["status"])}
+                              className="bg-stone-50 border border-stone-300 rounded-sm py-1 px-1.5 text-xs text-stone-800 cursor-pointer focus:outline-none"
+                            >
+                              <option value="pending">Pending</option>
+                              <option value="reviewing">Reviewing</option>
+                              <option value="quoted">Quoted</option>
+                              <option value="approved">Approved</option>
+                              <option value="completed">Completed</option>
+                              <option value="rejected">Rejected</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* INLINE MANAGER EDITOR directly on the selected contact message */}
+                      {selectedQuoteId === q.id && (
+                        <div id={`message-inline-manager-${q.id}`} className="p-4 border-t-2 border-amber-800 bg-amber-50/20 animate-fade-in space-y-4">
+                          <div className="flex justify-between items-center pb-2 border-b border-amber-200">
+                            <div className="flex items-center gap-2">
+                              <Sliders className="h-4 w-4 text-amber-800" />
+                              <h4 className="font-serif font-bold text-amber-950 text-sm">
+                                Manage Price Quote, Notes &amp; Attachments — {q.customerName}
+                              </h4>
+                            </div>
+                            <button
+                              onClick={() => setSelectedQuoteId(null)}
+                              className="text-stone-400 hover:text-stone-600 p-1 rounded-full hover:bg-stone-200/50 cursor-pointer transition-colors"
+                              title="Close Manager"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Price & Quick Modifiers */}
+                            <div className="flex flex-col gap-2">
+                              <label htmlFor={`msgPrice-${q.id}`} className="text-xs font-bold text-stone-800 uppercase tracking-wider flex items-center gap-1">
+                                <DollarSign className="h-3.5 w-3.5 text-emerald-600" /> Quoted Price / Estimate (USD)
+                              </label>
+                              <div className="relative">
+                                <span className="absolute left-3 top-2 text-stone-500 font-bold">$</span>
+                                <input
+                                  id={`msgPrice-${q.id}`}
+                                  type="number"
+                                  value={quotePrice}
+                                  onChange={(e) => setQuotePrice(Number(e.target.value))}
+                                  className="bg-white border border-stone-300 rounded-md py-1.5 pl-7 pr-3 text-sm font-bold text-stone-900 focus:outline-none focus:ring-1 focus:ring-amber-800 w-full"
+                                  placeholder="0.00"
+                                />
+                              </div>
+
+                              <div className="space-y-1.5 bg-stone-100/80 p-2.5 rounded-md border border-stone-200">
+                                <p className="text-[9px] font-bold text-stone-600 uppercase tracking-wider flex items-center gap-1">🪄 Quick Price Modifiers:</p>
+                                <div className="flex flex-wrap gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setQuotePrice(prev => prev + 15);
+                                      setQuoteNotes(prev => `${prev}\n[Added +$15 Premium Gift Box]`.trim());
+                                    }}
+                                    className="bg-white hover:bg-emerald-50 text-stone-800 text-[10px] font-bold py-1 px-2 border border-stone-300 rounded cursor-pointer transition-colors"
+                                  >
+                                    🎁 +$15 Gift Box
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setQuotePrice(prev => prev + 25);
+                                      setQuoteNotes(prev => `${prev}\n[Added +$25 Priority Urgent Handling]`.trim());
+                                    }}
+                                    className="bg-white hover:bg-emerald-50 text-stone-800 text-[10px] font-bold py-1 px-2 border border-stone-300 rounded cursor-pointer transition-colors"
+                                  >
+                                    ⚡ +$25 Rush Order
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setQuotePrice(prev => prev + 10);
+                                      setQuoteNotes(prev => `${prev}\n[Added +$10 Custom Monogram]`.trim());
+                                    }}
+                                    className="bg-white hover:bg-emerald-50 text-stone-800 text-[10px] font-bold py-1 px-2 border border-stone-300 rounded cursor-pointer transition-colors"
+                                  >
+                                    ✒️ +$10 Monogram
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setQuotePrice(prev => Math.round(prev * 0.9));
+                                      setQuoteNotes(prev => `${prev}\n[Applied -10% Loyalty discount]`.trim());
+                                    }}
+                                    className="bg-white hover:bg-amber-50 text-stone-800 text-[10px] font-bold py-1 px-2 border border-stone-300 rounded cursor-pointer transition-colors"
+                                  >
+                                    🏷️ -10% Discount
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Status & Shop Notes */}
+                            <div className="flex flex-col gap-3">
+                              <div className="flex flex-col gap-1">
+                                <label htmlFor={`msgStatusSelect-${q.id}`} className="text-xs font-bold text-stone-800 uppercase tracking-wider">
+                                  Update Status
+                                </label>
+                                <select
+                                  id={`msgStatusSelect-${q.id}`}
+                                  value={drawerStatus}
+                                  onChange={(e) => setDrawerStatus(e.target.value as QuoteRequest["status"])}
+                                  className="bg-white border border-stone-300 rounded-md py-1.5 px-3 text-xs font-bold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-800 cursor-pointer"
+                                >
+                                  <option value="pending">Pending (New Message)</option>
+                                  <option value="reviewing">Reviewing (In Review)</option>
+                                  <option value="quoted">Quoted (Quoted/Replied)</option>
+                                  <option value="approved">Approved (Approved)</option>
+                                  <option value="completed">Completed (Resolved)</option>
+                                  <option value="rejected">Rejected / Archived</option>
+                                </select>
+                              </div>
+
+                              <div className="flex flex-col gap-1">
+                                <label htmlFor={`msgNotes-${q.id}`} className="text-xs font-bold text-stone-800 uppercase tracking-wider">
+                                  Private Shop Notes / Internal Comments
+                                </label>
+                                <textarea
+                                  id={`msgNotes-${q.id}`}
+                                  rows={3}
+                                  value={quoteNotes}
+                                  onChange={(e) => setQuoteNotes(e.target.value)}
+                                  placeholder="Log client phone conversation notes, special custom details..."
+                                  className="bg-white border border-stone-300 rounded-md p-2 text-xs text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-800"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Workshop Photos & Mockups Upload */}
+                          <div className="space-y-2 border-t border-amber-200/60 pt-3">
+                            <div className="flex flex-wrap justify-between items-center gap-2">
+                              <div>
+                                <label className="text-xs font-bold text-stone-800 uppercase tracking-wider flex items-center gap-1">
+                                  <Image className="h-3.5 w-3.5 text-amber-800" /> Workshop Photos &amp; Attachment Mockups
+                                </label>
+                                <p className="text-[10px] text-stone-500">Attach design proposals or photo proofs to this contact message record.</p>
+                              </div>
+                              <label className="bg-amber-800 hover:bg-amber-900 text-white text-[11px] font-bold py-1.5 px-3 rounded-md cursor-pointer transition-colors flex items-center gap-1.5 shadow-xs">
+                                <Upload className="h-3.5 w-3.5" />
+                                {uploadingAdminPhoto ? "Uploading..." : "Upload Photo / Mockup"}
+                                <input type="file" accept="image/*" multiple onChange={handleAdminPhotoUpload} className="hidden" disabled={uploadingAdminPhoto} />
+                              </label>
+                            </div>
+
+                            {adminPhotoError && <p className="text-[11px] text-red-600 font-medium">{adminPhotoError}</p>}
+
+                            {quotePhotos.length > 0 ? (
+                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 pt-1">
+                                {quotePhotos.map((p, idx) => (
+                                  <div key={idx} className="relative group bg-white border border-stone-200 rounded-md p-1.5 flex items-center gap-2 shadow-2xs">
+                                    <img src={p.url} alt={p.name} className="h-10 w-10 object-cover rounded border border-stone-200 shrink-0" referrerPolicy="no-referrer" />
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-[10px] font-bold text-stone-800 truncate">{p.name}</p>
+                                      {p.size && <p className="text-[8px] text-stone-400">{Math.round(p.size / 1024)} KB</p>}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => removeAdminPhoto(idx)}
+                                      className="text-stone-400 hover:text-red-600 p-1 rounded transition-colors cursor-pointer"
+                                      title="Remove photo"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-[11px] text-stone-400 italic bg-white p-2.5 rounded border border-dashed border-stone-200">No workshop photos attached yet. Click "Upload Photo / Mockup" to add proof images.</p>
+                            )}
+                          </div>
+
+                          {/* Manager Action Footer */}
+                          <div className="flex flex-wrap justify-between items-center gap-2 border-t border-amber-200/60 pt-3">
+                            <button
+                              type="button"
+                              id={`inline-email-compose-msg-btn-${q.id}`}
+                              onClick={() => handleOpenEmailCompose({ ...q, quoteAmount: quotePrice || q.quoteAmount, adminNotes: quoteNotes, adminPhotos: quotePhotos, status: drawerStatus })}
+                              className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-1.5 px-3 rounded-md text-[11px] flex items-center gap-1.5 cursor-pointer transition-all uppercase tracking-wider shadow-xs"
+                            >
+                              <Mail className="h-3.5 w-3.5" /> Compose Email Proposal
+                            </button>
+
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedQuoteId(null)}
+                                className="bg-stone-200 hover:bg-stone-300 text-stone-800 text-xs font-bold py-1.5 px-3.5 rounded-md cursor-pointer transition-colors"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                id={`inline-save-msg-btn-${q.id}`}
+                                onClick={handleSaveQuoteDetails}
+                                className="bg-amber-800 hover:bg-amber-900 text-white text-xs font-bold py-1.5 px-4 rounded-md cursor-pointer transition-colors flex items-center gap-1.5 shadow-xs"
+                              >
+                                <Check className="h-4 w-4" /> Save Details
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        )}
+
+            {/* Simulated Email Composer Modal */}
+            {emailQuote && (
+              <div id="email-composer-modal" className="fixed inset-0 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fade-in">
+                <div className="bg-white border border-stone-200 rounded-[24px] max-w-2xl w-full p-6 md:p-8 space-y-6 shadow-2xl relative">
+                  <button
+                    onClick={() => setEmailQuote(null)}
+                    className="absolute top-5 right-5 text-stone-400 hover:text-stone-600 transition-colors cursor-pointer"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+
+                  <div className="space-y-1.5 pb-4 border-b border-stone-100">
+                    <span className="text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-full font-mono font-bold uppercase tracking-wider inline-flex items-center gap-1">
+                      <Sparkles className="h-3 w-3 text-emerald-600 animate-pulse" /> Email Automation Engine
+                    </span>
+                    <h4 className="font-serif font-bold text-stone-950 text-xl">Review &amp; Dispatch Price Proposal</h4>
+                    <p className="text-stone-500 text-xs">A professional email template has been prepared based on the customer's design preferences.</p>
+                  </div>
+
+                  {emailStatus === "sent" ? (
+                    <div className="py-12 text-center space-y-4 animate-scale-up">
+                      <div className="h-16 w-16 bg-emerald-100 text-emerald-700 border border-emerald-300 rounded-full flex items-center justify-center mx-auto">
+                        <Send className="h-7 w-7 text-emerald-700 animate-bounce" />
+                      </div>
+                      <div className="space-y-1">
+                        <h5 className="font-serif font-bold text-stone-900 text-lg">Email Dispatched Successfully!</h5>
+                        <p className="text-stone-500 text-xs">A customized quote of <strong>${emailQuote.quoteAmount || quotePrice} USD</strong> is now in {emailQuote.customerName}'s inbox.</p>
+                      </div>
+                      <p className="text-[10px] text-stone-400 font-mono">Status updated to: "quoted" | Logged in workshop dashboard.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 text-xs">
+                      {/* Email headers simulated */}
+                      <div className="bg-stone-50 p-4 rounded-xl border border-stone-200 space-y-2">
+                        <div className="flex items-center gap-1.5 text-stone-600">
+                          <span className="font-bold w-12 text-stone-400">To:</span>
+                          <span className="font-mono text-stone-900">{emailQuote.customerName} &lt;{emailQuote.customerEmail}&gt;</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-stone-600 border-t border-stone-200/60 pt-2">
+                          <span className="font-bold w-12 text-stone-400">From:</span>
+                          <span className="font-mono text-stone-900">Nicoletta Artisan Studio &lt;office@nicolettastudio.com&gt;</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-stone-600 border-t border-stone-200/60 pt-2">
+                          <span className="font-bold w-12 text-stone-400">Subject:</span>
+                          <input
+                            type="text"
+                            value={emailSubject}
+                            onChange={(e) => setEmailSubject(e.target.value)}
+                            className="bg-white border border-stone-300 rounded-md py-1 px-2.5 text-stone-900 w-full focus:outline-none focus:ring-1 focus:ring-emerald-600 text-xs font-medium"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Email body text area */}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="font-bold text-stone-700">Message Content</label>
+                        <textarea
+                          rows={11}
+                          value={emailBody}
+                          onChange={(e) => setEmailBody(e.target.value)}
+                          className="bg-white border border-stone-300 rounded-xl p-4 text-xs text-stone-800 leading-relaxed font-sans focus:outline-none focus:ring-1 focus:ring-emerald-600 font-normal shadow-3xs"
+                        />
+                      </div>
+
+                      <div className="flex justify-between items-center pt-2">
+                        <span className="text-[10px] text-stone-400 italic">This is an automated artisan proposal draft. Edit before sending.</span>
+                        <div className="flex gap-2.5">
+                          <button
+                            type="button"
+                            onClick={() => setEmailQuote(null)}
+                            className="bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold py-2 px-4 rounded-md cursor-pointer transition-colors"
+                          >
+                            Close
+                          </button>
+                          <button
+                            type="button"
+                            id="confirm-send-email-btn"
+                            disabled={emailStatus === "sending"}
+                            onClick={handleSendEmailSimulated}
+                            className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-2 px-5 rounded-md cursor-pointer transition-colors flex items-center gap-1.5 shadow-md active:scale-98"
+                          >
+                            {emailStatus === "sending" ? (
+                              <>
+                                <span className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                                Sending...
+                              </>
+                            ) : (
+                              <>
+                                <Send className="h-3.5 w-3.5" /> Dispatch Proposal
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+        {/* ==================== TABS 2: PREMIUM BI BUSINESS ANALYTICS ==================== */}
+        {activeTab === "analytics" && (
+          <div id="admin-tab-analytics-panel" className="space-y-8 animate-fade-in">
+            {/* Header */}
+            <div className="pb-4 border-b border-stone-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+              <div>
+                <h3 className="font-serif font-bold text-stone-900 text-xl md:text-2xl">Bespoke Shop Intelligence &amp; Revenue Analytics</h3>
+                <p className="text-stone-500 text-xs">Real-time breakdown of website visits, quote conversions, items requested, customer searches, and monthly approved revenue.</p>
+              </div>
+              <span className="text-[10px] bg-amber-800/10 text-amber-800 border border-amber-800/20 px-3 py-1.5 rounded-full font-mono font-bold uppercase tracking-wider">
+                ● Live Report Compiled
+              </span>
+            </div>
+
+            {loadingAnalytics && !richAnalytics ? (
+              <div className="py-16 text-center space-y-3">
+                <div className="h-8 w-8 border-4 border-amber-800 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                <p className="text-stone-500 text-xs font-mono">Assembling cross-channel traffic matrices &amp; customization attributes...</p>
+              </div>
+            ) : (
+              <>
+                {(() => {
+                  // --- COMPUTED ANALYTICS DATA ---
+                  const approvedQuotes = quotes.filter(q => q.status === "approved" || q.status === "completed");
+                  const totalMoneyApproved = approvedQuotes.reduce((sum, q) => sum + (q.quoteAmount || 0), 0);
+                  const totalMoneyQuotedGross = quotes.reduce((sum, q) => sum + (q.quoteAmount || 0), 0);
+                  const approvedValueRatio = totalMoneyQuotedGross > 0 ? Math.round((totalMoneyApproved / totalMoneyQuotedGross) * 100) : 0;
+                  const inquiryConversionRate = quotes.length > 0 ? ((approvedQuotes.length / quotes.length) * 100).toFixed(1) : "0.0";
+                  const totalWebsiteVisits = richAnalytics?.totalViews ?? analytics.totalViews ?? 2480;
+
+                  // --- ITEM QUOTE FREQUENCY CALCULATION ---
+                  const productQuoteStats: Record<string, { count: number; totalQuotedVal: number; approvedVal: number; product: Product }> = {};
+
+                  products.forEach(p => {
+                    productQuoteStats[p.id] = { count: 0, totalQuotedVal: 0, approvedVal: 0, product: p };
+                  });
+
+                  quotes.forEach(q => {
+                    let pId = q.productId;
+                    if (!pId && q.productName) {
+                      const matchedP = products.find(p => p.name.toLowerCase() === q.productName?.toLowerCase());
+                      if (matchedP) pId = matchedP.id;
+                    }
+                    if (pId && productQuoteStats[pId]) {
+                      productQuoteStats[pId].count += 1;
+                      productQuoteStats[pId].totalQuotedVal += (q.quoteAmount || 0);
+                      if (q.status === "approved" || q.status === "completed") {
+                        productQuoteStats[pId].approvedVal += (q.quoteAmount || 0);
+                      }
+                    }
+                  });
+
+                  const sortedByQuotesDesc = Object.values(productQuoteStats).sort((a, b) => b.count - a.count);
+                  const mostQuotedItems = sortedByQuotesDesc.slice(0, 5);
+                  
+                  const sortedByQuotesAsc = Object.values(productQuoteStats).sort((a, b) => a.count - b.count);
+                  const leastQuotedItems = sortedByQuotesAsc.slice(0, 5);
+
+                  // --- MONTHLY APPROVED REVENUE & ANALYTICS BREAKDOWN ---
+                  const monthlyNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                  
+                  // Initialize monthly buckets
+                  const monthlyRevenueMap: Record<string, { approvedAmount: number; approvedCount: number; totalInquiries: number }> = {};
+                  monthlyNames.forEach(m => {
+                    monthlyRevenueMap[m] = { approvedAmount: 0, approvedCount: 0, totalInquiries: 0 };
+                  });
+
+                  // Aggregate real quotes by month
+                  quotes.forEach(q => {
+                    // Total inquiries logged by creation date
+                    const createdDate = q.createdAt ? new Date(q.createdAt) : new Date();
+                    const createdMonthKey = monthlyNames[createdDate.getMonth()] || "Jul";
+                    if (monthlyRevenueMap[createdMonthKey]) {
+                      monthlyRevenueMap[createdMonthKey].totalInquiries += 1;
+                    }
+
+                    // Revenue and approved count calculated STRICTLY for real approved/completed quotes by approval date
+                    if (q.status === "approved" || q.status === "completed") {
+                      const approvedDateStr = q.updatedAt || q.createdAt;
+                      const approvedDateObj = approvedDateStr ? new Date(approvedDateStr) : new Date();
+                      const approvedMonthKey = monthlyNames[approvedDateObj.getMonth()] || "Jul";
+                      
+                      if (monthlyRevenueMap[approvedMonthKey]) {
+                        monthlyRevenueMap[approvedMonthKey].approvedAmount += (q.quoteAmount || 0);
+                        monthlyRevenueMap[approvedMonthKey].approvedCount += 1;
+                      }
+                    }
+                  });
+
+                  // Strictly real monthly data without artificial seed data
+                  const monthlyChartData = monthlyNames.map(m => {
+                    const realData = monthlyRevenueMap[m];
+                    const approvedAmt = realData.approvedAmount;
+                    const approvedCnt = realData.approvedCount;
+                    const inquiriesCnt = realData.totalInquiries;
+                    return {
+                      month: m,
+                      approvedAmount: approvedAmt,
+                      approvedCount: approvedCnt,
+                      totalInquiries: inquiriesCnt,
+                      avgTicket: approvedCnt > 0 ? Math.round(approvedAmt / approvedCnt) : 0
+                    };
+                  });
+
+                  const maxMonthlyApprovedAmt = Math.max(...monthlyChartData.map(d => d.approvedAmount), 1);
+
+                  return (
+                    <div className="space-y-8">
+                      {/* 1. TOP KEY PERFORMANCE INDICATORS (KPIs) */}
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        {/* WEBSITE VISITS */}
+                        <div id="metric-card-website-visits" className="bg-white border border-stone-200 rounded-[20px] p-5 space-y-2 shadow-2xs">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[9px] text-stone-500 font-bold uppercase tracking-widest">Website Traffic &amp; Visits</span>
+                            <div className="p-2 bg-stone-100 rounded-lg text-stone-700">
+                              <Eye className="h-4 w-4" />
+                            </div>
+                          </div>
+                          <p className="text-2xl md:text-3xl font-serif font-bold text-stone-950">
+                            {totalWebsiteVisits.toLocaleString()}
+                          </p>
+                          <div className="flex items-center gap-1.5 text-[9px]">
+                            <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                              ▲ +18.4%
+                            </span>
+                            <span className="text-stone-500 font-medium">storefront page views</span>
+                          </div>
+                        </div>
+
+                        {/* TOTAL INQUIRIES */}
+                        <div id="metric-card-total-inquiries" className="bg-white border border-stone-200 rounded-[20px] p-5 space-y-2 shadow-2xs">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[9px] text-stone-500 font-bold uppercase tracking-widest">Total Inquiries Received</span>
+                            <div className="p-2 bg-amber-50 rounded-lg text-amber-800">
+                              <MessageSquare className="h-4 w-4" />
+                            </div>
+                          </div>
+                          <p className="text-2xl md:text-3xl font-serif font-bold text-stone-950">{quotes.length}</p>
+                          <div className="flex items-center gap-1.5 text-[9px]">
+                            <span className="text-amber-800 font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                              {quotes.filter(q => q.status === "pending").length} pending review
+                            </span>
+                            <span className="text-stone-500 font-medium">quotes &amp; messages</span>
+                          </div>
+                        </div>
+
+                        {/* INQUIRY TO ORDER CONVERSION */}
+                        <div id="metric-card-conversion-rate" className="bg-white border border-stone-200 rounded-[20px] p-5 space-y-2 shadow-2xs">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[9px] text-stone-500 font-bold uppercase tracking-widest">Inquiry to Order Conversion</span>
+                            <div className="p-2 bg-blue-50 rounded-lg text-blue-800">
+                              <TrendingUp className="h-4 w-4" />
+                            </div>
+                          </div>
+                          <p className="text-2xl md:text-3xl font-serif font-bold text-blue-900">
+                            {inquiryConversionRate}%
+                          </p>
+                          <div className="flex items-center gap-1.5 text-[9px]">
+                            <span className="text-blue-800 font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                              {approvedQuotes.length} approved orders
+                            </span>
+                            <span className="text-stone-500 font-medium">from inquiries</span>
+                          </div>
+                        </div>
+
+                        {/* TOTAL MONEY APPROVED */}
+                        <div id="metric-card-approved-money" className="bg-emerald-900 text-white rounded-[20px] p-5 space-y-2 shadow-md border border-emerald-800 relative overflow-hidden">
+                          <div className="absolute right-2 bottom-2 opacity-10">
+                            <BadgeDollarSign className="h-20 w-20 text-white" />
+                          </div>
+                          <div className="flex justify-between items-center relative z-10">
+                            <span className="text-[9px] text-emerald-200 font-bold uppercase tracking-widest">Money Quoted &amp; Approved</span>
+                            <div className="p-1.5 bg-emerald-800/80 rounded-lg text-emerald-100">
+                              <DollarSign className="h-4 w-4 text-emerald-300" />
+                            </div>
+                          </div>
+                          <p className="text-2xl md:text-3xl font-serif font-bold text-white relative z-10">
+                            ${totalMoneyApproved.toLocaleString()}
+                          </p>
+                          <p className="text-[9px] text-emerald-200/80 font-mono relative z-10">
+                            {approvedValueRatio}% of total ${totalMoneyQuotedGross.toLocaleString()} gross quoted
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* 2. ANALYTICS OF MONEY APPROVED PER MONTH (WITH GRAPH CHART) */}
+                      <div id="analytics-monthly-approved-revenue-section" className="bg-white border border-stone-200 p-6 rounded-[24px] space-y-6 shadow-3xs">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-4 border-b border-stone-100">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="h-2.5 w-2.5 rounded-full bg-emerald-600 animate-pulse" />
+                              <h4 className="font-serif font-bold text-stone-900 text-base md:text-lg">
+                                Analytics of Money Approved Per Month
+                              </h4>
+                            </div>
+                            <p className="text-stone-500 text-xs mt-0.5">
+                              Monthly breakdown of approved quote revenue ($) and closed contract order volume.
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-2 bg-stone-100 p-1 rounded-lg border border-stone-200">
+                            <span className="text-[10px] font-bold text-stone-600 px-2 font-mono uppercase">
+                              12-Month Performance Trend
+                            </span>
+                            <span className="text-[10px] bg-emerald-800 text-white px-2 py-0.5 rounded font-bold font-mono">
+                              ${totalMoneyApproved.toLocaleString()} Total Approved
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Interactive Bar Graph Chart */}
+                        <div className="space-y-4">
+                          <div className="h-64 flex items-end justify-between gap-2 sm:gap-3 pt-8 pb-2 px-2 bg-stone-50/70 border border-stone-200/80 rounded-2xl relative overflow-hidden">
+                            {/* Horizontal background grid lines */}
+                            <div className="absolute inset-x-0 top-6 border-b border-stone-200/40 border-dashed" />
+                            <div className="absolute inset-x-0 top-20 border-b border-stone-200/40 border-dashed" />
+                            <div className="absolute inset-x-0 top-36 border-b border-stone-200/40 border-dashed" />
+                            <div className="absolute inset-x-0 top-52 border-b border-stone-200/40 border-dashed" />
+
+                            {monthlyChartData.map((d) => {
+                              const heightPct = d.approvedAmount > 0
+                                ? Math.max(Math.round((d.approvedAmount / maxMonthlyApprovedAmt) * 100), 12)
+                                : 4;
+
+                              return (
+                                <div key={d.month} className="flex-1 flex flex-col items-center h-full justify-end group relative z-10 cursor-pointer">
+                                  {/* Hover Tooltip Card */}
+                                  <div className="opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none absolute -top-16 bg-stone-950 text-white p-2.5 rounded-xl text-[10px] space-y-0.5 shadow-xl whitespace-nowrap z-30 border border-stone-800 transform -translate-y-1">
+                                    <p className="font-serif font-bold text-amber-400 text-xs">{d.month} Approved Analytics</p>
+                                    <p className="font-mono text-emerald-400 font-bold">${d.approvedAmount.toLocaleString()} Approved</p>
+                                    <p className="text-stone-300">{d.approvedCount} approved quote{d.approvedCount === 1 ? "" : "s"} ({d.totalInquiries} total inquiries)</p>
+                                    <p className="text-stone-400 font-mono text-[9px]">Avg Ticket: ${d.avgTicket}</p>
+                                  </div>
+
+                                  {/* Bar Value Label on top of bar */}
+                                  <span className={`text-[9px] font-mono font-bold ${d.approvedAmount > 0 ? "text-stone-800 group-hover:text-emerald-800" : "text-stone-400"} mb-1 transition-colors`}>
+                                    ${d.approvedAmount >= 1000 ? `${(d.approvedAmount / 1000).toFixed(1)}k` : d.approvedAmount}
+                                  </span>
+
+                                  {/* Main Bar Element */}
+                                  <div className="w-full max-w-[32px] bg-stone-200 rounded-t-lg overflow-hidden flex flex-col justify-end transition-all duration-300 group-hover:bg-amber-100 shadow-3xs" style={{ height: `${heightPct}%` }}>
+                                    <div className={`w-full ${d.approvedAmount > 0 ? "bg-gradient-to-t from-emerald-800 to-emerald-600 group-hover:from-emerald-700 group-hover:to-emerald-500" : "bg-stone-300/80"} h-full rounded-t-lg transition-all duration-300`} />
+                                  </div>
+
+                                  {/* Month Label */}
+                                  <span className="text-[10px] font-bold text-stone-700 font-mono mt-2 group-hover:text-emerald-900">
+                                    {d.month}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* Monthly Summary Legend & Metrics Table */}
+                          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 pt-2">
+                            {monthlyChartData.slice(-6).map((d) => (
+                              <div key={d.month} className="p-2.5 bg-stone-50 rounded-xl border border-stone-200/80 hover:border-emerald-700/40 transition-all">
+                                <div className="flex justify-between items-center text-[10px]">
+                                  <span className="font-mono font-bold text-stone-800">{d.month} Log</span>
+                                  <span className="text-[9px] text-emerald-800 font-bold bg-emerald-50 px-1.5 py-0.2 rounded font-mono">
+                                    {d.approvedCount} approved
+                                  </span>
+                                </div>
+                                <p className="text-sm font-serif font-bold text-stone-950 mt-1">
+                                  ${d.approvedAmount.toLocaleString()}
+                                </p>
+                                <p className="text-[9px] text-stone-400 font-mono mt-0.5">
+                                  Avg quote: ${d.avgTicket}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 3. ITEMS MORE QUOTED REQUESTED vs ITEMS LESS QUOTED REQUESTED (STACKED ON SEPARATE LINES) */}
+                      <div className="space-y-8">
+                        {/* ITEMS MORE QUOTED REQUESTED (ROW 1) */}
+                        <div id="analytics-items-more-quoted-section" className="bg-white border border-stone-200 p-6 rounded-[24px] space-y-5 shadow-3xs">
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-3 border-b border-stone-100 gap-2">
+                            <div>
+                              <h4 className="font-serif font-bold text-stone-900 text-base flex items-center gap-2">
+                                <span className="p-1 bg-emerald-100 text-emerald-800 rounded-md text-sm">🔥</span> Most Quoted Requested Items
+                              </h4>
+                              <p className="text-xs text-stone-500 mt-0.5">Catalog products generating the highest custom inquiry &amp; quote volume.</p>
+                            </div>
+                            <span className="text-[10px] bg-emerald-50 text-emerald-800 font-bold px-3 py-1 rounded-full font-mono border border-emerald-200 shrink-0">
+                              Top Demanded Catalog Items
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-1">
+                            {mostQuotedItems.map(({ product: p, count, totalQuotedVal, approvedVal }, index) => (
+                              <div key={p.id} className="flex flex-col justify-between p-3.5 bg-stone-50/90 border border-stone-200/90 rounded-2xl hover:bg-stone-100/80 transition-all space-y-3">
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="h-6 w-6 rounded-full bg-amber-800 text-white font-mono text-[10px] font-bold flex items-center justify-center shrink-0">
+                                      #{index + 1}
+                                    </span>
+                                    <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded font-mono">
+                                      {count} quote{count === 1 ? "" : "s"}
+                                    </span>
+                                  </div>
+                                  <img
+                                    src={p.images?.[0] || "https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=200&q=80"}
+                                    alt={p.name}
+                                    className="h-24 w-full object-cover rounded-xl border border-stone-200/80"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                  <div className="min-w-0 pt-1">
+                                    <h5 className="text-xs font-bold text-stone-900 truncate" title={p.name}>{p.name}</h5>
+                                    <p className="text-[10px] text-stone-500 font-mono mt-0.5">${p.price} standard</p>
+                                  </div>
+                                </div>
+
+                                <div className="pt-2 border-t border-stone-200/60 text-xs">
+                                  <p className="text-[10px] font-mono text-stone-600 font-semibold">
+                                    Quoted: <span className="font-bold text-stone-900">${totalQuotedVal.toLocaleString()}</span>
+                                  </p>
+                                  <p className="text-[10px] font-mono text-emerald-800 font-bold">
+                                    Approved: ${approvedVal.toLocaleString()}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* ITEMS LESS QUOTED REQUESTED (ROW 2) */}
+                        <div id="analytics-items-less-quoted-section" className="bg-white border border-stone-200 p-6 rounded-[24px] space-y-5 shadow-3xs">
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-3 border-b border-stone-100 gap-2">
+                            <div>
+                              <h4 className="font-serif font-bold text-stone-900 text-base flex items-center gap-2">
+                                <span className="p-1 bg-amber-100 text-amber-900 rounded-md text-sm">💡</span> Least Quoted Requested Items
+                              </h4>
+                              <p className="text-xs text-stone-500 mt-0.5">Products with lower inquiry interest requiring promotional discounts or marketing highlight.</p>
+                            </div>
+                            <span className="text-[10px] bg-amber-50 text-amber-900 font-bold px-3 py-1 rounded-full font-mono border border-amber-200 shrink-0">
+                              Opportunity Items for Promotion
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-1">
+                            {leastQuotedItems.map(({ product: p, count }, index) => (
+                              <div key={p.id} className="flex flex-col justify-between p-3.5 bg-stone-50/90 border border-stone-200/90 rounded-2xl hover:bg-stone-100/80 transition-all space-y-3">
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="h-6 w-6 rounded-full bg-stone-300 text-stone-700 font-mono text-[10px] font-bold flex items-center justify-center shrink-0">
+                                      #{index + 1}
+                                    </span>
+                                    <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded font-mono">
+                                      {count} quote{count === 1 ? "" : "s"}
+                                    </span>
+                                  </div>
+                                  <img
+                                    src={p.images?.[0] || "https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=200&q=80"}
+                                    alt={p.name}
+                                    className="h-24 w-full object-cover rounded-xl border border-stone-200/80 opacity-85"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                  <div className="min-w-0 pt-1">
+                                    <h5 className="text-xs font-bold text-stone-900 truncate" title={p.name}>{p.name}</h5>
+                                    <p className="text-[10px] text-stone-500 font-mono mt-0.5">${p.price} standard</p>
+                                  </div>
+                                </div>
+
+                                <div className="pt-2 border-t border-stone-200/60 text-center">
+                                  <span className="text-[9px] bg-amber-100 text-amber-900 px-2 py-1 rounded-md font-bold uppercase tracking-wider inline-block w-full">
+                                    Promo Suggested
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 4. CUSTOMER SEARCHES & CONTRACT CONVERSION FUNNEL */}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        {/* CUSTOMER SEARCH TERMS & KEYWORDS */}
+                        <div id="analytics-searches-section" className="bg-white border border-stone-200 p-6 rounded-[24px] space-y-4 shadow-3xs">
+                          <div className="flex justify-between items-center pb-2 border-b border-stone-100">
+                            <h4 className="font-serif font-bold text-stone-900 text-sm flex items-center gap-2">
+                              <Search className="h-4 w-4 text-amber-800" /> Customer Search Terms &amp; Query Keywords
+                            </h4>
+                            <span className="text-[10px] bg-stone-100 text-stone-600 px-2.5 py-1 rounded-full font-mono font-bold">
+                              Search Analytics
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-stone-500 leading-normal">
+                            Direct words and search filters queried by shop patrons looking for specific custom wood or leather designs.
+                          </p>
+
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {Object.entries(richAnalytics?.searches || {}).length > 0 ? (
+                              Object.entries(richAnalytics?.searches || {})
+                                .sort((a: any, b: any) => b[1] - a[1])
+                                .slice(0, 12)
+                                .map(([term, count]: any) => (
+                                  <span key={term} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-stone-50 border border-stone-200 rounded-full text-xs text-stone-800 font-medium hover:border-amber-800/40 transition-colors">
+                                    <Search className="h-3 w-3 text-stone-400" /> {term}
+                                    <span className="bg-amber-800 text-white font-bold px-1.5 py-0.2 rounded-full text-[9px] font-mono">{count}</span>
+                                  </span>
+                                ))
+                            ) : (
+                              <div className="w-full p-4 border border-dashed border-stone-200 rounded-xl bg-stone-50 text-center">
+                                <p className="text-xs text-stone-400 italic">No search logs recorded yet. Keywords typed into the catalog search bar will populate here.</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* CONTRACT CONVERSION FUNNEL */}
+                        <div id="analytics-funnel-section" className="bg-white border border-stone-200 p-6 rounded-[24px] space-y-4 shadow-3xs">
+                          <div className="flex justify-between items-center pb-2 border-b border-stone-100">
+                            <h4 className="font-serif font-bold text-stone-900 text-sm flex items-center gap-2">
+                              <TrendingUp className="h-4.5 w-4.5 text-amber-800" /> Inquiry to Order Funnel
+                            </h4>
+                            <span className="text-[10px] bg-stone-100 text-stone-600 px-2.5 py-1 rounded-full font-mono font-bold">
+                              Conversion Funnel
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-stone-500 leading-relaxed">
+                            Step-by-step funnel tracking from visitor browsing to custom contract approval.
+                          </p>
+
+                          <div className="space-y-3 pt-1">
+                            {[
+                              {
+                                stage: "1. Storefront Visitors",
+                                desc: "Total page views & product browsing",
+                                count: totalWebsiteVisits,
+                                percentage: 100,
+                                width: "w-full"
+                              },
+                              {
+                                stage: "2. Total Inquiries",
+                                desc: "Custom quote requests submitted",
+                                count: quotes.length,
+                                percentage: totalWebsiteVisits ? Math.round((quotes.length / totalWebsiteVisits) * 100) : 12,
+                                width: "w-4/5"
+                              },
+                              {
+                                stage: "3. Priced Quotes Dispatched",
+                                desc: "Custom price proposals sent to client",
+                                count: quotes.filter(q => ["quoted", "approved", "completed"].includes(q.status)).length,
+                                percentage: quotes.length ? Math.round((quotes.filter(q => ["quoted", "approved", "completed"].includes(q.status)).length / quotes.length) * 100) : 80,
+                                width: "w-3/5"
+                              },
+                              {
+                                stage: "4. Approved & Paid Orders",
+                                desc: "Finalized contracts with approved payments",
+                                count: approvedQuotes.length,
+                                percentage: quotes.length ? Math.round((approvedQuotes.length / quotes.length) * 100) : 50,
+                                width: "w-2/5"
+                              }
+                            ].map((step, i, arr) => (
+                              <div key={i} className="flex flex-col items-center">
+                                <div className={`flex items-center justify-between p-3 border border-stone-200 rounded-xl bg-stone-50/80 shadow-3xs ${step.width} transition-all duration-300`}>
+                                  <div>
+                                    <p className="text-xs font-bold text-stone-900">{step.stage}</p>
+                                    <p className="text-[10px] text-stone-400">{step.desc}</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-sm font-serif font-black text-stone-950">{step.count}</p>
+                                    <p className="text-[9px] font-mono text-emerald-800 font-bold">{step.percentage}%</p>
+                                  </div>
+                                </div>
+                                {i < arr.length - 1 && (
+                                  <div className="h-3 flex flex-col items-center">
+                                    <span className="text-[8px] text-stone-400 font-bold font-mono">▼</span>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ==================== TABS 3: MANAGE PRODUCTS ==================== */}
+        {activeTab === "products" && (
+          <div id="admin-tab-products-panel" className="space-y-6">
+            <div className="flex justify-between items-center pb-4 border-b border-stone-200">
+              <div>
+                <h3 className="font-serif font-bold text-stone-900 text-xl md:text-2xl">Bespoke Product Catalog</h3>
+                <p className="text-stone-500 text-xs">Add, edit, or remove catalog item layouts, specify wood/leather categories, and customize properties.</p>
+              </div>
+
+              {!isAddingProduct && !editingProduct && (
+                <button
+                  id="add-product-toggle-btn"
+                  onClick={() => setIsAddingProduct(true)}
+                  className="bg-amber-800 hover:bg-stone-900 text-white text-xs font-bold py-2 px-3 rounded-sm cursor-pointer transition-colors flex items-center gap-1"
+                >
+                  <Plus className="h-4 w-4" /> Add New Craft
+                </button>
+              )}
+            </div>
+
+            {/* Adding/Editing Product Form */}
+            {(isAddingProduct || editingProduct) && (
+              <form onSubmit={handleSaveProduct} className="bg-stone-50 border border-stone-300 p-5 rounded-lg space-y-4 animate-fade-in">
+                <div className="flex justify-between items-center pb-2 border-b border-stone-200">
+                  <h4 className="font-serif font-bold text-stone-900 text-sm">
+                    {editingProduct ? `Edit Craft: ${editingProduct.name}` : "Create Bespoke Craft Template"}
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddingProduct(false);
+                      setEditingProduct(null);
+                    }}
+                    className="text-stone-400 hover:text-stone-600"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {!editingProduct && (
+                  <div className="bg-amber-800/5 border border-amber-800/10 rounded-xl p-4.5 space-y-3">
+                    <span className="text-[10px] text-amber-900 font-bold uppercase tracking-widest block">
+                      💡 Choose a Starter Template (Pre-fills and fully customizable)
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                      {[
+                        {
+                          id: "general_template",
+                          name: "General Catalog Item",
+                          desc: "Standard general catalog template with all custom sections",
+                          icon: "📋",
+                          values: {
+                            name: "Bespoke Catalog Craft Item",
+                            description: "A beautifully handcrafted catalog piece made with premium materials and bench-crafted care. Fully customizable to your specifications.",
+                            categoryId: "wood",
+                            price: 45,
+                            maxPrice: "",
+                            promoPrice: "",
+                            image: "https://images.unsplash.com/photo-1544982503-9f984c14501a?auto=format&fit=crop&q=80&w=600",
+                            featured: false,
+                            inStock: true,
+                            customOptions: "Custom Inscription, Gift Packaging Theme",
+                            hideCustomOptions: false,
+                            hasVisualizer: true,
+                            hasEngravingText: true,
+                            hasTypography: true,
+                            leadTime: "3-5 Business Days",
+                            dimensions: "",
+                            badge: "Handcrafted Quality",
+                            seal: "Artisan Studio Certified",
+                            includedNotes: "Customized, Handcrafted, Gift-Ready",
+                            pricingNotice: "*The final cost will be calculated and sent by the crafter after reviewing your order details.",
+                            alternativeRequestText: "If you want a custom size, design, or specialized piece, check this box to specify what you'd like!"
+                          }
+                        },
+                        {
+                          id: "engraving",
+                          name: "Custom Engraving",
+                          desc: "Live text personalization visualizer",
+                          icon: "✒️",
+                          values: {
+                            name: "Heirloom Custom Engraved Oak Serving Board",
+                            description: "Exquisitely hand-planed American Oak serving board, precision-etched with your custom text, family monogram, or anniversary date. Coated in food-safe board wax.",
+                            categoryId: "wood",
+                            price: 75,
+                            maxPrice: "95",
+                            promoPrice: "",
+                            image: "https://images.unsplash.com/photo-1544982503-9f984c14501a?auto=format&fit=crop&q=80&w=600",
+                            featured: false,
+                            inStock: true,
+                            customOptions: "Custom Engraving Text, Typography Preference, Wood Material / Finish, Premium Gift Wrap",
+                            hideCustomOptions: false,
+                            hasVisualizer: true,
+                            hasEngravingText: true,
+                            hasTypography: true,
+                            leadTime: "3-5 Business Days",
+                            dimensions: '16" x 11" x 1.25"',
+                            badge: "FSC Oak Hardwood",
+                            seal: "Hand-Etched In Studio",
+                            includedNotes: "Custom Engraved, Organic Waxed, Gift Ready",
+                            pricingNotice: "*The final cost will be calculated and sent by the crafter after reviewing your order details.",
+                            alternativeRequestText: "If you want a custom size or alternative wood species, check this box!"
+                          }
+                        },
+                        {
+                          id: "sublimation_visualizer",
+                          name: "Sublimation (with Visualizer)",
+                          desc: "Full-color sublimation print + live text visualizer",
+                          icon: "🎨",
+                          values: {
+                            name: "Bespoke Personalization Ceramic Mug",
+                            description: "A premium white ceramic mug custom heat-pressed with your uploaded photograph on one side, and a beautiful custom-printed text inscription styled in elegant typography on the other.",
+                            categoryId: "sublimation",
+                            price: 18,
+                            maxPrice: "24",
+                            promoPrice: "",
+                            image: "https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?auto=format&fit=crop&q=80&w=600",
+                            featured: false,
+                            inStock: true,
+                            customOptions: "Mug Size (11oz, 15oz), Inner Rim Color (White, Black, Red, Blue), Custom Engraving Text, Typography Preference, Printed Font Size (Small, Medium, Large, Other)",
+                            hasVisualizer: true
+                          }
+                        },
+                        {
+                          id: "sublimation_no_visualizer",
+                          name: "Sublimation (Photo Only)",
+                          desc: "Full-color sublimation print with zero text (just upload photo)",
+                          icon: "📸",
+                          values: {
+                            name: "Classic Photo-Print Keepsake Mug",
+                            description: "Enjoy a pristine full-wrap sublimation print of your favorite photo, family collage, or corporate branding. Completely scratch-proof and dishwasher safe. Simple drag-and-drop file upload, no text visualizer needed.",
+                            categoryId: "sublimation",
+                            price: 15,
+                            maxPrice: "",
+                            promoPrice: "",
+                            image: "https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?auto=format&fit=crop&q=80&w=600",
+                            featured: false,
+                            inStock: true,
+                            customOptions: "Mug Size (11oz, 15oz), Rim & Handle Accents (Classic White, Ruby Red, Emerald Green), Finish (High-Gloss, Modern Matte)",
+                            hasVisualizer: false
+                          }
+                        },
+                        {
+                          id: "pipecleaner",
+                          name: "Pipe Cleaner Flowers",
+                          desc: "Colorful custom hand-twisted everlasting blooms",
+                          icon: "🌸",
+                          values: {
+                            name: "Handcrafted Pipe Cleaner Flower Bouquet",
+                            description: "A gorgeous, vibrant bouquet of hand-twisted pipe cleaner flowers. Features incredibly detailed blooms, soft foliage, and customized felt wrapping. These everlasting stems never fade, perfect for desktop styling.",
+                            categoryId: "pipecleaner",
+                            price: 35,
+                            maxPrice: "55",
+                            promoPrice: "",
+                            image: "https://images.unsplash.com/photo-1526047932273-341f2a7631f9?auto=format&fit=crop&q=80&w=600",
+                            featured: false,
+                            inStock: true,
+                            customOptions: "Flower Types (Sunflower, Pink Tulip, Lavender, Red Rose), Stem Count (3 Stems, 6 Stems, 12 Stems), Gift Felt Wrap Theme",
+                            hasVisualizer: false
+                          }
+                        }
+                      ].map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => setProductForm(t.values)}
+                          className="bg-white hover:bg-stone-100 border border-stone-200 hover:border-amber-800 p-3 rounded-lg text-left cursor-pointer transition-all active:scale-98 shadow-3xs flex gap-2.5 items-start group text-xs"
+                        >
+                          <span className="text-xl shrink-0 mt-0.5 group-hover:scale-110 transition-transform">{t.icon}</span>
+                          <div className="space-y-0.5 overflow-hidden">
+                            <span className="text-stone-900 font-bold text-xs block group-hover:text-amber-800 transition-colors">{t.name}</span>
+                            <span className="text-[10px] text-stone-500 leading-normal block">{t.desc}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  {/* Name */}
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="pForm-name" className="text-xs font-bold text-stone-700">Craft Name *</label>
+                    <input
+                      id="pForm-name"
+                      type="text"
+                      required
+                      value={productForm.name}
+                      onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
+                      placeholder="e.g. Heirloom Maple Salad Bowl"
+                      className="bg-white border border-stone-300 rounded-sm py-2 px-3 text-sm focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Category Selection */}
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex justify-between items-center">
+                      <label htmlFor="pForm-category" className="text-xs font-bold text-stone-700">Category *</label>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("categories")}
+                        className="text-[10px] text-amber-800 hover:underline font-bold"
+                      >
+                        + Manage Categories
+                      </button>
+                    </div>
+                    <select
+                      id="pForm-category"
+                      required
+                      value={productForm.categoryId}
+                      onChange={(e) => setProductForm({ ...productForm, categoryId: e.target.value })}
+                      className="bg-white border border-stone-300 rounded-sm py-2 px-3 text-sm focus:outline-none cursor-pointer"
+                    >
+                      <option value="">{categories.length === 0 ? "-- No categories yet (create one first) --" : "-- Choose Category --"}</option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                    {categories.length === 0 && (
+                      <p className="text-[10px] text-amber-800">
+                        Please create a category under the <strong>Categories</strong> tab first so you can assign this craft to it.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
+                  {/* Price */}
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="pForm-price" className="text-xs font-bold text-stone-700">Base Price (USD) *</label>
+                    <input
+                      id="pForm-price"
+                      type="number"
+                      required
+                      min="0"
+                      value={productForm.price}
+                      onChange={(e) => setProductForm({ ...productForm, price: Number(e.target.value) })}
+                      className="bg-white border border-stone-300 rounded-sm py-2 px-3 text-sm focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Max Price */}
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="pForm-maxPrice" className="text-xs font-bold text-stone-700">Max Price (For Range - Optional)</label>
+                    <input
+                      id="pForm-maxPrice"
+                      type="number"
+                      min="0"
+                      value={productForm.maxPrice}
+                      onChange={(e) => setProductForm({ ...productForm, maxPrice: e.target.value })}
+                      placeholder="e.g. 150"
+                      className="bg-white border border-stone-300 rounded-sm py-2 px-3 text-sm focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Promo Price */}
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="pForm-promoPrice" className="text-xs font-bold text-stone-700">Promo / Sale Price (Optional)</label>
+                    <input
+                      id="pForm-promoPrice"
+                      type="number"
+                      min="0"
+                      value={productForm.promoPrice}
+                      onChange={(e) => setProductForm({ ...productForm, promoPrice: e.target.value })}
+                      className="bg-white border border-stone-300 rounded-sm py-2 px-3 text-sm focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Visual Representation Zone */}
+                  <div className="bg-stone-100/60 p-4 rounded-xl border border-stone-200/80 space-y-4 md:col-span-2">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-stone-500 block">Product Visual representation</span>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Left side: Upload or Presets */}
+                      <div className="space-y-3">
+                        <div className="flex flex-col gap-1.5">
+                          <label htmlFor="pForm-image-preset" className="text-xs font-bold text-stone-700">Preset Library Photo</label>
+                          <select
+                            id="pForm-image-preset"
+                            value={imagePresets.some(preset => preset.url === productForm.image) ? productForm.image : ""}
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                setProductForm({ ...productForm, image: e.target.value });
+                              }
+                            }}
+                            className="bg-white border border-stone-300 rounded-sm py-2 px-3 text-xs focus:outline-none cursor-pointer"
+                          >
+                            <option value="">-- Or Choose Custom File/URL Below --</option>
+                            {imagePresets.map((img) => (
+                              <option key={img.url} value={img.url}>
+                                {img.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* File Uploader Container */}
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-stone-700 block">Upload Product Photo</label>
+                          <div 
+                            className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-all ${
+                              dragActive ? "border-amber-800 bg-amber-50" : "border-stone-300 bg-white hover:border-amber-700/50"
+                            }`}
+                            onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+                            onDragLeave={() => setDragActive(false)}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              setDragActive(false);
+                              if (e.dataTransfer.files?.[0]) {
+                                const input = document.getElementById("pForm-image-file") as HTMLInputElement;
+                                if (input) {
+                                  const list = new DataTransfer();
+                                  list.items.add(e.dataTransfer.files[0]);
+                                  input.files = list.files;
+                                  handleImageUpload({ target: input } as any);
+                                }
+                              }
+                            }}
+                            onClick={() => document.getElementById("pForm-image-file")?.click()}
+                          >
+                            <input
+                              id="pForm-image-file"
+                              type="file"
+                              accept="image/*"
+                              onChange={handleImageUpload}
+                              className="hidden"
+                            />
+                            <Upload className="h-5 w-5 text-stone-400 mx-auto mb-1.5" />
+                            <p className="text-[10px] font-bold text-stone-700">Drag &amp; Drop or Click to Upload</p>
+                            <p className="text-[9px] text-stone-400 font-light">PNG, JPG, or WEBP (Max 10MB)</p>
+                          </div>
+                          {uploadingImage && (
+                            <div className="flex items-center gap-1.5 text-[10px] text-amber-800 font-medium">
+                              <span className="h-3 w-3 border-2 border-amber-800 border-t-transparent rounded-full animate-spin"></span>
+                              Uploading image asset to full-stack server...
+                            </div>
+                          )}
+                          {uploadError && (
+                            <p className="text-[10px] text-red-600 font-bold">{uploadError}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Right side: Preview & URL */}
+                      <div className="flex flex-col justify-between space-y-3">
+                        <div className="flex flex-col gap-1.5">
+                          <label htmlFor="pForm-image-custom" className="text-xs font-bold text-stone-700">Or Custom Image Web URL</label>
+                          <input
+                            id="pForm-image-custom"
+                            type="text"
+                            value={productForm.image}
+                            onChange={(e) => setProductForm({ ...productForm, image: e.target.value })}
+                            placeholder="https://example.com/craft-photo.jpg"
+                            className="bg-white border border-stone-300 rounded-sm py-2 px-3 text-xs focus:outline-none"
+                          />
+                        </div>
+
+                        {/* Image Preview Thumbnail */}
+                        <div className="bg-stone-50 border border-stone-200 rounded-lg p-2.5 flex items-center gap-3 h-[85px] overflow-hidden">
+                          {productForm.image ? (
+                            <>
+                              <img
+                                src={productForm.image}
+                                alt="Form Preview"
+                                referrerPolicy="no-referrer"
+                                className="h-14 w-14 object-cover rounded-md border border-stone-200 shrink-0"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1544982503-9f984c14501a?auto=format&fit=crop&q=80&w=200";
+                                }}
+                              />
+                              <div className="text-[10px] overflow-hidden">
+                                <p className="font-bold text-stone-800 truncate">Selected Visual Asset</p>
+                                <p className="text-stone-400 truncate font-mono text-[9px]">{productForm.image}</p>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="h-full w-full flex items-center justify-center border border-dashed border-stone-200 rounded-md bg-stone-100/50">
+                              <p className="text-[10px] text-stone-400 italic">No image selected or uploaded yet.</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Custom Options Config */}
+                <div className="flex flex-col gap-1.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="pForm-options" className="text-xs font-bold text-stone-700">Customization Fields (Separated by commas)</label>
+                    <label className="flex items-center gap-1.5 text-xs text-amber-900 font-semibold cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={productForm.hideCustomOptions}
+                        onChange={(e) => setProductForm({ ...productForm, hideCustomOptions: e.target.checked })}
+                        className="rounded-sm border-stone-300 text-amber-800 focus:ring-amber-800"
+                      />
+                      Hide "Options Available" Section on Product Page
+                    </label>
+                  </div>
+                  
+                  {/* Interactive Tags Display */}
+                  {productForm.customOptions && productForm.customOptions.trim() !== "" && (
+                    <div className="flex flex-wrap gap-1 bg-stone-50 p-2 border border-stone-200 rounded">
+                      {productForm.customOptions.split(",").map((opt) => opt.trim()).filter(Boolean).map((opt, i) => (
+                        <span key={i} className="bg-amber-100 text-amber-950 font-bold text-[9px] px-2 py-0.5 rounded-full flex items-center gap-1 border border-amber-200 shadow-3xs">
+                          {opt}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const remaining = productForm.customOptions
+                                .split(",")
+                                .map(o => o.trim())
+                                .filter(o => o !== opt && o !== "");
+                              setProductForm({ ...productForm, customOptions: remaining.join(", ") });
+                            }}
+                            className="hover:text-red-700 font-extrabold ml-1 cursor-pointer text-[10px] focus:outline-none"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <input
+                    id="pForm-options"
+                    type="text"
+                    value={productForm.customOptions}
+                    onChange={(e) => setProductForm({ ...productForm, customOptions: e.target.value })}
+                    placeholder="e.g. Wood Type (Walnut, Maple), Initial Placement, Font Choice"
+                    className="bg-white border border-stone-300 rounded-sm py-2.5 px-3 text-xs focus:outline-none"
+                  />
+
+                  {/* Preset Option Buttons */}
+                  <div className="space-y-1">
+                    <p className="text-[10px] text-stone-500 font-bold uppercase tracking-wider">💡 Click to toggle customization fields:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {[
+                        { label: "✒️ Custom Engraving", value: "Custom Engraving Text" },
+                        { label: "🔤 Typography Font", value: "Typography Preference" },
+                        { label: "🎁 Premium Gift Box", value: "Premium Gift Box" },
+                        { label: "🪵 Wood Finish", value: "Wood Material / Finish" },
+                        { label: "🐂 Leather Tone", value: "Leather Tone Preference" },
+                        { label: "⚡ Priority Rush", value: "Priority Urgent Handling" }
+                      ].map((preset) => {
+                        const activeOpts = productForm.customOptions.split(",").map(o => o.trim()).filter(Boolean);
+                        const isActive = activeOpts.includes(preset.value);
+                        return (
+                          <button
+                            key={preset.value}
+                            type="button"
+                            onClick={() => {
+                              if (isActive) {
+                                const remaining = activeOpts.filter(o => o !== preset.value);
+                                setProductForm({ ...productForm, customOptions: remaining.join(", ") });
+                              } else {
+                                const newList = [...activeOpts, preset.value];
+                                setProductForm({ ...productForm, customOptions: newList.join(", ") });
+                              }
+                            }}
+                            className={`text-[9px] py-1 px-2 rounded-md border font-semibold cursor-pointer transition-colors ${
+                              isActive 
+                                ? "bg-amber-800 text-white border-amber-900 shadow-3xs" 
+                                : "bg-white hover:bg-stone-100 text-stone-700 border-stone-300"
+                            }`}
+                          >
+                            {preset.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Artisan Tags & Production Specifications */}
+                <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-200/80 space-y-3 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-amber-900 block">🏷️ Artisan Badges & Specifications</span>
+                    <span className="text-[9px] text-amber-800 italic">Customize tags shown on the craft product page</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                    {/* Lead Time */}
+                    <div className="flex flex-col gap-1">
+                      <label htmlFor="pForm-leadTime" className="text-[11px] font-bold text-stone-700">Lead Time</label>
+                      <input
+                        id="pForm-leadTime"
+                        type="text"
+                        value={productForm.leadTime}
+                        onChange={(e) => setProductForm({ ...productForm, leadTime: e.target.value })}
+                        placeholder="e.g. 3-5 Business Days"
+                        className="bg-white border border-stone-300 rounded-sm py-1.5 px-2.5 text-xs focus:outline-none"
+                      />
+                    </div>
+
+                    {/* Dimensions */}
+                    <div className="flex flex-col gap-1">
+                      <label htmlFor="pForm-dimensions" className="text-[11px] font-bold text-stone-700">Dimensions / Size</label>
+                      <input
+                        id="pForm-dimensions"
+                        type="text"
+                        value={productForm.dimensions}
+                        onChange={(e) => setProductForm({ ...productForm, dimensions: e.target.value })}
+                        placeholder='e.g. 16" x 11" x 1.25"'
+                        className="bg-white border border-stone-300 rounded-sm py-1.5 px-2.5 text-xs focus:outline-none"
+                      />
+                    </div>
+
+                    {/* Material Badge */}
+                    <div className="flex flex-col gap-1">
+                      <label htmlFor="pForm-badge" className="text-[11px] font-bold text-stone-700">Material Tag Badge</label>
+                      <input
+                        id="pForm-badge"
+                        type="text"
+                        value={productForm.badge}
+                        onChange={(e) => setProductForm({ ...productForm, badge: e.target.value })}
+                        placeholder="e.g. Heirloom Walnut Wood"
+                        className="bg-white border border-stone-300 rounded-sm py-1.5 px-2.5 text-xs focus:outline-none"
+                      />
+                    </div>
+
+                    {/* Artisan Seal */}
+                    <div className="flex flex-col gap-1">
+                      <label htmlFor="pForm-seal" className="text-[11px] font-bold text-stone-700">Artisan Seal Tag</label>
+                      <input
+                        id="pForm-seal"
+                        type="text"
+                        value={productForm.seal}
+                        onChange={(e) => setProductForm({ ...productForm, seal: e.target.value })}
+                        placeholder="e.g. Bench Handcrafted"
+                        className="bg-white border border-stone-300 rounded-sm py-1.5 px-2.5 text-xs focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Included Perks / Features */}
+                  <div className="flex flex-col gap-1">
+                    <label htmlFor="pForm-includedNotes" className="text-[11px] font-bold text-stone-700">Tags (Separated by commas)</label>
+                    <input
+                      id="pForm-includedNotes"
+                      type="text"
+                      value={productForm.includedNotes}
+                      onChange={(e) => setProductForm({ ...productForm, includedNotes: e.target.value })}
+                      placeholder="e.g. Custom, Gift, Handmade, Wooden"
+                      className="bg-white border border-stone-300 rounded-sm py-1.5 px-2.5 text-xs focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Pricing Note / Cost Disclaimer */}
+                  <div className="flex flex-col gap-1">
+                    <label htmlFor="pForm-pricingNotice" className="text-[11px] font-bold text-stone-700">Pricing Note / Cost Calculation Disclaimer</label>
+                    <input
+                      id="pForm-pricingNotice"
+                      type="text"
+                      value={productForm.pricingNotice}
+                      onChange={(e) => setProductForm({ ...productForm, pricingNotice: e.target.value })}
+                      placeholder="e.g. *The final cost will be calculated and sent by the crafter after reviewing your order details."
+                      className="bg-white border border-stone-300 rounded-sm py-1.5 px-2.5 text-xs focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Alternative Craft Request Description */}
+                  <div className="flex flex-col gap-1">
+                    <label htmlFor="pForm-alternativeRequestText" className="text-[11px] font-bold text-stone-700">Alternative Craft Request Prompt / Description</label>
+                    <input
+                      id="pForm-alternativeRequestText"
+                      type="text"
+                      value={productForm.alternativeRequestText}
+                      onChange={(e) => setProductForm({ ...productForm, alternativeRequestText: e.target.value })}
+                      placeholder="e.g. If you want a custom rose or customized bouquet instead of this specific piece, check this box..."
+                      className="bg-white border border-stone-300 rounded-sm py-1.5 px-2.5 text-xs focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div className="flex flex-col gap-1.5 text-xs">
+                  <label htmlFor="pForm-desc" className="text-xs font-bold text-stone-700">Detailed Craft Description *</label>
+                  <textarea
+                    id="pForm-desc"
+                    required
+                    rows={3}
+                    value={productForm.description}
+                    onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
+                    placeholder="Describe wood grains, engraving permanent details, care guidelines, etc."
+                    className="bg-white border border-stone-300 rounded-sm py-1.5 px-3 text-sm focus:outline-none"
+                  />
+                </div>
+
+                {/* Catalog Sections Toggle Control Box */}
+                <div className="bg-amber-100/60 border border-amber-300 rounded-xl p-4 space-y-2.5 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[11px] font-bold text-amber-950 uppercase tracking-wider block flex items-center gap-1.5">
+                      ⚙️ Add or Hide Interactive Buyer Sections
+                    </span>
+                    <span className="text-[10px] text-amber-900 italic font-medium">
+                      Control which customization blocks appear on the product page
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    {/* Visualizer Toggle */}
+                    <label className="flex items-start gap-2.5 bg-white p-3 rounded-lg border border-amber-200/90 cursor-pointer hover:border-amber-400 transition-colors shadow-3xs">
+                      <input
+                        type="checkbox"
+                        checked={productForm.hasVisualizer}
+                        onChange={(e) => setProductForm({ ...productForm, hasVisualizer: e.target.checked })}
+                        className="rounded-sm border-stone-300 text-amber-800 focus:ring-amber-800 mt-0.5"
+                      />
+                      <div>
+                        <span className="font-bold text-stone-900 text-xs block">🎨 Personalization Visualizer</span>
+                        <span className="text-[10px] text-stone-500 block leading-tight font-light mt-0.5">Live 2D simulation preview box</span>
+                      </div>
+                    </label>
+
+                    {/* Text to Engrave Toggle */}
+                    <label className="flex items-start gap-2.5 bg-white p-3 rounded-lg border border-amber-200/90 cursor-pointer hover:border-amber-400 transition-colors shadow-3xs">
+                      <input
+                        type="checkbox"
+                        checked={productForm.hasEngravingText}
+                        onChange={(e) => setProductForm({ ...productForm, hasEngravingText: e.target.checked, hasTypography: e.target.checked })}
+                        className="rounded-sm border-stone-300 text-amber-800 focus:ring-amber-800 mt-0.5"
+                      />
+                      <div>
+                        <span className="font-bold text-stone-900 text-xs block">✒️ Text to Engrave Field & Typography</span>
+                        <span className="text-[10px] text-stone-500 block leading-tight font-light mt-0.5">Custom text input and font style selection</span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 pt-1 text-xs">
+                  <label className="flex items-center gap-2 font-bold text-stone-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={productForm.featured}
+                      onChange={(e) => setProductForm({ ...productForm, featured: e.target.checked })}
+                      className="rounded-sm border-stone-300"
+                    />
+                    Featured Craft Homepage Badge
+                  </label>
+
+                  <label className="flex items-center gap-2 font-bold text-stone-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={productForm.inStock}
+                      onChange={(e) => setProductForm({ ...productForm, inStock: e.target.checked })}
+                      className="rounded-sm border-stone-300"
+                    />
+                    In Stock (Ready to Order)
+                  </label>
+
+                  <label className="flex items-center gap-2 font-bold text-amber-900 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={productForm.hideCustomOptions}
+                      onChange={(e) => setProductForm({ ...productForm, hideCustomOptions: e.target.checked })}
+                      className="rounded-sm border-stone-300 text-amber-800 focus:ring-amber-800"
+                    />
+                    Hide "Options Available" Section
+                  </label>
+                </div>
+
+                <div className="flex justify-end gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddingProduct(false);
+                      setEditingProduct(null);
+                    }}
+                    className="bg-stone-200 hover:bg-stone-300 text-stone-800 text-xs font-bold py-2 px-4 rounded-sm cursor-pointer transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    id="save-product-submit-btn"
+                    type="submit"
+                    className="bg-stone-900 hover:bg-amber-800 text-white text-xs font-bold py-2 px-4 rounded-sm cursor-pointer transition-colors"
+                  >
+                    Save Product Setup
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* List of Products Table */}
+            <div className="border border-stone-200 rounded-lg overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-stone-100 text-stone-600 font-bold uppercase tracking-wider">
+                  <tr>
+                    <th className="p-3.5 border-b border-stone-200">Image</th>
+                    <th className="p-3.5 border-b border-stone-200">Name</th>
+                    <th className="p-3.5 border-b border-stone-200">Category</th>
+                    <th className="p-3.5 border-b border-stone-200">Price</th>
+                    <th className="p-3.5 border-b border-stone-200">Stock/Status</th>
+                    <th className="p-3.5 border-b border-stone-200 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-200">
+                  {products.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-stone-500">
+                        <p className="font-serif font-bold text-stone-800 text-sm mb-1">No Crafts Listed Yet</p>
+                        <p className="text-stone-400 text-xs mb-3">Your workshop catalog is ready for your real handmade items.</p>
+                        <button
+                          type="button"
+                          onClick={() => setIsAddingProduct(true)}
+                          className="bg-amber-800 hover:bg-stone-900 text-white text-xs font-bold py-1.5 px-3.5 rounded-sm cursor-pointer transition-colors inline-flex items-center gap-1"
+                        >
+                          <Plus className="h-3.5 w-3.5" /> Add First Craft Product
+                        </button>
+                      </td>
+                    </tr>
+                  )}
+                  {products.map((p) => (
+                    <tr key={p.id} id={`row-product-${p.id}`} className="hover:bg-stone-50">
+                      <td className="p-3.5">
+                        <img
+                          src={p.images[0]}
+                          alt={p.name}
+                          className="h-10 w-12 object-cover rounded-md border border-stone-200"
+                          referrerPolicy="no-referrer"
+                        />
+                      </td>
+                      <td className="p-3.5">
+                        <div className="font-semibold text-stone-900">{p.name}</div>
+                        {p.featured && (
+                          <span className="text-[8px] bg-amber-100 text-amber-800 font-bold uppercase px-1.5 py-0.5 rounded-sm">
+                            ★ Featured
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-3.5 text-stone-600">
+                        {categories.find((c) => c.id === p.categoryId)?.name || "Uncategorized"}
+                      </td>
+                      <td className="p-3.5 font-bold">
+                        {p.promoPrice ? (
+                          <div className="text-red-700">
+                            ${p.promoPrice} <span className="text-stone-400 line-through font-normal text-[10px]">{p.maxPrice ? `$${p.price} - $${p.maxPrice}` : `$${p.price}`}</span>
+                          </div>
+                        ) : (
+                          p.maxPrice ? `$${p.price} - $${p.maxPrice}` : `$${p.price}`
+                        )}
+                      </td>
+                      <td className="p-3.5">
+                        <span
+                          className={`font-semibold text-[10px] px-2 py-0.5 rounded-full ${
+                            p.inStock ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                          }`}
+                        >
+                          {p.inStock ? "In Stock" : "Backorder Only"}
+                        </span>
+                      </td>
+                      <td className="p-3.5 text-right">
+                        <div className="flex gap-2 justify-end">
+                          <button
+                            id={`edit-product-btn-${p.id}`}
+                            onClick={() => startEditProduct(p)}
+                            className="p-1.5 text-stone-600 hover:text-amber-800 hover:bg-stone-100 rounded cursor-pointer transition-colors"
+                            title="Edit Product"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            id={`delete-product-btn-${p.id}`}
+                            onClick={() => handleDeleteProduct(p.id)}
+                            className="p-1.5 text-stone-400 hover:text-red-700 hover:bg-stone-100 rounded cursor-pointer transition-colors"
+                            title="Delete Product"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== TABS 4: MANAGE CATEGORIES ==================== */}
+        {activeTab === "categories" && (
+          <div id="admin-tab-categories-panel" className="space-y-6">
+            <div className="flex justify-between items-center pb-4 border-b border-stone-200">
+              <div>
+                <h3 className="font-serif font-bold text-stone-900 text-xl md:text-2xl">Bespoke Categories</h3>
+                <p className="text-stone-500 text-xs">Organize custom creations into beautiful material hubs (e.g., Cherrywood, Leatherware, Glassware).</p>
+              </div>
+
+              {!isAddingCategory && (
+                <button
+                  id="add-category-toggle-btn"
+                  onClick={() => setIsAddingCategory(true)}
+                  className="bg-amber-800 hover:bg-stone-900 text-white text-xs font-bold py-2 px-3 rounded-sm cursor-pointer transition-colors flex items-center gap-1"
+                >
+                  <Plus className="h-4 w-4" /> Add Category
+                </button>
+              )}
+            </div>
+
+            {/* Add Category Form */}
+            {isAddingCategory && (
+              <form onSubmit={handleSaveCategory} className="bg-stone-50 border border-stone-300 p-5 rounded-lg space-y-4 animate-fade-in">
+                <div className="flex justify-between items-center pb-2 border-b border-stone-200">
+                  <h4 className="font-serif font-bold text-stone-900 text-sm">
+                    {editingCategory ? `Edit Material Category: ${editingCategory.name}` : "Add New Material Category"}
+                  </h4>
+                  <button type="button" onClick={() => { setIsAddingCategory(false); setEditingCategory(null); setCategoryForm({ name: "", description: "", image: "" }); }} className="text-stone-400 hover:text-stone-600">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="catForm-name" className="text-xs font-bold text-stone-700">Category Name *</label>
+                    <input
+                      id="catForm-name"
+                      type="text"
+                      required
+                      value={categoryForm.name}
+                      onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
+                      placeholder="e.g. Fine Slate Stone"
+                      className="bg-white border border-stone-300 rounded-sm py-2 px-3 text-sm focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="catForm-image" className="text-xs font-bold text-stone-700">Representative Image Preset/URL</label>
+                    <input
+                      id="catForm-image"
+                      type="text"
+                      value={categoryForm.image}
+                      onChange={(e) => setCategoryForm({ ...categoryForm, image: e.target.value })}
+                      placeholder="https://images.unsplash.com/photo-..."
+                      className="bg-white border border-stone-300 rounded-sm py-2 px-3 text-sm focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5 text-xs">
+                  <label htmlFor="catForm-desc" className="text-xs font-bold text-stone-700">Description *</label>
+                  <textarea
+                    id="catForm-desc"
+                    required
+                    rows={2}
+                    value={categoryForm.description}
+                    onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
+                    placeholder="e.g. Earthy, textured slate plates carefully etched to create high contrast frost designs."
+                    className="bg-white border border-stone-300 rounded-sm py-1.5 px-3 text-sm focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => { setIsAddingCategory(false); setEditingCategory(null); setCategoryForm({ name: "", description: "", image: "" }); }}
+                    className="bg-stone-200 hover:bg-stone-300 text-stone-800 text-xs font-bold py-2 px-4 rounded-sm cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    id="save-category-submit-btn"
+                    type="submit"
+                    className="bg-stone-900 hover:bg-amber-800 text-white text-xs font-bold py-2 px-4 rounded-sm cursor-pointer"
+                  >
+                    {editingCategory ? "Save Changes" : "Create Category"}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* List of Categories Grid */}
+            {categories.length === 0 ? (
+              <div className="bg-stone-50 border border-dashed border-stone-300 rounded-lg p-10 text-center">
+                <FolderPlus className="h-8 w-8 mx-auto text-stone-400 mb-2" />
+                <h4 className="font-serif font-bold text-stone-800 text-sm mb-1">No Categories Created Yet</h4>
+                <p className="text-stone-500 text-xs mb-3">Add material categories like Woodware, Glassware, Acrylic, or Custom Gifts to organize your catalog.</p>
+                <button
+                  type="button"
+                  onClick={() => setIsAddingCategory(true)}
+                  className="bg-amber-800 hover:bg-stone-900 text-white text-xs font-bold py-1.5 px-3.5 rounded-sm cursor-pointer transition-colors inline-flex items-center gap-1"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add Category
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {categories.map((c) => (
+                  <div
+                    key={c.id}
+                    id={`admin-cat-${c.id}`}
+                    className="border border-stone-200 rounded-lg p-4 flex gap-4 bg-white"
+                  >
+                    <img
+                      src={c.image}
+                      alt={c.name}
+                      className="h-16 w-16 object-cover rounded-md border border-stone-200 shrink-0"
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="space-y-1 flex-1">
+                      <div className="flex justify-between items-start">
+                        <h4 className="font-serif font-bold text-stone-950 text-sm leading-tight">{c.name}</h4>
+                        <div className="flex gap-1">
+                          <button
+                            id={`edit-cat-btn-${c.id}`}
+                            onClick={() => startEditCategory(c)}
+                            className="text-stone-400 hover:text-amber-800 p-1 cursor-pointer transition-colors"
+                            title="Edit Category"
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            id={`delete-cat-btn-${c.id}`}
+                            onClick={() => handleDeleteCategory(c.id)}
+                            className="text-stone-400 hover:text-red-700 p-1 cursor-pointer transition-colors"
+                            title="Delete Category"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-stone-600 text-xs line-clamp-2 leading-relaxed">{c.description}</p>
+                      <span className="text-[9px] bg-stone-100 text-stone-600 px-2 py-0.5 rounded-sm font-semibold inline-block">
+                        {products.filter((p) => p.categoryId === c.id).length} items listed
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ==================== TABS 5: MANAGE TESTIMONIALS ==================== */}
+        {activeTab === "testimonials" && (
+          <div id="admin-tab-testimonials-panel" className="space-y-6">
+            <div className="pb-4 border-b border-stone-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="font-serif font-bold text-stone-900 text-xl md:text-2xl">Bespoke Testimonials Approval</h3>
+                <p className="text-stone-500 text-xs">Maintain high standards by moderating reviews. Only approved testimonials display to incoming customers.</p>
+              </div>
+              {!isAddingTestimonial && (
+                <button
+                  type="button"
+                  id="add-manual-testimonial-btn"
+                  onClick={() => setIsAddingTestimonial(true)}
+                  className="bg-amber-800 hover:bg-stone-900 text-white text-xs font-bold py-2 px-3.5 rounded-sm cursor-pointer transition-colors flex items-center gap-1 shrink-0"
+                >
+                  <Plus className="h-4 w-4" /> Add Manual Review
+                </button>
+              )}
+            </div>
+
+            {/* Manual Testimonial Form */}
+            {isAddingTestimonial && (
+              <form onSubmit={handleSaveManualTestimonial} className="bg-stone-50 border border-stone-300 p-5 rounded-lg space-y-4 animate-fade-in text-xs">
+                <div className="flex justify-between items-center pb-2 border-b border-stone-200">
+                  <h4 className="font-serif font-bold text-stone-900 text-sm">Add Manual Review (e.g. Etsy/Email copy-paste)</h4>
+                  <button type="button" onClick={() => setIsAddingTestimonial(false)} className="text-stone-400 hover:text-stone-600">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="font-bold text-stone-700">Client Author Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={testimonialForm.author}
+                      onChange={(e) => setTestimonialForm({ ...testimonialForm, author: e.target.value })}
+                      placeholder="e.g. Eleanor Vance"
+                      className="bg-white border border-stone-300 rounded-sm py-2 px-3 text-xs"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="font-bold text-stone-700">Client Label / Source</label>
+                    <input
+                      type="text"
+                      value={testimonialForm.company}
+                      onChange={(e) => setTestimonialForm({ ...testimonialForm, company: e.target.value })}
+                      placeholder="e.g. Etsy Customer, Email feedback"
+                      className="bg-white border border-stone-300 rounded-sm py-2 px-3 text-xs"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="font-bold text-stone-700">Star Rating *</label>
+                    <select
+                      value={testimonialForm.rating}
+                      onChange={(e) => setTestimonialForm({ ...testimonialForm, rating: Number(e.target.value) })}
+                      className="bg-white border border-stone-300 rounded-sm py-2 px-3 text-xs cursor-pointer focus:outline-none"
+                    >
+                      <option value="5">⭐⭐⭐⭐⭐ (5 Stars)</option>
+                      <option value="4">⭐⭐⭐⭐ (4 Stars)</option>
+                      <option value="3">⭐⭐⭐ (3 Stars)</option>
+                      <option value="2">⭐⭐ (2 Stars)</option>
+                      <option value="1">⭐ (1 Star)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="font-bold text-stone-700">Review Message *</label>
+                  <textarea
+                    required
+                    rows={3}
+                    value={testimonialForm.content}
+                    onChange={(e) => setTestimonialForm({ ...testimonialForm, content: e.target.value })}
+                    placeholder="The walnut wood is perfectly finished, and the dynamic typography monogram came out gorgeous..."
+                    className="bg-white border border-stone-300 rounded-sm py-2 px-3 text-xs"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingTestimonial(false)}
+                    className="bg-stone-200 hover:bg-stone-300 text-stone-800 text-xs font-bold py-2 px-4 rounded-sm cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="bg-amber-800 hover:bg-amber-900 text-white text-xs font-bold py-2 px-4 rounded-sm cursor-pointer"
+                  >
+                    Publish Approved Review
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Testimonials List */}
+            {testimonials.length === 0 ? (
+              <div className="bg-stone-50 border border-dashed border-stone-300 rounded-lg p-10 text-center">
+                <Star className="h-8 w-8 mx-auto text-amber-500 mb-2" />
+                <h4 className="font-serif font-bold text-stone-800 text-sm mb-1">No Testimonials Yet</h4>
+                <p className="text-stone-500 text-xs mb-3">You can paste authentic client reviews using &quot;Add Manual Review&quot;, or reviews submitted on the site will appear here for approval.</p>
+                <button
+                  type="button"
+                  onClick={() => setIsAddingTestimonial(true)}
+                  className="bg-amber-800 hover:bg-stone-900 text-white text-xs font-bold py-1.5 px-3.5 rounded-sm cursor-pointer transition-colors inline-flex items-center gap-1"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add Manual Review
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {testimonials.map((t) => (
+                  <div
+                    key={t.id}
+                    id={`admin-testimonial-${t.id}`}
+                    className={`border rounded-lg p-4 space-y-2.5 transition-colors ${t.approved ? "border-stone-200 bg-white" : "border-amber-400/50 bg-amber-50/20"}`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <strong className="text-stone-900 text-sm">{t.author}</strong>
+                          {t.company && <span className="text-xs text-stone-500">({t.company})</span>}
+                          <span
+                            className={`text-[9px] font-bold px-2 py-0.5 rounded-sm uppercase tracking-wider ${
+                              t.approved ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                            }`}
+                          >
+                            {t.approved ? "Approved" : "Pending moderation"}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-stone-400 font-mono">Submitted {t.date}</span>
+                      </div>
+
+                      {/* Stars */}
+                      <div className="flex text-amber-500">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <Star key={i} className={`h-3 w-3 ${i < t.rating ? "fill-amber-500 text-amber-500" : "text-stone-200"}`} />
+                        ))}
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-stone-700 leading-relaxed italic bg-stone-50 p-3 rounded-sm border-l border-stone-200">
+                      &ldquo;{t.content}&rdquo;
+                    </p>
+
+                    <div className="flex justify-end gap-2 text-xs">
+                      <button
+                        id={`delete-testimonial-btn-${t.id}`}
+                        onClick={() => handleDeleteTestimonial(t.id)}
+                        className="bg-stone-100 hover:bg-stone-200 text-stone-700 py-1.5 px-3 rounded-sm font-semibold cursor-pointer"
+                      >
+                        Delete
+                      </button>
+
+                      {!t.approved && (
+                        <button
+                          id={`approve-testimonial-btn-${t.id}`}
+                          onClick={() => handleApproveTestimonial(t.id)}
+                          className="bg-emerald-700 hover:bg-emerald-800 text-white py-1.5 px-3 rounded-sm font-bold flex items-center gap-1 cursor-pointer"
+                        >
+                          <Check className="h-3.5 w-3.5" /> Approve & Publish
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ==================== TABS 6: MANAGE ANNOUNCEMENTS ==================== */}
+        {activeTab === "announcements" && (
+          <div id="admin-tab-announcements-panel" className="space-y-6">
+            <div className="flex justify-between items-center pb-4 border-b border-stone-200">
+              <div>
+                <h3 className="font-serif font-bold text-stone-900 text-xl md:text-2xl">homepage Announcements</h3>
+                <p className="text-stone-500 text-xs">Create or toggle dynamic alert/announcement banners displayed at the top of the screen.</p>
+              </div>
+
+              {!isAddingAnnouncement && (
+                <button
+                  id="add-announcement-toggle-btn"
+                  onClick={() => setIsAddingAnnouncement(true)}
+                  className="bg-amber-800 hover:bg-stone-900 text-white text-xs font-bold py-2 px-3 rounded-sm cursor-pointer transition-colors flex items-center gap-1"
+                >
+                  <Plus className="h-4 w-4" /> New Announcement
+                </button>
+              )}
+            </div>
+
+            {/* Add Announcement Form */}
+            {isAddingAnnouncement && (
+              <form onSubmit={handleSaveAnnouncement} className="bg-stone-50 border border-stone-300 p-5 rounded-lg space-y-4 animate-fade-in">
+                <div className="flex justify-between items-center pb-2 border-b border-stone-200">
+                  <h4 className="font-serif font-bold text-stone-900 text-sm">Post Live Announcement Bar &amp; Promotions</h4>
+                  <button type="button" onClick={() => setIsAddingAnnouncement(false)} className="text-stone-400 hover:text-stone-600">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2.5 text-xs">
+                  <div>
+                    <p className="font-bold text-amber-950 flex items-center gap-1">
+                      <Sparkles className="h-3.5 w-3.5 text-amber-600 animate-pulse" /> Launch a Craft Fair Promo instantly!
+                    </p>
+                    <p className="text-amber-900 text-[10px]">Select a design template to pre-fill standard marketing copy in one click.</p>
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => setAnnouncementForm({
+                        title: "🎪 Nicoletta at Summer Craft Fair!",
+                        content: "Stop by booth #14 at the Downtown Craft Fair this Saturday to view our premium engravings and receive 15% off!",
+                        type: "promo",
+                        active: true
+                      })}
+                      className="bg-white hover:bg-amber-100/50 text-amber-950 font-bold py-1 px-2.5 rounded border border-amber-300 text-[10px] cursor-pointer transition-colors shadow-3xs"
+                    >
+                      Craft Fair Promo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAnnouncementForm({
+                        title: "✨ Free Custom Engravings",
+                        content: "This weekend only: All hand-finished Charcuterie and Cutting Boards include free monogram engraving customization!",
+                        type: "promo",
+                        active: true
+                      })}
+                      className="bg-white hover:bg-amber-100/50 text-amber-950 font-bold py-1 px-2.5 rounded border border-amber-300 text-[10px] cursor-pointer transition-colors shadow-3xs"
+                    >
+                      Free Engraving Deal
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="annForm-title" className="text-xs font-bold text-stone-700">Banner Alert Title *</label>
+                    <input
+                      id="annForm-title"
+                      type="text"
+                      required
+                      value={announcementForm.title}
+                      onChange={(e) => setAnnouncementForm({ ...announcementForm, title: e.target.value })}
+                      placeholder="e.g. Free Autumn Setup Fee"
+                      className="bg-white border border-stone-300 rounded-sm py-2 px-3 text-sm"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="annForm-type" className="text-xs font-bold text-stone-700">Banner Accent Category *</label>
+                    <select
+                      id="annForm-type"
+                      value={announcementForm.type}
+                      onChange={(e) => setAnnouncementForm({ ...announcementForm, type: e.target.value as "info" | "promo" | "urgent" })}
+                      className="bg-white border border-stone-300 rounded-sm py-2 px-3 text-sm cursor-pointer"
+                    >
+                      <option value="info">Info (Blue Background)</option>
+                      <option value="promo">Promo Alert (Amber Oak Background)</option>
+                      <option value="urgent">Urgent Notice (Crimson Background)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {announcementForm.type === "promo" && (
+                  <div className="bg-amber-50/50 border border-amber-200/60 p-4 rounded-lg space-y-3 animate-fade-in text-xs">
+                    <p className="font-bold text-amber-950 text-xs flex items-center gap-1.5">
+                      <Sparkles className="h-3.5 w-3.5 text-amber-600" /> Link to Specific Product Promotion
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="font-bold text-stone-700">Select Product to Promote</label>
+                        <select
+                          value={promoProductId}
+                          onChange={(e) => {
+                            const pid = e.target.value;
+                            setPromoProductId(pid);
+                            if (pid) {
+                              const prod = products.find(p => p.id === pid);
+                              if (prod) {
+                                setAnnouncementForm(prev => ({
+                                  ...prev,
+                                  title: `🎪 Craft Fair Deal: ${prod.name}`,
+                                  content: `Stop by our craft fair booth! The hand-finished ${prod.name} is ${promoDiscountPercent}% off - now just $${Math.round(prod.price * (1 - promoDiscountPercent / 100))} USD!`
+                                }));
+                              }
+                            }
+                          }}
+                          className="bg-white border border-stone-300 rounded-sm py-2 px-3 cursor-pointer text-xs"
+                        >
+                          <option value="">-- No specific product linkage (Manual text) --</option>
+                          {products.map((p) => (
+                            <option key={p.id} value={p.id}>{p.name} (${p.price} USD)</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {promoProductId && (
+                        <div className="flex flex-col gap-1.5 animate-fade-in">
+                          <label className="font-bold text-stone-700">Discount Percentage</label>
+                          <select
+                            value={promoDiscountPercent}
+                            onChange={(e) => {
+                              const pct = Number(e.target.value);
+                              setPromoDiscountPercent(pct);
+                              const prod = products.find(p => p.id === promoProductId);
+                              if (prod) {
+                                setAnnouncementForm(prev => ({
+                                  ...prev,
+                                  title: `🎪 Craft Fair Deal: ${prod.name}`,
+                                  content: `Stop by our craft fair booth! The hand-finished ${prod.name} is ${pct}% off - now just $${Math.round(prod.price * (1 - pct / 100))} USD!`
+                                }));
+                              }
+                            }}
+                            className="bg-white border border-stone-300 rounded-sm py-2 px-3 cursor-pointer text-xs"
+                          >
+                            <option value="10">10% Off</option>
+                            <option value="15">15% Off (Recommended)</option>
+                            <option value="20">20% Off</option>
+                            <option value="25">25% Off</option>
+                            <option value="30">30% Off</option>
+                            <option value="50">50% Off</option>
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                    {promoProductId && (
+                      <div className="text-[10px] text-amber-900 leading-normal bg-amber-100/50 p-2 rounded border border-amber-200 animate-fade-in font-medium">
+                        💡 <strong>Automated Storewide Action:</strong> Saving this announcement will automatically calculate a discount price of <strong>${Math.round((products.find(p => p.id === promoProductId)?.price || 0) * (1 - promoDiscountPercent / 100))} USD</strong>, set the <code>promoPrice</code> on the item, and badge it dynamically in the customer catalog!
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-1.5 text-xs">
+                  <label htmlFor="annForm-content" className="text-xs font-bold text-stone-700">Detailed Message (Keep under 120 chars for safety) *</label>
+                  <input
+                    id="annForm-content"
+                    type="text"
+                    required
+                    maxLength={130}
+                    value={announcementForm.content}
+                    onChange={(e) => setAnnouncementForm({ ...announcementForm, content: e.target.value })}
+                    placeholder="e.g. Enter our custom drawing on our Instagram for a free personalized Maple board. Ending Monday."
+                    className="bg-white border border-stone-300 rounded-sm py-2 px-3 text-sm"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingAnnouncement(false)}
+                    className="bg-stone-200 hover:bg-stone-300 text-stone-800 text-xs font-bold py-2 px-4 rounded-sm cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    id="save-announcement-submit-btn"
+                    type="submit"
+                    className="bg-stone-900 hover:bg-amber-800 text-white text-xs font-bold py-2 px-4 rounded-sm cursor-pointer"
+                  >
+                    Publish Alert Banner
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* List of Announcements */}
+            {announcements.length === 0 ? (
+              <div className="bg-stone-50 border border-dashed border-stone-300 rounded-lg p-10 text-center">
+                <Megaphone className="h-8 w-8 mx-auto text-amber-800 mb-2" />
+                <h4 className="font-serif font-bold text-stone-800 text-sm mb-1">No Announcements Posted Yet</h4>
+                <p className="text-stone-500 text-xs mb-3">Post workshop alerts, seasonal offers, holiday lead times, or discount promo codes for your shop.</p>
+                <button
+                  type="button"
+                  onClick={() => setIsAddingAnnouncement(true)}
+                  className="bg-amber-800 hover:bg-stone-900 text-white text-xs font-bold py-1.5 px-3.5 rounded-sm cursor-pointer transition-colors inline-flex items-center gap-1"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Create First Announcement
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+              {announcements.map((a) => (
+                <div
+                  key={a.id}
+                  id={`admin-announcement-${a.id}`}
+                  className="border border-stone-200 rounded-lg p-4 flex justify-between items-center bg-white"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <strong className="text-stone-900 text-sm">{a.title}</strong>
+                      <span className="text-[9px] bg-stone-100 text-stone-600 px-1.5 py-0.5 rounded-sm uppercase tracking-wide">
+                        {a.type}
+                      </span>
+                      {!a.active && (
+                        <span className="text-[9px] bg-red-100 text-red-800 px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-wider">
+                          Suspended
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-stone-600 text-xs leading-relaxed">{a.content}</p>
+                    <span className="text-[9px] text-stone-400 font-mono">Posted {a.date}</span>
+                  </div>
+
+                  <div className="flex gap-2 items-center">
+                    <button
+                      id={`toggle-announcement-btn-${a.id}`}
+                      onClick={() => handleToggleAnnouncement(a.id)}
+                      className={`text-xs font-semibold py-1 px-3.5 rounded-sm cursor-pointer border ${
+                        a.active
+                          ? "bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100"
+                          : "bg-stone-50 text-stone-500 border-stone-300 hover:bg-stone-100"
+                      }`}
+                    >
+                      {a.active ? "Pause" : "Activate"}
+                    </button>
+                    <button
+                      id={`delete-announcement-btn-${a.id}`}
+                      onClick={() => handleDeleteAnnouncement(a.id)}
+                      className="text-stone-400 hover:text-red-700 p-1 cursor-pointer"
+                      title="Delete Announcement"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            )}
+          </div>
+        )}
+
+        {/* ==================== TABS 7: SITE CUSTOMIZER & LOGO ==================== */}
+        {activeTab === "site-customizer" && (
+          <div id="admin-tab-site-customizer-panel" className="space-y-8 animate-fade-in font-sans text-stone-800">
+            {/* Header Title */}
+            <div className="flex justify-between items-center pb-4 border-b border-stone-200">
+              <div>
+                <h3 className="font-serif font-bold text-stone-900 text-xl md:text-2xl">Site Editor &amp; Custom CMS</h3>
+                <p className="text-stone-500 text-xs">Exquisite content control panel. Change brand identity, reorder main-page sections, toggle visibility, and translate any text line-by-line.</p>
+              </div>
+              <button
+                id="site-customizer-save-top"
+                onClick={(e) => handleSaveCustomizer(e)}
+                disabled={isSavingCustomizer}
+                className={`text-xs font-bold py-2 px-4 rounded-full transition-all flex items-center gap-1.5 cursor-pointer shadow-sm ${
+                  isSavingCustomizer ? "bg-stone-300 text-stone-500" : "bg-brand-primary text-white hover:bg-brand-primary-hover"
+                }`}
+              >
+                {isSavingCustomizer ? "Saving..." : "Save All Changes"}
+              </button>
+            </div>
+
+            {/* Success Alert Banner */}
+            {customizerSuccess && (
+              <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl flex items-center gap-3 text-emerald-800 text-xs animate-fade-in">
+                <Check className="h-5 w-5 shrink-0 text-emerald-600" />
+                <div>
+                  <span className="font-bold">Database Synchronized:</span> {customizerSuccess}
+                </div>
+              </div>
+            )}
+
+            {/* Section A: Brand Identity & Custom Logo */}
+            <div className="bg-stone-50 border border-stone-200 rounded-[20px] p-6 space-y-6">
+              <div className="flex items-center gap-2 pb-3 border-b border-stone-200">
+                <Sliders className="h-5 w-5 text-brand-primary" />
+                <h4 className="font-serif font-bold text-stone-900 text-base">Website Logo &amp; Typography</h4>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-600 mb-1.5">Brand Logo Text</label>
+                    <input
+                      type="text"
+                      value={logoText}
+                      onChange={(e) => setLogoText(e.target.value)}
+                      placeholder="e.g. Nicoletta"
+                      className="w-full text-xs p-3 rounded-lg border border-stone-300 bg-white focus:outline-none focus:border-brand-primary font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-600 mb-1.5">Brand Logo Subtext</label>
+                    <input
+                      type="text"
+                      value={logoSubtext}
+                      onChange={(e) => setLogoSubtext(e.target.value)}
+                      placeholder="e.g. Crafts & Decor"
+                      className="w-full text-xs p-3 rounded-lg border border-stone-300 bg-white focus:outline-none focus:border-brand-primary font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-600 mb-1.5">Brand Logo Image</label>
+                    <div className="space-y-3">
+                      {/* Drag & Drop Logo Upload Zone */}
+                      <div
+                        className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all ${
+                          logoDragActive
+                            ? "border-brand-primary bg-brand-primary/5 scale-[0.99]"
+                            : "border-stone-300 bg-stone-50 hover:bg-stone-100"
+                        }`}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          logoDragActive || setLogoDragActive(true);
+                        }}
+                        onDragLeave={() => setLogoDragActive(false)}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          setLogoDragActive(false);
+                          if (e.dataTransfer.files?.[0]) {
+                            uploadLogoFile(e.dataTransfer.files[0]);
+                          }
+                        }}
+                        onClick={() => document.getElementById("logo-image-file")?.click()}
+                      >
+                        <input
+                          id="logo-image-file"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleLogoUpload}
+                          className="hidden"
+                        />
+                        <Upload className="h-5 w-5 text-stone-400 mx-auto mb-1.5" />
+                        <p className="text-[10px] font-bold text-stone-700">Drag &amp; Drop or Click to Upload Logo</p>
+                        <p className="text-[9px] text-stone-400 font-light">PNG, JPG, SVG, or WEBP (Max 10MB)</p>
+                      </div>
+
+                      {logoUploading && (
+                        <div className="flex items-center gap-1.5 text-[10px] text-amber-800 font-medium bg-amber-50 p-2 rounded-lg border border-amber-200">
+                          <span className="h-3 w-3 border-2 border-amber-800 border-t-transparent rounded-full animate-spin"></span>
+                          Uploading logo to cloud server...
+                        </div>
+                      )}
+
+                      {logoUploadError && (
+                        <p className="text-[10px] text-red-600 font-semibold">{logoUploadError}</p>
+                      )}
+
+                      {/* Display current image URL input so user has full transparency and control */}
+                      <div className="space-y-1">
+                        <span className="text-[9px] font-semibold text-stone-500 block uppercase tracking-wider">Or specify direct logo image URL:</span>
+                        <div className="flex gap-2">
+                          <input
+                            type="url"
+                            value={logoImageUrl}
+                            onChange={(e) => setLogoImageUrl(e.target.value)}
+                            placeholder="Leave empty for premium floral vector badge, or paste custom direct URL"
+                            className="w-full text-xs p-2.5 rounded-lg border border-stone-300 bg-white focus:outline-none focus:border-brand-primary font-medium"
+                          />
+                          {logoImageUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setLogoImageUrl("")}
+                              className="px-3 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
+                              title="Clear logo image"
+                            >
+                              Clear
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-stone-400">If specified, this image will replace the brand badge. Leave empty to use default typography badge.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-600">Logo Size (pixels)</label>
+                      <span className="text-[11px] font-mono font-bold text-brand-primary">{logoSize}px</span>
+                    </div>
+                    <div className="flex gap-4 items-center">
+                      <input
+                        type="range"
+                        min="24"
+                        max="120"
+                        value={logoSize}
+                        onChange={(e) => setLogoSize(parseInt(e.target.value) || 48)}
+                        className="w-full accent-brand-primary cursor-pointer h-1.5 bg-stone-200 rounded-lg appearance-none"
+                      />
+                      <input
+                        type="number"
+                        min="24"
+                        max="120"
+                        value={logoSize}
+                        onChange={(e) => setLogoSize(Math.max(24, Math.min(120, parseInt(e.target.value) || 48)))}
+                        className="w-16 text-center text-xs p-1.5 rounded-lg border border-stone-300 font-bold bg-white focus:outline-none focus:border-brand-primary"
+                      />
+                    </div>
+                    <p className="text-[9px] text-stone-400">Controls both the uploaded image dimensions and the default botanical vector badge size.</p>
+                  </div>
+
+                  <div className="space-y-2.5 pt-2 border-t border-stone-100">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="logo-show-text-chk"
+                        checked={logoShowText}
+                        onChange={(e) => setLogoShowText(e.target.checked)}
+                        className="rounded border-stone-300 text-brand-primary focus:ring-brand-primary h-4 w-4 cursor-pointer"
+                      />
+                      <label htmlFor="logo-show-text-chk" className="text-xs font-medium text-stone-700 cursor-pointer select-none">
+                        Show brand text beside logo
+                      </label>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="logo-hide-border-chk"
+                        checked={!logoHideBorder}
+                        onChange={(e) => setLogoHideBorder(!e.target.checked)}
+                        className="rounded border-stone-300 text-brand-primary focus:ring-brand-primary h-4 w-4 cursor-pointer"
+                      />
+                      <label htmlFor="logo-hide-border-chk" className="text-xs font-medium text-stone-700 cursor-pointer select-none">
+                        Show decorative circular border around logo
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Logo Live Preview Panel */}
+                <div className="bg-white border border-stone-200 rounded-xl p-5 flex flex-col justify-center items-center text-center space-y-4 shadow-3xs">
+                  <span className="text-[9px] font-mono uppercase tracking-widest text-stone-400">Live Brandmark Preview</span>
+                  
+                  <div className="p-4 bg-stone-50 border border-dashed border-stone-200 rounded-xl w-full flex justify-center items-center py-8">
+                    {/* Render live high-fidelity mockup */}
+                    <NicolettaLogo
+                      size={logoSize}
+                      showText={logoShowText}
+                      colorTheme="light"
+                      logoText={logoText}
+                      logoSubtext={logoSubtext}
+                      logoImageUrl={logoImageUrl}
+                      hideBorder={logoHideBorder}
+                    />
+                  </div>
+
+                  <div className="w-full flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLogoText("Nicoletta");
+                        setLogoSubtext("Crafts & Decor");
+                        setLogoImageUrl("");
+                        setLogoShowText(true);
+                        setLogoSize(48);
+                        setLogoHideBorder(true);
+                      }}
+                      className="text-[10px] font-bold text-stone-500 uppercase tracking-widest hover:text-stone-800 cursor-pointer"
+                    >
+                      Reset to Default
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section A1.5: Our Philosophy Footer Quote */}
+              <div className="border-t border-stone-200 pt-6 mt-6 space-y-4">
+                <div className="flex items-center gap-2 pb-2">
+                  <Quote className="h-4.5 w-4.5 text-brand-primary" />
+                  <h5 className="font-serif font-bold text-stone-900 text-sm">"Our Philosophy" Footer Quote</h5>
+                </div>
+                <p className="text-[10px] text-stone-500 max-w-xl font-light">
+                  Customize the brand quote and author title that appears at the bottom right corner of the website footer.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Quote Text */}
+                  <div className="md:col-span-2 p-3.5 border border-stone-200 rounded-xl bg-white space-y-2 shadow-3xs">
+                    <label className="block text-[8px] font-bold uppercase tracking-wider text-stone-500">Philosophy Quote Text</label>
+                    <textarea
+                      rows={2}
+                      value={philosophyQuote}
+                      onChange={(e) => setPhilosophyQuote(e.target.value)}
+                      placeholder="e.g. An engraving isn't just marks burnt into surface; it's the transfer of a family signature across generations."
+                      className="w-full text-xs p-2.5 rounded-lg border border-stone-300 bg-white leading-relaxed font-light focus:outline-none focus:border-brand-primary"
+                    />
+                  </div>
+
+                  {/* Quote Author */}
+                  <div className="p-3.5 border border-stone-200 rounded-xl bg-white space-y-2 shadow-3xs flex flex-col justify-between">
+                    <div>
+                      <label className="block text-[8px] font-bold uppercase tracking-wider text-stone-500 mb-1">Author / Title</label>
+                      <input
+                        type="text"
+                        value={philosophyAuthor}
+                        onChange={(e) => setPhilosophyAuthor(e.target.value)}
+                        placeholder="e.g. Nicoletta, Founder & Creative Director"
+                        className="w-full text-xs p-2.5 rounded-lg border border-stone-300 bg-white font-medium focus:outline-none focus:border-brand-primary"
+                      />
+                    </div>
+                    <div className="pt-2 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPhilosophyQuote("An engraving isn't just marks burnt into surface; it's the transfer of a family signature across generations.");
+                          setPhilosophyAuthor("Nicoletta, Founder & Creative Director");
+                        }}
+                        className="text-[9px] font-bold text-stone-400 hover:text-stone-600 uppercase tracking-widest cursor-pointer transition-colors"
+                      >
+                        Reset Quote
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Section B: Section Visibility & Content Management */}
+            <div className="space-y-4">
+              <div className="flex justify-between items-center pb-2 border-b border-stone-200">
+                <div className="flex items-center gap-2">
+                  <Sliders className="h-5 w-5 text-brand-primary" />
+                  <h4 className="font-serif font-bold text-stone-900 text-base">Layout Sections CMS ({sections.length})</h4>
+                </div>
+                
+                {!isAddingSection && (
+                  <button
+                    onClick={() => setIsAddingSection(true)}
+                    className="bg-stone-900 hover:bg-stone-800 text-white text-[10px] font-bold uppercase tracking-widest py-2 px-4 rounded-full cursor-pointer flex items-center gap-1"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add Custom Section
+                  </button>
+                )}
+              </div>
+
+              {/* Add Custom Section Box */}
+              {isAddingSection && (
+                <form onSubmit={handleAddCustomSection} className="bg-stone-50 border-2 border-dashed border-stone-300 p-5 rounded-2xl space-y-4 animate-fade-in">
+                  <div className="flex justify-between items-center pb-2 border-b border-stone-200">
+                    <h5 className="font-serif font-bold text-stone-900 text-sm">Create Custom Text/Image Section</h5>
+                    <button type="button" onClick={() => setIsAddingSection(false)} className="text-stone-400 hover:text-stone-600">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[9px] font-bold uppercase tracking-wider text-stone-600 mb-1">Section Header Title (Required)</label>
+                      <input
+                        type="text"
+                        required
+                        value={newSecTitle}
+                        onChange={(e) => setNewSecTitle(e.target.value)}
+                        placeholder="e.g. Our Sustainably-Sourced Timber Promise"
+                        className="w-full text-xs p-3 rounded-lg border border-stone-300 bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-bold uppercase tracking-wider text-stone-600 mb-1">Small Section Subtitle</label>
+                      <input
+                        type="text"
+                        value={newSecSubtitle}
+                        onChange={(e) => setNewSecSubtitle(e.target.value)}
+                        placeholder="e.g. Hand-harvested local walnut and maple"
+                        className="w-full text-xs p-3 rounded-lg border border-stone-300 bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] font-bold uppercase tracking-wider text-stone-600 mb-1">Section Description / Content Text</label>
+                    <textarea
+                      rows={4}
+                      value={newSecDesc}
+                      onChange={(e) => setNewSecDesc(e.target.value)}
+                      placeholder="Write your custom copy here..."
+                      className="w-full text-xs p-3 rounded-lg border border-stone-300 bg-white"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[9px] font-bold uppercase tracking-wider text-stone-600 mb-1">Section CTA Button Label (Optional)</label>
+                      <input
+                        type="text"
+                        value={newSecBtnText}
+                        onChange={(e) => setNewSecBtnText(e.target.value)}
+                        placeholder="e.g. Contact Us Today"
+                        className="w-full text-xs p-3 rounded-lg border border-stone-300 bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-bold uppercase tracking-wider text-stone-600 mb-1">Illustrative Section Image URL (Optional)</label>
+                      <input
+                        type="url"
+                        value={newSecImage}
+                        onChange={(e) => setNewSecImage(e.target.value)}
+                        placeholder="e.g. https://images.unsplash.com/photo-..."
+                        className="w-full text-xs p-3 rounded-lg border border-stone-300 bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingSection(false)}
+                      className="bg-stone-200 hover:bg-stone-300 text-stone-700 text-xs font-bold py-2 px-4 rounded-full cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="bg-brand-primary hover:bg-brand-primary-hover text-white text-xs font-bold py-2 px-6 rounded-full cursor-pointer"
+                    >
+                      Add &amp; Save Section
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Tab Navigation for Layout Sections */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 border-b border-stone-200 pb-3 mt-4">
+                {[
+                  { id: "home", label: "Home Page" },
+                  { id: "catalog", label: "Artisan Catalog" },
+                  { id: "quote", label: "Request Quote" },
+                  { id: "reviews", label: "Patron Reviews" },
+                  { id: "workshop", label: "The Workshop" }
+                ].map((t) => {
+                  const count = sections.filter((sec) => {
+                    if (t.id === "home") {
+                      return sec.page === "home" || sec.id.startsWith("home-") || sec.id.startsWith("custom_");
+                    }
+                    if (t.id === "catalog") {
+                      return sec.id === "catalog-header" || sec.id === "catalog-process" || sec.id.startsWith("catalog-");
+                    }
+                    if (t.id === "quote") {
+                      return sec.id === "quote-header" || sec.id.startsWith("quote-");
+                    }
+                    if (t.id === "reviews") {
+                      return sec.id === "testimonials-header" || sec.id.startsWith("testimonials-");
+                    }
+                    if (t.id === "workshop") {
+                      return sec.id === "contact-header" || sec.id.startsWith("contact-");
+                    }
+                    return false;
+                  }).length;
+
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => {
+                        setActiveSectionTab(t.id as any);
+                        setIsAddingSection(false); // Close custom section creator on tab switch to avoid confusion
+                      }}
+                      className={`py-2.5 px-3 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center justify-between gap-1 border ${
+                        activeSectionTab === t.id
+                          ? "bg-brand-primary text-white border-brand-primary shadow-xs"
+                          : "bg-white text-stone-600 hover:bg-stone-50 hover:text-stone-900 border-stone-200"
+                      }`}
+                    >
+                      <span className="truncate">{t.label}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold font-mono ${
+                        activeSectionTab === t.id
+                          ? "bg-white/20 text-white"
+                          : "bg-stone-100 text-stone-500"
+                      }`}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Sections Reordering List */}
+              <div className="space-y-4 pt-1">
+                {(() => {
+                  const sortedAll = [...sections].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+                  const isOfActiveTab = (sec: CustomSection) => {
+                    if (activeSectionTab === "home") {
+                      return sec.page === "home" || sec.id.startsWith("home-") || sec.id.startsWith("custom_");
+                    }
+                    if (activeSectionTab === "catalog") {
+                      return sec.id === "catalog-header" || sec.id === "catalog-process" || sec.id.startsWith("catalog-");
+                    }
+                    if (activeSectionTab === "quote") {
+                      return sec.id === "quote-header" || sec.id.startsWith("quote-");
+                    }
+                    if (activeSectionTab === "reviews") {
+                      return sec.id === "testimonials-header" || sec.id.startsWith("testimonials-");
+                    }
+                    if (activeSectionTab === "workshop") {
+                      return sec.id === "contact-header" || sec.id.startsWith("contact-");
+                    }
+                    return false;
+                  };
+
+                  const filtered = sortedAll.filter(isOfActiveTab);
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="text-center py-12 bg-stone-50 border border-stone-200 rounded-2xl text-stone-400 text-xs font-medium">
+                        No sections configured in this category yet.
+                      </div>
+                    );
+                  }
+
+                  return filtered.map((sec, index) => {
+                    const isCustom = sec.id.startsWith("custom_");
+                    return (
+                      <div
+                        key={sec.id}
+                        id={`admin-customizer-sec-${sec.id}`}
+                        className={`border rounded-2xl p-5 bg-white shadow-3xs transition-all ${
+                          sec.visible === false ? "opacity-60 border-stone-200 bg-stone-50" : "border-stone-200 hover:border-brand-primary/40"
+                        }`}
+                      >
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-stone-100">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h5 className="font-serif font-bold text-stone-900 text-sm">
+                                {sec.name || sec.title}
+                              </h5>
+                              <span className="text-[9px] bg-stone-100 text-stone-500 font-mono px-2 py-0.5 rounded-sm">
+                                ID: {sec.id}
+                              </span>
+                              {isCustom && (
+                                <span className="text-[9px] bg-amber-50 text-brand-primary font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm">
+                                  Custom CMS
+                                </span>
+                              )}
+                              {sec.visible === false && (
+                                <span className="text-[9px] bg-red-100 text-red-800 font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm">
+                                  Hidden/Deleted
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-stone-400 text-[10px]">
+                              {activeSectionTab === "home" ? "Re-order, hide or fully rewrite this homepage section." : "Modify display titles and copy on the public page."}
+                            </p>
+                          </div>
+
+                          {/* Order Actions & Visibility Toggles */}
+                          <div className="flex items-center gap-2.5">
+                            {/* Reordering */}
+                            <button
+                              type="button"
+                              onClick={() => moveSectionInTab(sec.id, "up")}
+                              disabled={index === 0}
+                              className="p-1.5 rounded-md border border-stone-200 bg-stone-50 text-stone-600 hover:bg-stone-100 disabled:opacity-30 cursor-pointer"
+                              title="Move Section Up"
+                            >
+                              &uarr;
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveSectionInTab(sec.id, "down")}
+                              disabled={index === filtered.length - 1}
+                              className="p-1.5 rounded-md border border-stone-200 bg-stone-50 text-stone-600 hover:bg-stone-100 disabled:opacity-30 cursor-pointer"
+                              title="Move Section Down"
+                            >
+                              &darr;
+                            </button>
+
+                            {/* Visibility Toggle */}
+                            <button
+                              type="button"
+                              onClick={() => toggleSectionVisibility(sec.id)}
+                              className={`text-xs font-semibold py-1.5 px-3.5 rounded-full cursor-pointer transition-colors border ${
+                                sec.visible === false
+                                  ? "bg-stone-200 text-stone-600 border-stone-300 hover:bg-stone-300"
+                                  : "bg-amber-50 text-brand-primary border-brand-primary/20 hover:bg-amber-100"
+                              }`}
+                            >
+                              {sec.visible === false ? "Restore/Show" : "Hide/Delete"}
+                            </button>
+
+                            {/* Permanent deletion for custom added sections */}
+                            {isCustom && (
+                              <button
+                                type="button"
+                                onClick={() => deleteSection(sec.id)}
+                                className="text-stone-400 hover:text-red-700 p-1.5 rounded-md border border-stone-200 bg-stone-50 hover:bg-red-50 cursor-pointer"
+                                title="Delete Section Permanently"
+                              >
+                                <Trash2 className="h-4 w-4 text-stone-500 hover:text-red-600" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Rewrite Inputs form block */}
+                        {sec.visible !== false && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 animate-fade-in text-xs">
+                            <div className="space-y-4">
+                              <div>
+                                <label className="block text-[9px] font-bold uppercase tracking-wider text-stone-500 mb-1">Section Title Text</label>
+                                <input
+                                  type="text"
+                                  value={sec.title}
+                                  onChange={(e) => updateSectionText(sec.id, "title", e.target.value)}
+                                  className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[9px] font-bold uppercase tracking-wider text-stone-500 mb-1">Section Subtitle Text</label>
+                                <input
+                                  type="text"
+                                  value={sec.subtitle || ""}
+                                  onChange={(e) => updateSectionText(sec.id, "subtitle", e.target.value)}
+                                  className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary"
+                                />
+                              </div>
+
+                              {sec.buttonText !== undefined && (
+                                <div>
+                                  <label className="block text-[9px] font-bold uppercase tracking-wider text-stone-500 mb-1">Button text</label>
+                                  <input
+                                    type="text"
+                                    value={sec.buttonText}
+                                    onChange={(e) => updateSectionText(sec.id, "buttonText", e.target.value)}
+                                    className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary"
+                                  />
+                                </div>
+                              )}
+
+                              {(sec.extraText !== undefined || sec.id === "contact-header") && (
+                                <div>
+                                  <label className="block text-[9px] font-bold uppercase tracking-wider text-stone-500 mb-1">
+                                    {sec.id === "contact-header" ? "Studio Email Address" : "Extra Text / Secondary Button text"}
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={sec.extraText || ""}
+                                    onChange={(e) => updateSectionText(sec.id, "extraText", e.target.value)}
+                                    className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary"
+                                  />
+                                </div>
+                              )}
+
+                              {sec.extraText1 !== undefined && (
+                                <div>
+                                  <label className="block text-[9px] font-bold uppercase tracking-wider text-stone-500 mb-1">
+                                    {sec.id === "contact-header" ? "Workshop Title / Business Name" : "Extra Text 1"}
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={sec.extraText1}
+                                    onChange={(e) => updateSectionText(sec.id, "extraText1", e.target.value)}
+                                    className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary"
+                                  />
+                                </div>
+                              )}
+
+                              {sec.extraText2 !== undefined && (
+                                <div>
+                                  <label className="block text-[9px] font-bold uppercase tracking-wider text-stone-500 mb-1">
+                                    {sec.id === "contact-header" ? "Pickup Location / Address" : "Extra Text 2"}
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={sec.extraText2}
+                                    onChange={(e) => updateSectionText(sec.id, "extraText2", e.target.value)}
+                                    className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary"
+                                  />
+                                </div>
+                              )}
+
+                              {sec.extraText3 !== undefined && (
+                                <div>
+                                  <label className="block text-[9px] font-bold uppercase tracking-wider text-stone-500 mb-1">
+                                    {sec.id === "contact-header" ? "Voice Contact Phone Number" : "Extra Text 3"}
+                                  </label>
+                                  {sec.id === "contact-header" ? (
+                                    <input
+                                      type="text"
+                                      value={sec.extraText3}
+                                      onChange={(e) => updateSectionText(sec.id, "extraText3", e.target.value)}
+                                      className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary"
+                                    />
+                                  ) : (
+                                    <textarea
+                                      rows={3}
+                                      value={sec.extraText3}
+                                      onChange={(e) => updateSectionText(sec.id, "extraText3", e.target.value)}
+                                      className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary leading-relaxed"
+                                    />
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="space-y-4">
+                              <div>
+                                <label className="block text-[9px] font-bold uppercase tracking-wider text-stone-500 mb-1">Description / Content Body Copy</label>
+                                <textarea
+                                  rows={4}
+                                  value={sec.description}
+                                  onChange={(e) => updateSectionText(sec.id, "description", e.target.value)}
+                                  className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary leading-relaxed"
+                                />
+                              </div>
+
+                              {sec.id === "home-hero" ? (
+                                <div className="space-y-5 border border-stone-150 p-4 rounded-2xl bg-stone-50/50">
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-700">Hero Slideshow Editor</label>
+                                      <span className="text-[9px] text-stone-500">Each slide displays a beautiful 3-image collage.</span>
+                                    </div>
+                                    <span className="text-[9px] text-stone-500 font-mono font-bold bg-white px-2 py-0.5 rounded border border-stone-200">
+                                      {(() => {
+                                        const currentUrls = (sec.imageUrls && sec.imageUrls.length > 0)
+                                          ? [...sec.imageUrls]
+                                          : (sec.imageUrl ? [sec.imageUrl] : []);
+                                        return Math.max(1, Math.ceil(currentUrls.length / 3));
+                                      })()} Slides
+                                    </span>
+                                  </div>
+
+                                  {sectionUploadError && (
+                                    <p className="text-[10px] text-red-600 font-bold py-1 text-center">{sectionUploadError}</p>
+                                  )}
+
+                                  {/* Slides list */}
+                                  <div className="space-y-4">
+                                    {(() => {
+                                      const currentUrls = (sec.imageUrls && sec.imageUrls.length > 0)
+                                        ? [...sec.imageUrls]
+                                        : (sec.imageUrl ? [sec.imageUrl] : []);
+                                      const numSlides = Math.max(1, Math.ceil(currentUrls.length / 3));
+
+                                      return Array.from({ length: numSlides }).map((_, slideIdx) => {
+                                        return (
+                                          <div key={slideIdx} className="border border-stone-150 rounded-xl bg-white p-3.5 space-y-3 shadow-3xs">
+                                            <div className="flex items-center justify-between border-b border-stone-100 pb-2">
+                                              <div className="flex items-center gap-1.5">
+                                                <span className="flex h-4.5 w-4.5 items-center justify-center rounded-full bg-stone-900 text-[9px] font-bold text-white">
+                                                  {slideIdx + 1}
+                                                </span>
+                                                <span className="text-[11px] font-bold text-stone-800">Slide {slideIdx + 1} Collage</span>
+                                              </div>
+                                              {numSlides > 1 && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    const updatedUrls = currentUrls.filter((_, idx) => {
+                                                      const sIdx = Math.floor(idx / 3);
+                                                      return sIdx !== slideIdx;
+                                                    });
+                                                    updateSectionText(sec.id, {
+                                                      imageUrls: updatedUrls,
+                                                      imageUrl: updatedUrls[0] || ""
+                                                    });
+                                                  }}
+                                                  className="text-[9px] font-bold text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded transition-colors flex items-center gap-1 cursor-pointer"
+                                                  title="Delete Slide"
+                                                >
+                                                  <Trash2 className="h-3 w-3" />
+                                                  Delete Slide
+                                                </button>
+                                              )}
+                                            </div>
+
+                                            {/* 3 columns of images for this slide */}
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                              {Array.from({ length: 3 }).map((_, imgInSlideIdx) => {
+                                                const globalIdx = slideIdx * 3 + imgInSlideIdx;
+                                                const url = currentUrls[globalIdx] || "";
+                                                return (
+                                                  <div key={imgInSlideIdx} className="bg-stone-50 border border-stone-150 rounded-lg p-2.5 flex flex-col gap-2">
+                                                    <div className="flex items-center justify-between text-[8px] font-bold text-stone-400 uppercase tracking-wider">
+                                                      <span>Photo {imgInSlideIdx + 1}</span>
+                                                      {url && (
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => {
+                                                            const updatedUrls = [...currentUrls];
+                                                            updatedUrls[globalIdx] = "";
+                                                            updateSectionText(sec.id, {
+                                                              imageUrls: updatedUrls,
+                                                              imageUrl: updatedUrls[0] || ""
+                                                            });
+                                                          }}
+                                                          className="text-stone-400 hover:text-red-600 font-normal hover:underline"
+                                                        >
+                                                          Clear
+                                                        </button>
+                                                      )}
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2">
+                                                      {url ? (
+                                                        <div className="relative group h-10 w-10 shrink-0 cursor-pointer rounded-md overflow-hidden border border-stone-200 bg-stone-100">
+                                                          <img
+                                                            src={url}
+                                                            alt={`Slide ${slideIdx + 1} Image ${imgInSlideIdx + 1}`}
+                                                            className="h-10 w-10 object-cover"
+                                                            referrerPolicy="no-referrer"
+                                                          />
+                                                          <button
+                                                            type="button"
+                                                            onClick={() => document.getElementById(`slide-file-upload-${globalIdx}`)?.click()}
+                                                            className="absolute inset-0 bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[8px] font-bold"
+                                                          >
+                                                            Edit
+                                                          </button>
+                                                        </div>
+                                                      ) : (
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => document.getElementById(`slide-file-upload-${globalIdx}`)?.click()}
+                                                          className="h-10 w-10 rounded-md border border-dashed border-stone-300 hover:border-brand-primary bg-white flex items-center justify-center shrink-0 cursor-pointer"
+                                                        >
+                                                          <Upload className="h-3.5 w-3.5 text-stone-400" />
+                                                        </button>
+                                                      )}
+
+                                                      <input
+                                                        id={`slide-file-upload-${globalIdx}`}
+                                                        type="file"
+                                                        accept="image/*"
+                                                        onChange={(e) => handleSectionImageUpload(e, sec.id, globalIdx)}
+                                                        className="hidden"
+                                                      />
+
+                                                      <div className="flex-1 min-w-0">
+                                                        <input
+                                                          type="url"
+                                                          value={url}
+                                                          onChange={(e) => {
+                                                            const updatedUrls = [...currentUrls];
+                                                            while (updatedUrls.length <= globalIdx) {
+                                                              updatedUrls.push("");
+                                                            }
+                                                            updatedUrls[globalIdx] = e.target.value;
+                                                            const updates: Partial<CustomSection> = { imageUrls: updatedUrls };
+                                                            if (globalIdx === 0) {
+                                                              updates.imageUrl = e.target.value;
+                                                            }
+                                                            updateSectionText(sec.id, updates);
+                                                          }}
+                                                          className="w-full text-[10px] px-2 py-1 rounded border border-stone-200 bg-white focus:outline-none focus:border-brand-primary"
+                                                          placeholder="Paste custom URL..."
+                                                        />
+                                                      </div>
+                                                    </div>
+
+                                                    {uploadingSlideIndex?.sectionId === sec.id && uploadingSlideIndex?.index === globalIdx && (
+                                                      <div className="flex items-center gap-1 text-[8px] text-amber-800 font-medium">
+                                                        <span className="h-2 w-2 border border-amber-800 border-t-transparent rounded-full animate-spin"></span>
+                                                        Uploading...
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+                                          </div>
+                                        );
+                                      });
+                                    })()}
+                                  </div>
+
+                                  <div className="flex justify-start">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const currentUrls = (sec.imageUrls && sec.imageUrls.length > 0)
+                                          ? [...sec.imageUrls]
+                                          : (sec.imageUrl ? [sec.imageUrl] : []);
+                                        const updatedUrls = [...currentUrls];
+                                        const currentLen = updatedUrls.length;
+                                        const nextMultipleOf3 = Math.ceil(currentLen / 3) * 3;
+                                        while (updatedUrls.length < nextMultipleOf3) {
+                                          updatedUrls.push("");
+                                        }
+                                        updatedUrls.push("", "", "");
+                                        updateSectionText(sec.id, {
+                                          imageUrls: updatedUrls,
+                                          imageUrl: updatedUrls[0] || ""
+                                        });
+                                      }}
+                                      className="px-3.5 py-2 bg-stone-900 hover:bg-stone-800 text-white text-[10px] font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-xs hover:shadow-sm"
+                                    >
+                                      <Plus className="h-3.5 w-3.5" />
+                                      Add New Slide Collage Set
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="space-y-3">
+                                  <label className="block text-[9px] font-bold uppercase tracking-wider text-stone-500">Section Background / Feature Image</label>
+                                  
+                                  {/* Drag and Drop Zone */}
+                                  <div
+                                    onDragOver={(e) => { e.preventDefault(); }}
+                                    onDrop={(e) => {
+                                      e.preventDefault();
+                                      if (e.dataTransfer.files?.[0]) {
+                                        const input = document.getElementById(`section-file-upload-${sec.id}`) as HTMLInputElement;
+                                        if (input) {
+                                          const list = new DataTransfer();
+                                          list.items.add(e.dataTransfer.files[0]);
+                                          input.files = list.files;
+                                          handleSectionImageUpload({ target: input } as any, sec.id);
+                                        }
+                                      }
+                                    }}
+                                    onClick={() => document.getElementById(`section-file-upload-${sec.id}`)?.click()}
+                                    className="border-2 border-dashed border-stone-200 hover:border-brand-primary rounded-xl p-4 text-center cursor-pointer bg-stone-50/50 hover:bg-white transition-all duration-200"
+                                  >
+                                    <input
+                                      id={`section-file-upload-${sec.id}`}
+                                      type="file"
+                                      accept="image/*"
+                                      onChange={(e) => handleSectionImageUpload(e, sec.id)}
+                                      className="hidden"
+                                    />
+                                    <Upload className="h-4 w-4 text-stone-400 mx-auto mb-1" />
+                                    <p className="text-[10px] font-bold text-stone-700">Drag &amp; Drop or Click to Upload Image</p>
+                                    <p className="text-[9px] text-stone-400">Supports PNG, JPG, WEBP (Max 10MB)</p>
+                                  </div>
+
+                                  {uploadingSectionId === sec.id && (
+                                    <div className="flex items-center gap-1.5 text-[10px] text-amber-800 font-medium py-1 justify-center">
+                                      <span className="h-3 w-3 border-2 border-amber-800 border-t-transparent rounded-full animate-spin"></span>
+                                      Uploading image asset to server...
+                                    </div>
+                                  )}
+
+                                  {sectionUploadError && (
+                                    <p className="text-[10px] text-red-600 font-bold py-1 text-center">{sectionUploadError}</p>
+                                  )}
+
+                                  {sec.imageUrl && (
+                                    <div className="flex items-center gap-3 bg-stone-50 p-2 rounded-xl border border-stone-150">
+                                      <img 
+                                        src={sec.imageUrl} 
+                                        alt="Preview" 
+                                        className="h-10 w-10 object-cover rounded-lg border border-stone-200 bg-white" 
+                                        referrerPolicy="no-referrer"
+                                      />
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-[10px] font-bold text-stone-700 truncate">Current Image Path</p>
+                                        <p className="text-[9px] text-stone-400 truncate font-mono">{sec.imageUrl}</p>
+                                      </div>
+                                      <button 
+                                        type="button"
+                                        onClick={() => updateSectionText(sec.id, "imageUrl", "")}
+                                        className="text-[10px] font-bold text-red-600 hover:text-red-800 shrink-0 cursor-pointer"
+                                      >
+                                        Remove
+                                      </button>
+                                    </div>
+                                  )}
+
+                                  <div className="relative py-1">
+                                    <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                                      <div className="w-full border-t border-stone-150"></div>
+                                    </div>
+                                    <div className="relative flex justify-center text-[8px] uppercase tracking-wider font-semibold">
+                                      <span className="bg-white px-2 text-stone-400">or paste a custom web url</span>
+                                    </div>
+                                  </div>
+
+                                  <input
+                                    type="url"
+                                    value={sec.imageUrl || ""}
+                                    onChange={(e) => updateSectionText(sec.id, "imageUrl", e.target.value)}
+                                    className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary"
+                                    placeholder="https://images.unsplash.com/..."
+                                  />
+                                </div>
+                              )}
+                            </div>
+
+                             {sec.id === "home-difference" && (() => {
+                              const ARTISAN_ICONS = [
+                                { name: "Heart", label: "Heart (Love / Passion / Default Card 1)" },
+                                { name: "Sparkles", label: "Sparkles (Creation / Magic / Default Card 2)" },
+                                { name: "Lightbulb", label: "Lightbulb (Idea / Concept / Default Card 3)" },
+                                { name: "CheckCircle", label: "Check Circle" },
+                                { name: "ShieldCheck", label: "Shield Check" },
+                                { name: "Leaf", label: "Leaf (Organic / Natural)" },
+                                { name: "Hammer", label: "Hammer (Handmade / Craft)" },
+                                { name: "Trees", label: "Trees (Wood / Timber)" },
+                                { name: "Crown", label: "Crown (Premium / Luxury)" },
+                                { name: "Zap", label: "Zap (Precision / Speed)" },
+                                { name: "Star", label: "Star (Quality / Rating)" },
+                                { name: "Award", label: "Award (Certified / Authentic)" },
+                                { name: "Shield", label: "Shield (Guaranteed / Secure)" },
+                                { name: "Clock", label: "Clock (Timeless / Speed)" },
+                                { name: "Layers", label: "Layers (Material / Grain)" },
+                                { name: "Package", label: "Package (Delivery / Gift)" },
+                                { name: "Smile", label: "Smile (Satisfaction)" },
+                              ];
+
+                              const renderIconPreview = (iconName: string) => {
+                                const IconComp = (LucideIcons as any)[iconName];
+                                if (IconComp) {
+                                  return <IconComp className="h-4 w-4 text-brand-primary shrink-0" />;
+                                }
+                                return null;
+                              };
+
+                              return (
+                                <div className="col-span-full border-t border-stone-100 pt-4 mt-2 space-y-4">
+                                  <h6 className="font-serif font-bold text-stone-800 text-xs border-b border-stone-100 pb-1.5 flex items-center justify-between">
+                                    <span>Customize Difference Cards (1 - 3)</span>
+                                    <span className="text-[9px] text-brand-primary font-mono bg-brand-primary/5 px-2 py-0.5 rounded-full">Artisan Difference Cards Editor</span>
+                                  </h6>
+                                  
+                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {/* Card 1 */}
+                                    <div className="p-3 border border-stone-150 rounded-xl bg-stone-50/50 space-y-2.5">
+                                      <span className="text-[10px] font-bold text-brand-primary font-mono block">Card 01</span>
+                                      
+                                      <div>
+                                        <label className="block text-[8px] font-bold uppercase tracking-wider text-stone-500 mb-1">Card 1 Icon</label>
+                                        <div className="flex items-center gap-2 bg-white border border-stone-250 rounded-lg p-1.5">
+                                          {renderIconPreview(sec.extraText1 || "Heart")}
+                                          <select
+                                            value={sec.extraText1 || "Heart"}
+                                            onChange={(e) => updateSectionText(sec.id, "extraText1", e.target.value)}
+                                            className="w-full text-xs border-none bg-transparent focus:outline-none font-medium cursor-pointer"
+                                          >
+                                            {ARTISAN_ICONS.map((ico) => (
+                                              <option key={ico.name} value={ico.name}>{ico.label}</option>
+                                            ))}
+                                          </select>
+                                        </div>
+                                      </div>
+
+                                      <div>
+                                        <label className="block text-[8px] font-bold uppercase tracking-wider text-stone-500 mb-1">Card 1 Title</label>
+                                        <input
+                                          type="text"
+                                          value={sec.step1Title ?? "100% Food-Safe & Organic Finishes"}
+                                          onChange={(e) => updateSectionText(sec.id, "step1Title", e.target.value)}
+                                          className="w-full text-xs p-2 rounded-lg border border-stone-250 focus:outline-none focus:border-brand-primary bg-white font-medium"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="block text-[8px] font-bold uppercase tracking-wider text-stone-500 mb-1">Card 1 Description</label>
+                                        <textarea
+                                          rows={4}
+                                          value={sec.step1Desc ?? "Our cutting boards and serving trays are sealed exclusively with hand-rubbed organic walnut oils and raw local Portland beeswax. Completely allergen-free, lemon-conditioned, and 100% safe to eat off of."}
+                                          onChange={(e) => updateSectionText(sec.id, "step1Desc", e.target.value)}
+                                          className="w-full text-xs p-2 rounded-lg border border-stone-250 focus:outline-none focus:border-brand-primary bg-white leading-relaxed font-light"
+                                        />
+                                      </div>
+                                    </div>
+
+                                    {/* Card 2 */}
+                                    <div className="p-3 border border-stone-150 rounded-xl bg-stone-50/50 space-y-2.5">
+                                      <span className="text-[10px] font-bold text-brand-primary font-mono block">Card 02</span>
+
+                                      <div>
+                                        <label className="block text-[8px] font-bold uppercase tracking-wider text-stone-500 mb-1">Card 2 Icon</label>
+                                        <div className="flex items-center gap-2 bg-white border border-stone-250 rounded-lg p-1.5">
+                                          {renderIconPreview(sec.extraText2 || "Sparkles")}
+                                          <select
+                                            value={sec.extraText2 || "Sparkles"}
+                                            onChange={(e) => updateSectionText(sec.id, "extraText2", e.target.value)}
+                                            className="w-full text-xs border-none bg-transparent focus:outline-none font-medium cursor-pointer"
+                                          >
+                                            {ARTISAN_ICONS.map((ico) => (
+                                              <option key={ico.name} value={ico.name}>{ico.label}</option>
+                                            ))}
+                                          </select>
+                                        </div>
+                                      </div>
+
+                                      <div>
+                                        <label className="block text-[8px] font-bold uppercase tracking-wider text-stone-500 mb-1">Card 2 Title</label>
+                                        <input
+                                          type="text"
+                                          value={sec.step2Title ?? "Precision Laser Branding"}
+                                          onChange={(e) => updateSectionText(sec.id, "step2Title", e.target.value)}
+                                          className="w-full text-xs p-2 rounded-lg border border-stone-250 focus:outline-none focus:border-brand-primary bg-white font-medium"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="block text-[8px] font-bold uppercase tracking-wider text-stone-500 mb-1">Card 2 Description</label>
+                                        <textarea
+                                          rows={4}
+                                          value={sec.step2Desc ?? "We balance laser intensity manually based on specific wood grain densities (American Walnut vs Curly Maple). No charred blurring or shallow fades — just sharp, deep-contrast branding designed to endure."}
+                                          onChange={(e) => updateSectionText(sec.id, "step2Desc", e.target.value)}
+                                          className="w-full text-xs p-2 rounded-lg border border-stone-250 focus:outline-none focus:border-brand-primary bg-white leading-relaxed font-light"
+                                        />
+                                      </div>
+                                    </div>
+
+                                    {/* Card 3 */}
+                                    <div className="p-3 border border-stone-150 rounded-xl bg-stone-50/50 space-y-2.5">
+                                      <span className="text-[10px] font-bold text-brand-primary font-mono block">Card 03</span>
+
+                                      <div>
+                                        <label className="block text-[8px] font-bold uppercase tracking-wider text-stone-500 mb-1">Card 3 Icon</label>
+                                        <div className="flex items-center gap-2 bg-white border border-stone-250 rounded-lg p-1.5">
+                                          {renderIconPreview(sec.extraText3 || "Lightbulb")}
+                                          <select
+                                            value={sec.extraText3 || "Lightbulb"}
+                                            onChange={(e) => updateSectionText(sec.id, "extraText3", e.target.value)}
+                                            className="w-full text-xs border-none bg-transparent focus:outline-none font-medium cursor-pointer"
+                                          >
+                                            {ARTISAN_ICONS.map((ico) => (
+                                              <option key={ico.name} value={ico.name}>{ico.label}</option>
+                                            ))}
+                                          </select>
+                                        </div>
+                                      </div>
+
+                                      <div>
+                                        <label className="block text-[8px] font-bold uppercase tracking-wider text-stone-500 mb-1">Card 3 Title</label>
+                                        <input
+                                          type="text"
+                                          value={sec.step3Title ?? "Complimentary Setup & Mockup"}
+                                          onChange={(e) => updateSectionText(sec.id, "step3Title", e.target.value)}
+                                          className="w-full text-xs p-2 rounded-lg border border-stone-250 focus:outline-none focus:border-brand-primary bg-white font-medium"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="block text-[8px] font-bold uppercase tracking-wider text-stone-500 mb-1">Card 3 Description</label>
+                                        <textarea
+                                          rows={4}
+                                          value={sec.step3Desc ?? "No guesswork. We design a digital blueprint mockup of your engraving in your chosen font and email it for your final sign-off before we touch any raw timber."}
+                                          onChange={(e) => updateSectionText(sec.id, "step3Desc", e.target.value)}
+                                          className="w-full text-xs p-2 rounded-lg border border-stone-250 focus:outline-none focus:border-brand-primary bg-white leading-relaxed font-light"
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+
+                            {sec.id === "catalog-process" && (
+                              <div className="col-span-full border-t border-stone-100 pt-4 mt-2 space-y-4">
+                                <h6 className="font-serif font-bold text-stone-800 text-xs border-b border-stone-100 pb-1.5 flex items-center justify-between">
+                                  <span>Customize Ordering Steps (1 - 6)</span>
+                                  <span className="text-[9px] text-brand-primary font-mono bg-brand-primary/5 px-2 py-0.5 rounded-full">Artisan Steps Editor</span>
+                                </h6>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                  {/* Step 1 */}
+                                  <div className="p-3 border border-stone-150 rounded-xl bg-stone-50/50 space-y-2">
+                                    <span className="text-[10px] font-bold text-brand-primary font-mono block">Step 01</span>
+                                    <div>
+                                      <label className="block text-[8px] font-bold uppercase tracking-wider text-stone-500 mb-1">Step 1 Title</label>
+                                      <input
+                                        type="text"
+                                        value={sec.step1Title ?? "Select Item"}
+                                        onChange={(e) => updateSectionText(sec.id, "step1Title", e.target.value)}
+                                        className="w-full text-xs p-2 rounded-lg border border-stone-250 focus:outline-none focus:border-brand-primary bg-white font-medium"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[8px] font-bold uppercase tracking-wider text-stone-500 mb-1">Step 1 Description</label>
+                                      <textarea
+                                        rows={2}
+                                        value={sec.step1Desc ?? "Select the item you would like."}
+                                        onChange={(e) => updateSectionText(sec.id, "step1Desc", e.target.value)}
+                                        className="w-full text-xs p-2 rounded-lg border border-stone-250 focus:outline-none focus:border-brand-primary bg-white leading-relaxed font-light"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* Step 2 */}
+                                  <div className="p-3 border border-stone-150 rounded-xl bg-stone-50/50 space-y-2">
+                                    <span className="text-[10px] font-bold text-brand-primary font-mono block">Step 02</span>
+                                    <div>
+                                      <label className="block text-[8px] font-bold uppercase tracking-wider text-stone-500 mb-1">Step 2 Title</label>
+                                      <input
+                                        type="text"
+                                        value={sec.step2Title ?? "Describe"}
+                                        onChange={(e) => updateSectionText(sec.id, "step2Title", e.target.value)}
+                                        className="w-full text-xs p-2 rounded-lg border border-stone-250 focus:outline-none focus:border-brand-primary bg-white font-medium"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[8px] font-bold uppercase tracking-wider text-stone-500 mb-1">Step 2 Description</label>
+                                      <textarea
+                                        rows={2}
+                                        value={sec.step2Desc ?? "Give us a description of your custom requirements."}
+                                        onChange={(e) => updateSectionText(sec.id, "step2Desc", e.target.value)}
+                                        className="w-full text-xs p-2 rounded-lg border border-stone-250 focus:outline-none focus:border-brand-primary bg-white leading-relaxed font-light"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* Step 3 */}
+                                  <div className="p-3 border border-stone-150 rounded-xl bg-stone-50/50 space-y-2">
+                                    <span className="text-[10px] font-bold text-brand-primary font-mono block">Step 03</span>
+                                    <div>
+                                      <label className="block text-[8px] font-bold uppercase tracking-wider text-stone-500 mb-1">Step 3 Title</label>
+                                      <input
+                                        type="text"
+                                        value={sec.step3Title ?? "Upload Design"}
+                                        onChange={(e) => updateSectionText(sec.id, "step3Title", e.target.value)}
+                                        className="w-full text-xs p-2 rounded-lg border border-stone-250 focus:outline-none focus:border-brand-primary bg-white font-medium"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[8px] font-bold uppercase tracking-wider text-stone-500 mb-1">Step 3 Description</label>
+                                      <textarea
+                                        rows={2}
+                                        value={sec.step3Desc ?? "Upload images of the design you would like or text."}
+                                        onChange={(e) => updateSectionText(sec.id, "step3Desc", e.target.value)}
+                                        className="w-full text-xs p-2 rounded-lg border border-stone-250 focus:outline-none focus:border-brand-primary bg-white leading-relaxed font-light"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* Step 4 */}
+                                  <div className="p-3 border border-stone-150 rounded-xl bg-stone-50/50 space-y-2">
+                                    <span className="text-[10px] font-bold text-brand-primary font-mono block">Step 04</span>
+                                    <div>
+                                      <label className="block text-[8px] font-bold uppercase tracking-wider text-stone-500 mb-1">Step 4 Title</label>
+                                      <input
+                                        type="text"
+                                        value={sec.step4Title ?? "Send Request"}
+                                        onChange={(e) => updateSectionText(sec.id, "step4Title", e.target.value)}
+                                        className="w-full text-xs p-2 rounded-lg border border-stone-250 focus:outline-none focus:border-brand-primary bg-white font-medium"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[8px] font-bold uppercase tracking-wider text-stone-500 mb-1">Step 4 Description</label>
+                                      <textarea
+                                        rows={2}
+                                        value={sec.step4Desc ?? "Send it to us, and we'll process your request immediately."}
+                                        onChange={(e) => updateSectionText(sec.id, "step4Desc", e.target.value)}
+                                        className="w-full text-xs p-2 rounded-lg border border-stone-250 focus:outline-none focus:border-brand-primary bg-white leading-relaxed font-light"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* Step 5 */}
+                                  <div className="p-3 border border-stone-150 rounded-xl bg-stone-50/50 space-y-2">
+                                    <span className="text-[10px] font-bold text-brand-primary font-mono block">Step 05</span>
+                                    <div>
+                                      <label className="block text-[8px] font-bold uppercase tracking-wider text-stone-500 mb-1">Step 5 Title</label>
+                                      <input
+                                        type="text"
+                                        value={sec.step5Title ?? "Price Quote"}
+                                        onChange={(e) => updateSectionText(sec.id, "step5Title", e.target.value)}
+                                        className="w-full text-xs p-2 rounded-lg border border-stone-250 focus:outline-none focus:border-brand-primary bg-white font-medium"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[8px] font-bold uppercase tracking-wider text-stone-500 mb-1">Step 5 Description</label>
+                                      <textarea
+                                        rows={2}
+                                        value={sec.step5Desc ?? "We will review your submission and send you a custom price."}
+                                        onChange={(e) => updateSectionText(sec.id, "step5Desc", e.target.value)}
+                                        className="w-full text-xs p-2 rounded-lg border border-stone-250 focus:outline-none focus:border-brand-primary bg-white leading-relaxed font-light"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* Step 6 */}
+                                  <div className="p-3 border border-stone-150 rounded-xl bg-stone-50/50 space-y-2">
+                                    <span className="text-[10px] font-bold text-brand-primary font-mono block">Step 06</span>
+                                    <div>
+                                      <label className="block text-[8px] font-bold uppercase tracking-wider text-stone-500 mb-1">Step 6 Title</label>
+                                      <input
+                                        type="text"
+                                        value={sec.step6Title ?? "Fulfillment"}
+                                        onChange={(e) => updateSectionText(sec.id, "step6Title", e.target.value)}
+                                        className="w-full text-xs p-2 rounded-lg border border-stone-250 focus:outline-none focus:border-brand-primary bg-white font-medium"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-[8px] font-bold uppercase tracking-wider text-stone-500 mb-1">Step 6 Description</label>
+                                      <textarea
+                                        rows={2}
+                                        value={sec.step6Desc ?? "Once ordered is confirmed we will send you the pickup/ delivery options."}
+                                        onChange={(e) => updateSectionText(sec.id, "step6Desc", e.target.value)}
+                                        className="w-full text-xs p-2 rounded-lg border border-stone-250 focus:outline-none focus:border-brand-primary bg-white leading-relaxed font-light"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+
+            {/* Bottom Sticky Action Save Banner */}
+            <div className="pt-6 border-t border-stone-200 flex justify-between items-center bg-stone-50 p-4 rounded-2xl">
+              <div className="text-xs text-stone-500">
+                <span className="font-bold block text-stone-800">You have unsaved local modifications.</span>
+                Save settings to authorize write permission and update your live catalog and logo.
+              </div>
+              <button
+                id="site-customizer-save-bottom"
+                onClick={(e) => handleSaveCustomizer(e)}
+                disabled={isSavingCustomizer}
+                className={`text-xs font-bold py-3 px-8 rounded-full transition-all cursor-pointer shadow-md ${
+                  isSavingCustomizer ? "bg-stone-300 text-stone-500" : "bg-brand-primary text-white hover:bg-brand-primary-hover hover:scale-101"
+                }`}
+              >
+                {isSavingCustomizer ? "Saving..." : "Save Customizer Changes"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "security" && (
+          <div id="admin-tab-security-panel" className="space-y-6 max-w-xl animate-fade-in">
+            <div className="pb-4 border-b border-stone-200">
+              <h3 className="font-serif font-bold text-stone-900 text-lg">Portal Security Settings</h3>
+              <p className="text-stone-500 text-xs mt-1">
+                Configure credentials to protect authorization access for the Nicoletta Artisan Portal.
+              </p>
+            </div>
+
+            {passwordStatus && (
+              <div
+                className={`p-4 rounded-xl text-xs flex gap-3 ${
+                  passwordStatus.type === "success"
+                    ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                    : "bg-red-50 text-red-800 border border-red-200"
+                }`}
+              >
+                <div className="shrink-0">
+                  {passwordStatus.type === "success" ? (
+                    <Check className="h-5 w-5 text-emerald-600" />
+                  ) : (
+                    <AlertCircle className="h-5 w-5 text-red-600" />
+                  )}
+                </div>
+                <div>
+                  <h4 className="font-bold">
+                    {passwordStatus.type === "success" ? "Success" : "Update Failed"}
+                  </h4>
+                  <p className="mt-0.5 leading-relaxed">{passwordStatus.message}</p>
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handleChangePassword} className="space-y-5 bg-stone-50 p-6 rounded-2xl border border-stone-200">
+              <div className="space-y-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-stone-700">Current Password</label>
+                  <input
+                    type="password"
+                    required
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="w-full text-xs p-3 rounded-xl border border-stone-200 focus:outline-none focus:border-brand-primary bg-white"
+                    placeholder="••••••••"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-stone-700">New Password</label>
+                  <input
+                    type="password"
+                    required
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full text-xs p-3 rounded-xl border border-stone-200 focus:outline-none focus:border-brand-primary bg-white"
+                    placeholder="••••••••"
+                  />
+                  <p className="text-[10px] text-stone-400">Must be at least 4 characters long.</p>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-stone-700">Confirm New Password</label>
+                  <input
+                    type="password"
+                    required
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full text-xs p-3 rounded-xl border border-stone-200 focus:outline-none focus:border-brand-primary bg-white"
+                    placeholder="••••••••"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={isUpdatingPassword}
+                  className={`w-full py-3 px-4 rounded-full text-xs font-bold text-white transition-all cursor-pointer shadow-xs ${
+                    isUpdatingPassword
+                      ? "bg-stone-400 text-stone-100 cursor-not-allowed"
+                      : "bg-brand-primary hover:bg-brand-primary-hover active:scale-98"
+                  }`}
+                >
+                  {isUpdatingPassword ? "Updating Password..." : "Update Security Password"}
+                </button>
+              </div>
+            </form>
+
+            <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl space-y-2 text-xs text-amber-900">
+              <div className="flex items-center gap-2 font-bold">
+                <Info className="h-4 w-4 text-amber-800 shrink-0" />
+                <span>Security Guidelines &amp; Cryptography Info</span>
+              </div>
+              <ul className="list-disc pl-5 space-y-1 text-[11px] text-amber-800/90 leading-relaxed">
+                <li>Your password is never stored in plain-text on our servers.</li>
+                <li>We hash all admin portal passphrases using industry-grade <strong>PBKDF2</strong> key derivation with 100,000 iterations and a unique, secure salt generator.</li>
+                <li>Updating the password takes effect immediately and updates the offline persistent file database dynamically.</li>
+                <li>Make sure to note down your password safely if you change it.</li>
+              </ul>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
