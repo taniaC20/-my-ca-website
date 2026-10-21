@@ -561,7 +561,7 @@ app.post("/api/auth/login", (req, res) => {
   }
 
   if (!match) {
-    return res.status(401).json({ error: "Unauthorized. Secret passphrase does not match." });
+    return res.status(401).json({ error: "Login validation failed. Secret passphrase mismatch." });
   }
 
   // Generate cryptographically secure random session ID
@@ -1010,24 +1010,50 @@ app.delete("/api/admin/products/:id", requireAdmin, (req, res) => {
 
 // Admin Categories CRUD
 app.post("/api/admin/categories", requireAdmin, (req, res) => {
-  const { name, description, image } = req.body;
+  const { id: bodyId, name, description, image } = req.body;
   const cleanName = sanitizeString(name);
   if (!cleanName) {
     return res.status(400).json({ error: "Category name required." });
   }
 
-  const id = cleanName.toLowerCase().replace(/[^a-z0-9]/g, "-");
-  const newCat = {
+  const id = bodyId ? sanitizeString(bodyId) : cleanName.toLowerCase().replace(/[^a-z0-9]/g, "-");
+  const existingIdx = dbState.categories.findIndex((c) => c.id === id);
+  const catObj = {
     id,
     name: cleanName,
-    slug: id,
+    slug: cleanName.toLowerCase().replace(/[^a-z0-9]/g, "-"),
     description: sanitizeString(description),
     image: sanitizeString(image) || "https://images.unsplash.com/photo-1544982503-9f984c14501a?auto=format&fit=crop&q=80&w=600"
   };
 
-  dbState.categories.push(newCat);
+  if (existingIdx !== -1) {
+    dbState.categories[existingIdx] = catObj;
+    saveDatabase();
+    return res.status(200).json(catObj);
+  }
+
+  dbState.categories.push(catObj);
   saveDatabase();
-  res.status(201).json(newCat);
+  res.status(201).json(catObj);
+});
+
+app.put("/api/admin/categories/:id", requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const index = dbState.categories.findIndex((c) => c.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: "Category not found." });
+  }
+  const { name, description, image } = req.body;
+  const cleanName = sanitizeString(name) || dbState.categories[index].name;
+  dbState.categories[index] = {
+    ...dbState.categories[index],
+    name: cleanName,
+    slug: cleanName.toLowerCase().replace(/[^a-z0-9]/g, "-"),
+    description: description !== undefined ? sanitizeString(description) : dbState.categories[index].description,
+    image: image !== undefined ? sanitizeString(image) : dbState.categories[index].image
+  };
+  saveDatabase();
+  res.json(dbState.categories[index]);
 });
 
 app.delete("/api/admin/categories/:id", requireAdmin, (req, res) => {
