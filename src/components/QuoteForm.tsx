@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { MessageSquare, Calendar, PenTool, Hash, Send, Sparkles, Upload, Trash2, Paperclip, CheckCircle } from "lucide-react";
 import { Product, QuoteRequest } from "../types";
+import { getStoredCustomerSession } from "../supabaseClient";
 
 interface QuoteFormProps {
   products: Product[];
@@ -10,11 +11,12 @@ interface QuoteFormProps {
 }
 
 export default function QuoteForm({ products, selectedProduct, onSubmitQuote, onClearSelection }: QuoteFormProps) {
+  const activeCustomer = getStoredCustomerSession();
   const [formData, setFormData] = useState({
     productId: "",
-    customerName: "",
-    customerEmail: "",
-    customerPhone: "",
+    customerName: activeCustomer?.fullName || "",
+    customerEmail: activeCustomer?.email || "",
+    customerPhone: activeCustomer?.phone || "",
     engravingText: "",
     fontPreference: "Classic Cursive (Dancing Script)",
     specialInstructions: "",
