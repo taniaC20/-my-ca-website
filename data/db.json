@@ -31,17 +31,14 @@
         "order": 1,
         "buttonText1": "Browse Collections",
         "buttonText2": "Request Custom Quote",
-        "imageUrl": "/uploads/artisan_bcfb03b127a83119e4f588c0ba497f1b.jpg",
+        "imageUrl": "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&q=80&w=1200",
         "imageUrls": [
-          "/uploads/artisan_bcfb03b127a83119e4f588c0ba497f1b.jpg",
-          "/uploads/artisan_173f9b4474adf8e8be7a6c88d8d52a95.jpg",
-          "/uploads/artisan_6e84e548f7d73d83f8140662fbd98f84.jpg",
-          "/uploads/artisan_36514e4c1b3fb24869df8bc4c1ecebc4.jpg",
-          "/uploads/artisan_c287ea393419a8e96e764b3f961ab92b.jpg",
-          "/uploads/artisan_4a175707e4f0950f44ef33ff6bd6f3f1.jpg",
-          "/uploads/artisan_986c0a631a289bb5e8284f36c65aef31.jpg",
-          "/uploads/artisan_0adb6e6b7dc3feea097d8a14b397c2b7.jpg",
-          "/uploads/artisan_6aaf74e81aa1173ec417bebe979013d4.jpg"
+          "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&q=80&w=1200",
+          "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&q=80&w=1200",
+          "https://images.unsplash.com/photo-1544982503-9f984c14501a?auto=format&fit=crop&q=80&w=1200",
+          "https://images.unsplash.com/photo-1610701596007-11502861dcfa?auto=format&fit=crop&q=80&w=1200",
+          "https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&q=80&w=1200",
+          "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&q=80&w=1200"
         ]
       },
       {

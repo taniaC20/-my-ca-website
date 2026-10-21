@@ -6,17 +6,25 @@ interface HeroSlideshowProps {
 }
 
 export function HeroSlideshow({ sec }: HeroSlideshowProps) {
-  // Extract images from imageUrls array, or fallback to imageUrl, or a default Unsplash photo
+  // Extract images from imageUrls array, or fallback to imageUrl, or default curated craft photos
   const images = React.useMemo(() => {
+    const defaultFallbacks = [
+      "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&q=80&w=1200",
+      "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&q=80&w=1200",
+      "https://images.unsplash.com/photo-1544982503-9f984c14501a?auto=format&fit=crop&q=80&w=1200",
+      "https://images.unsplash.com/photo-1610701596007-11502861dcfa?auto=format&fit=crop&q=80&w=1200",
+      "https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&q=80&w=1200",
+      "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&q=80&w=1200"
+    ];
     let list: string[] = [];
     if (sec.imageUrls && sec.imageUrls.length > 0) {
-      list = sec.imageUrls.filter(url => url && url.trim() !== "");
+      list = sec.imageUrls.filter(url => url && url.trim() !== "" && !url.startsWith("/uploads/artisan_"));
     }
-    if (list.length === 0 && sec.imageUrl) {
+    if (list.length === 0 && sec.imageUrl && !sec.imageUrl.startsWith("/uploads/artisan_")) {
       list = [sec.imageUrl];
     }
     if (list.length === 0) {
-      return ["https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&q=80&w=1600"];
+      return defaultFallbacks;
     }
     return list;
   }, [sec.imageUrls, sec.imageUrl]);

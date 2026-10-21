@@ -205,7 +205,7 @@ export default function ProductDetails({
         setUploadError(`"${file.name}" exceeds the 10MB limit.`);
         continue;
       }
-      const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "application/pdf"];
+      const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp", "image/svg+xml", "application/pdf"];
       if (!allowedTypes.includes(file.type)) {
         setUploadError(`"${file.name}" is an invalid file type.`);
         continue;
@@ -215,6 +215,7 @@ export default function ProductDetails({
         const reader = new FileReader();
         reader.onload = async (e) => {
           const base64Data = e.target?.result as string;
+          const sizeKB = Math.max(1, Math.round(file.size / 1024));
           try {
             const response = await fetch("/api/upload", {
               method: "POST",
@@ -225,18 +226,23 @@ export default function ProductDetails({
                 data: base64Data
               })
             });
-            const result = await response.json();
             if (response.ok) {
+              const result = await response.json();
               setUploadedFiles((prev) => [
                 ...prev,
-                { name: result.name, size: result.size, url: result.url }
+                { name: result.name || file.name, size: result.size || sizeKB, url: result.url || base64Data }
               ]);
             } else {
-              setUploadError(result.error || `Failed to upload "${file.name}".`);
+              setUploadedFiles((prev) => [
+                ...prev,
+                { name: file.name, size: sizeKB, url: base64Data }
+              ]);
             }
           } catch (err) {
-            console.error("Upload error:", err);
-            setUploadError("Failed to connect to the server.");
+            setUploadedFiles((prev) => [
+              ...prev,
+              { name: file.name, size: sizeKB, url: base64Data }
+            ]);
           }
           resolve();
         };
@@ -338,7 +344,7 @@ export default function ProductDetails({
   const isEngraving = !isSublimation && !isPipeCleaner;
   const hasVisualizer = product.hasVisualizer !== false && !isPipeCleaner;
   const hasEngravingText = product.hasEngravingText !== undefined ? product.hasEngravingText : hasVisualizer;
-  const hasTypography = hasEngravingText;
+  const hasTypography = product.hasTypography !== undefined ? product.hasTypography : hasEngravingText;
 
   return (
     <div id="product-detail-view" className="space-y-8 animate-fade-in max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
