@@ -510,6 +510,15 @@ function verifyMagicBytes(buffer: Buffer, mimeType: string): boolean {
     return buffer.length > 6 && buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38 &&
            (buffer[4] === 0x37 || buffer[4] === 0x39) && buffer[5] === 0x61;
   }
+  if (mimeType === "image/webp") {
+    return buffer.length > 12 &&
+           buffer.slice(0, 4).toString("ascii") === "RIFF" &&
+           buffer.slice(8, 12).toString("ascii") === "WEBP";
+  }
+  if (mimeType === "image/svg+xml") {
+    const head = buffer.toString("utf8", 0, Math.min(buffer.length, 1024)).toLowerCase();
+    return head.includes("<svg");
+  }
   if (mimeType === "application/pdf") {
     return buffer.length > 4 && buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46;
   }
@@ -862,9 +871,9 @@ app.post("/api/upload", (req, res) => {
     }
 
     // Validate MIME types and Extensions
-    const allowedMimeTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "application/pdf"];
+    const allowedMimeTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp", "image/svg+xml", "application/pdf"];
     if (!allowedMimeTypes.includes(mime)) {
-      return res.status(400).json({ error: "Invalid file type. Only JPEG, PNG, GIF, and PDF are permitted." });
+      return res.status(400).json({ error: "Invalid file type. Only JPEG, PNG, GIF, WEBP, SVG, and PDF are permitted." });
     }
 
     // Secure Verification of File Headers / Magic Bytes
@@ -874,8 +883,8 @@ app.post("/api/upload", (req, res) => {
 
     // Sanitize Filename with safe extensions only (Blocks directory traversal & execution)
     const originalExt = path.extname(name).toLowerCase();
-    const safeExtensions = [".png", ".jpg", ".jpeg", ".gif", ".pdf"];
-    const ext = safeExtensions.includes(originalExt) ? originalExt : ".jpg";
+    const safeExtensions = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".pdf"];
+    const ext = safeExtensions.includes(originalExt) ? originalExt : ".png";
 
     const uniqueId = crypto.randomBytes(16).toString("hex");
     const safeFilename = `artisan_${uniqueId}${ext}`;

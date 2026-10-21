@@ -24,22 +24,27 @@ export const NicolettaLogo: React.FC<NicolettaLogoProps> = ({
   const goldColor = "#C2824C"; // Rich Caramel Gold
   const darkColor = colorTheme === "light" ? "#42352B" : "#FDFBF7"; // Dark Caramel Cocoa vs Soft Ivory White
   const mutedColor = colorTheme === "light" ? "#8E7D70" : "#E8DFD5"; // Warm Taupe vs Sand Beige
+  const [imgError, setImgError] = React.useState(false);
+
+  React.useEffect(() => {
+    setImgError(false);
+  }, [logoImageUrl]);
 
   return (
     <div className={`flex items-center gap-3 ${className}`} id="nicoletta-logo-wrapper">
       {/* Circle Icon Badge */}
-      {logoImageUrl ? (
+      {logoImageUrl && !imgError ? (
         <img
           id="nicoletta-logo-image"
           src={logoImageUrl}
           alt={logoText || "Custom Logo"}
+          onError={() => setImgError(true)}
           style={{ 
             width: size || 56, 
             height: size || 56, 
-            backgroundColor: colorTheme === "dark" ? "transparent" : "#ffffff",
-            filter: colorTheme === "dark" ? "brightness(0) invert(1)" : "none"
+            backgroundColor: colorTheme === "dark" ? "transparent" : "#ffffff"
           }}
-          className={`shrink-0 rounded-full object-cover shadow-xs transition-transform duration-300 group-hover:scale-105 ${hideBorder ? "" : "border-2 border-brand-primary"}`}
+          className={`shrink-0 rounded-full object-contain shadow-xs transition-transform duration-300 group-hover:scale-105 ${hideBorder ? "" : "border-2 border-brand-primary"}`}
           referrerPolicy="no-referrer"
         />
       ) : (

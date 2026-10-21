@@ -332,7 +332,7 @@ export default function App() {
         if (localCustStr) {
           try {
             const localCust = JSON.parse(localCustStr);
-            if (localCust && localCust.logoImageUrl && !serverCust.logoImageUrl) {
+            if (localCust && typeof localCust.logoImageUrl === "string" && localCust.logoImageUrl.length > 0 && !serverCust.logoImageUrl) {
               serverCust.logoImageUrl = localCust.logoImageUrl;
             }
           } catch (e) {
