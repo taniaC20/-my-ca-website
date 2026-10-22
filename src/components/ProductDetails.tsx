@@ -600,7 +600,7 @@ export default function ProductDetails({
                 </div>
                 <p className="text-brand-muted text-[11px] leading-relaxed font-light">
                   {isPipeCleaner || (!hasVisualizer && !hasEngravingText)
-                    ? "Fill in your contact information and the crafter will get back to you soon with availability and how to order information, with payment instructions and pickup/delivery instructions."
+                    ? "Please fill out your contact information, and we'll get back to you soon to confirm availability and guide you through the ordering process, including payment options and pickup or delivery details."
                     : "Fill in your custom details below. The crafter will review your order and contact you soon."}
                 </p>
               </div>
