@@ -2433,42 +2433,52 @@ export default function App() {
                     {/* Visual details card */}
                     {(() => {
                       const sec = customization.sections?.find(s => s.id === "contact-header");
+                      const workshopTitle = sec?.extraText1 || "Nicoletta Crafts Workshop";
+                      const pickupAddress = sec?.extraText2 || "305 Water St, St. John's, NL, Canada";
+                      const voiceContact = sec?.extraText3 || "(709) 555-0182";
+                      const emailInquiry = sec?.extraText || "sales@nicolettacraftsdecor.ca";
                       return (
                         <div className="bg-brand-highlight/40 border border-brand-border/60 rounded-[24px] p-6 space-y-4">
                           <h4 className="font-serif font-bold text-brand-dark text-lg border-b border-brand-border pb-2.5">
-                            {sec?.extraText1 || "Nicoletta Crafts Workshop"}
+                            {workshopTitle}
                           </h4>
                           
                           <div className="space-y-3.5 text-xs">
-                            <div className="flex items-start gap-3">
-                              <MapPin className="h-4 w-4 text-brand-primary shrink-0 mt-0.5" />
-                              <div>
-                                <p className="font-bold text-brand-dark uppercase text-[10px] tracking-wider">Pickup location</p>
-                                <p className="text-brand-text mt-0.5 font-light">
-                                  {sec?.extraText2 || "305 Water St, St. John's, NL, Canada"}
-                                </p>
+                            {pickupAddress && (
+                              <div className="flex items-start gap-3">
+                                <MapPin className="h-4 w-4 text-brand-primary shrink-0 mt-0.5" />
+                                <div>
+                                  <p className="font-bold text-brand-dark uppercase text-[10px] tracking-wider">Pickup location</p>
+                                  <p className="text-brand-text mt-0.5 font-light">
+                                    {pickupAddress}
+                                  </p>
+                                </div>
                               </div>
-                            </div>
+                            )}
 
-                            <div className="flex items-start gap-3">
-                              <Phone className="h-4 w-4 text-brand-primary shrink-0 mt-0.5" />
-                              <div>
-                                <p className="font-bold text-brand-dark uppercase text-[10px] tracking-wider">Voice Contact</p>
-                                <p className="text-brand-text mt-0.5 font-light">
-                                  {sec?.extraText3 || "(709) 555-0182"}
-                                </p>
+                            {voiceContact && (
+                              <div className="flex items-start gap-3">
+                                <Phone className="h-4 w-4 text-brand-primary shrink-0 mt-0.5" />
+                                <div>
+                                  <p className="font-bold text-brand-dark uppercase text-[10px] tracking-wider">Voice Contact</p>
+                                  <p className="text-brand-text mt-0.5 font-light">
+                                    {voiceContact}
+                                  </p>
+                                </div>
                               </div>
-                            </div>
+                            )}
 
-                            <div className="flex items-start gap-3">
-                              <Mail className="h-4 w-4 text-brand-primary shrink-0 mt-0.5" />
-                              <div>
-                                <p className="font-bold text-brand-dark uppercase text-[10px] tracking-wider">Email Inquiry</p>
-                                <p className="text-brand-text mt-0.5 font-light">
-                                  {sec?.extraText || "crafts@nicolettadecor.com"}
-                                </p>
+                            {emailInquiry && (
+                              <div className="flex items-start gap-3">
+                                <Mail className="h-4 w-4 text-brand-primary shrink-0 mt-0.5" />
+                                <div>
+                                  <p className="font-bold text-brand-dark uppercase text-[10px] tracking-wider">Email Inquiry</p>
+                                  <p className="text-brand-text mt-0.5 font-light">
+                                    {emailInquiry}
+                                  </p>
+                                </div>
                               </div>
-                            </div>
+                            )}
                           </div>
                         </div>
                       );
@@ -2774,19 +2784,29 @@ export default function App() {
           {/* Col 2: Workshop Contact */}
           {(() => {
             const sec = customization.sections?.find(s => s.id === "contact-header");
+            const workshopTitle = sec?.extraText1 || "Nicoletta Crafts Workshop";
+            const pickupAddress = sec?.extraText2 || "305 Water St, St. John's, NL, Canada";
+            const phoneContact = sec?.extraText3 || "(709) 555-0182";
+            const emailContact = sec?.extraText || "sales@nicolettacraftsdecor.ca";
             return (
               <div className="space-y-2.5">
-                <span className="text-brand-highlight font-bold uppercase tracking-widest block text-[11px]">The Workshop</span>
+                <span className="text-brand-highlight font-bold uppercase tracking-widest block text-[11px]">{workshopTitle}</span>
                 <div className="space-y-1.5 text-brand-muted">
-                  <p className="flex items-center gap-1.5">
-                    <MapPin className="h-3.5 w-3.5 text-brand-primary shrink-0" /> {sec?.extraText2 || "305 Water St, St. John's, NL, Canada"}
-                  </p>
-                  <p className="flex items-center gap-1.5">
-                    <Phone className="h-3.5 w-3.5 text-brand-primary shrink-0" /> {sec?.extraText3 || "(709) 555-0182"}
-                  </p>
-                  <p className="flex items-center gap-1.5">
-                    <Mail className="h-3.5 w-3.5 text-brand-primary shrink-0" /> {sec?.extraText || "crafts@nicolettadecor.com"}
-                  </p>
+                  {pickupAddress && (
+                    <p className="flex items-center gap-1.5">
+                      <MapPin className="h-3.5 w-3.5 text-brand-primary shrink-0" /> {pickupAddress}
+                    </p>
+                  )}
+                  {phoneContact && (
+                    <p className="flex items-center gap-1.5">
+                      <Phone className="h-3.5 w-3.5 text-brand-primary shrink-0" /> {phoneContact}
+                    </p>
+                  )}
+                  {emailContact && (
+                    <p className="flex items-center gap-1.5">
+                      <Mail className="h-3.5 w-3.5 text-brand-primary shrink-0" /> {emailContact}
+                    </p>
+                  )}
                 </div>
               </div>
             );

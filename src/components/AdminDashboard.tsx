@@ -34,7 +34,8 @@ import {
   Megaphone,
   GripVertical,
   Download,
-  Phone
+  Phone,
+  MapPin
 } from "lucide-react";
 import { Product, Category, Testimonial, Announcement, QuoteRequest, AnalyticsSummary, CustomizationSettings, CustomSection, GIFT_OCCASION_PRESETS, GiftOccasionFilter } from "../types";
 import { NicolettaLogo } from "./NicolettaLogo";
@@ -5807,8 +5808,8 @@ export default function AdminDashboard({
                   { id: "home", label: "Home Page" },
                   { id: "catalog", label: "Artisan Catalog" },
                   { id: "quote", label: "Request Quote" },
-                  { id: "reviews", label: "Patron Reviews" },
-                  { id: "workshop", label: "The Workshop" }
+                  { id: "reviews", label: "Customer Reviews" },
+                  { id: "workshop", label: "Connect & Footer Info" }
                 ].map((t) => {
                   const safeSecs = Array.isArray(sections) ? sections.filter((s) => Boolean(s && typeof s.id === "string")) : [];
                   const count = safeSecs.filter((sec) => {
@@ -6053,69 +6054,203 @@ export default function AdminDashboard({
                                 </div>
                               )}
 
-                              {(sec.extraText !== undefined || sec.id === "contact-header") && (
-                                <div>
-                                  <label className="block text-[9px] font-bold uppercase tracking-wider text-stone-500 mb-1">
-                                    {sec.id === "contact-header" ? "Studio Email Address" : "Extra Text / Secondary Button text"}
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={sec.extraText || ""}
-                                    onChange={(e) => updateSectionText(sec.id, "extraText", e.target.value)}
-                                    className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary"
-                                  />
-                                </div>
-                              )}
+                              {sec.id === "contact-header" ? (
+                                <div className="space-y-4 col-span-1 md:col-span-2 bg-brand-highlight/40 border border-brand-border/70 p-4 md:p-5 rounded-2xl">
+                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-brand-border/50 pb-3">
+                                    <div className="flex items-center gap-2">
+                                      <MapPin className="h-4 w-4 text-brand-primary" />
+                                      <h5 className="font-bold text-xs text-brand-dark uppercase tracking-wider">
+                                        Workshop Location, Contact Info &amp; Footer Details
+                                      </h5>
+                                    </div>
+                                    <span className="text-[10px] text-brand-primary font-bold bg-white px-2 py-0.5 rounded border border-brand-border self-start sm:self-auto">
+                                      Syncs to Connect Page &amp; Storefront Footer
+                                    </span>
+                                  </div>
 
-                              {sec.extraText1 !== undefined && (
-                                <div>
-                                  <label className="block text-[9px] font-bold uppercase tracking-wider text-stone-500 mb-1">
-                                    {sec.id === "contact-header" ? "Workshop Title / Business Name" : "Extra Text 1"}
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={sec.extraText1}
-                                    onChange={(e) => updateSectionText(sec.id, "extraText1", e.target.value)}
-                                    className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary"
-                                  />
-                                </div>
-                              )}
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                                    <div>
+                                      <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-700 mb-1">
+                                        Workshop Title / Business Name
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={sec.extraText1 ?? "Nicoletta Crafts Workshop"}
+                                        onChange={(e) => updateSectionText(sec.id, "extraText1", e.target.value)}
+                                        placeholder="Nicoletta Crafts Workshop"
+                                        className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary bg-white font-medium"
+                                      />
+                                      <span className="text-[9px] text-stone-400 mt-0.5 block">Header for the workshop card and footer column</span>
+                                    </div>
 
-                              {sec.extraText2 !== undefined && (
-                                <div>
-                                  <label className="block text-[9px] font-bold uppercase tracking-wider text-stone-500 mb-1">
-                                    {sec.id === "contact-header" ? "Pickup Location / Address" : "Extra Text 2"}
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={sec.extraText2}
-                                    onChange={(e) => updateSectionText(sec.id, "extraText2", e.target.value)}
-                                    className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary"
-                                  />
-                                </div>
-                              )}
+                                    <div>
+                                      <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-700 mb-1">
+                                        Pickup Location / Physical Address
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={sec.extraText2 ?? "305 Water St, St. John's, NL, Canada"}
+                                        onChange={(e) => updateSectionText(sec.id, "extraText2", e.target.value)}
+                                        placeholder="305 Water St, St. John's, NL, Canada"
+                                        className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary bg-white font-medium"
+                                      />
+                                      <span className="text-[9px] text-stone-400 mt-0.5 block">Physical address for customer pickups and visits</span>
+                                    </div>
 
-                              {sec.extraText3 !== undefined && (
-                                <div>
-                                  <label className="block text-[9px] font-bold uppercase tracking-wider text-stone-500 mb-1">
-                                    {sec.id === "contact-header" ? "Voice Contact Phone Number" : "Extra Text 3"}
-                                  </label>
-                                  {sec.id === "contact-header" ? (
-                                    <input
-                                      type="text"
-                                      value={sec.extraText3}
-                                      onChange={(e) => updateSectionText(sec.id, "extraText3", e.target.value)}
-                                      className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary"
-                                    />
-                                  ) : (
-                                    <textarea
-                                      rows={3}
-                                      value={sec.extraText3}
-                                      onChange={(e) => updateSectionText(sec.id, "extraText3", e.target.value)}
-                                      className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary leading-relaxed"
-                                    />
+                                    <div>
+                                      <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-700 mb-1">
+                                        Voice Contact / Phone Number
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={sec.extraText3 ?? "(709) 555-0182"}
+                                        onChange={(e) => updateSectionText(sec.id, "extraText3", e.target.value)}
+                                        placeholder="(709) 555-0182"
+                                        className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary bg-white font-medium"
+                                      />
+                                      <span className="text-[9px] text-stone-400 mt-0.5 block">Voice phone number displayed on website</span>
+                                    </div>
+
+                                    <div>
+                                      <label className="block text-[10px] font-bold uppercase tracking-wider text-stone-700 mb-1">
+                                        Email Inquiry Address
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={sec.extraText ?? "sales@nicolettacraftsdecor.ca"}
+                                        onChange={(e) => updateSectionText(sec.id, "extraText", e.target.value)}
+                                        placeholder="sales@nicolettacraftsdecor.ca"
+                                        className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary bg-white font-medium"
+                                      />
+                                      <span className="text-[9px] text-stone-400 mt-0.5 block">Store inquiry and contact email address</span>
+                                    </div>
+                                  </div>
+
+                                  {/* Live Preview Box */}
+                                  <div className="bg-white border border-stone-200 p-3.5 rounded-xl space-y-2 mt-2">
+                                    <span className="text-[9px] font-bold uppercase tracking-wider text-stone-400 block">
+                                      Instant Live Preview (Updates automatically on save)
+                                    </span>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px]">
+                                      <div className="p-3 bg-brand-highlight/20 border border-brand-border/60 rounded-lg space-y-1">
+                                        <span className="font-bold text-[9px] uppercase tracking-wider text-brand-primary block">
+                                          Connect Page Card
+                                        </span>
+                                        <p className="font-bold text-stone-900">{sec.extraText1 || "Nicoletta Crafts Workshop"}</p>
+                                        <p className="text-stone-600 flex items-center gap-1">
+                                          <MapPin className="h-3 w-3 text-brand-primary shrink-0" />
+                                          {sec.extraText2 || "305 Water St, St. John's, NL, Canada"}
+                                        </p>
+                                        <p className="text-stone-600 flex items-center gap-1">
+                                          <Phone className="h-3 w-3 text-brand-primary shrink-0" />
+                                          {sec.extraText3 || "(709) 555-0182"}
+                                        </p>
+                                        <p className="text-stone-600 flex items-center gap-1">
+                                          <Mail className="h-3 w-3 text-brand-primary shrink-0" />
+                                          {sec.extraText || "sales@nicolettacraftsdecor.ca"}
+                                        </p>
+                                      </div>
+
+                                      <div className="p-3 bg-stone-900 text-stone-200 border border-stone-800 rounded-lg space-y-1">
+                                        <span className="font-bold text-[9px] uppercase tracking-wider text-amber-400 block">
+                                          Website Footer
+                                        </span>
+                                        <p className="font-bold text-white">{sec.extraText1 || "Nicoletta Crafts Workshop"}</p>
+                                        <p className="text-stone-400 text-[10px] flex items-center gap-1">
+                                          <MapPin className="h-3 w-3 text-brand-primary shrink-0" />
+                                          {sec.extraText2 || "305 Water St, St. John's, NL, Canada"}
+                                        </p>
+                                        <p className="text-stone-400 text-[10px] flex items-center gap-1">
+                                          <Phone className="h-3 w-3 text-brand-primary shrink-0" />
+                                          {sec.extraText3 || "(709) 555-0182"}
+                                        </p>
+                                        <p className="text-stone-400 text-[10px] flex items-center gap-1">
+                                          <Mail className="h-3 w-3 text-brand-primary shrink-0" />
+                                          {sec.extraText || "sales@nicolettacraftsdecor.ca"}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  {sec.buttonText !== undefined && (
+                                    <div>
+                                      <label className="block text-[9px] font-bold uppercase tracking-wider text-stone-500 mb-1">Button text</label>
+                                      <input
+                                        type="text"
+                                        value={sec.buttonText}
+                                        onChange={(e) => updateSectionText(sec.id, "buttonText", e.target.value)}
+                                        className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary"
+                                      />
+                                    </div>
                                   )}
-                                </div>
+
+                                  {sec.extraText !== undefined && (
+                                    <div>
+                                      <label className="block text-[9px] font-bold uppercase tracking-wider text-stone-500 mb-1">
+                                        Extra Text / Secondary Button text
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={sec.extraText || ""}
+                                        onChange={(e) => updateSectionText(sec.id, "extraText", e.target.value)}
+                                        className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary"
+                                      />
+                                    </div>
+                                  )}
+
+                                  {sec.extraText1 !== undefined && (
+                                    <div>
+                                      <label className="block text-[9px] font-bold uppercase tracking-wider text-stone-500 mb-1">
+                                        Extra Text 1
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={sec.extraText1}
+                                        onChange={(e) => updateSectionText(sec.id, "extraText1", e.target.value)}
+                                        className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary"
+                                      />
+                                    </div>
+                                  )}
+
+                                  {sec.extraText2 !== undefined && (
+                                    <div>
+                                      <label className="block text-[9px] font-bold uppercase tracking-wider text-stone-500 mb-1">
+                                        Extra Text 2
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={sec.extraText2}
+                                        onChange={(e) => updateSectionText(sec.id, "extraText2", e.target.value)}
+                                        className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary"
+                                      />
+                                    </div>
+                                  )}
+
+                                  {sec.extraText3 !== undefined && (
+                                    <div>
+                                      <label className="block text-[9px] font-bold uppercase tracking-wider text-stone-500 mb-1">
+                                        Extra Text 3
+                                      </label>
+                                      {sec.id === "contact-header" ? (
+                                        <input
+                                          type="text"
+                                          value={sec.extraText3}
+                                          onChange={(e) => updateSectionText(sec.id, "extraText3", e.target.value)}
+                                          className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary"
+                                        />
+                                      ) : (
+                                        <textarea
+                                          rows={3}
+                                          value={sec.extraText3}
+                                          onChange={(e) => updateSectionText(sec.id, "extraText3", e.target.value)}
+                                          className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary leading-relaxed"
+                                        />
+                                      )}
+                                    </div>
+                                  )}
+                                </>
                               )}
                             </div>
 

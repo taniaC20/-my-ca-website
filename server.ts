@@ -297,7 +297,7 @@ const DEFAULT_CUSTOMIZATION = {
       extraText1: "Nicoletta Crafts Workshop",
       extraText2: "305 Water St, St. John's, NL, Canada",
       extraText3: "(709) 555-0182",
-      extraText: "crafts@nicolettadecor.com",
+      extraText: "sales@nicolettacraftsdecor.ca",
       visible: true,
       order: 1
     }
