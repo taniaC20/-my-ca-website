@@ -757,12 +757,22 @@ export default function App() {
           synced = res.ok;
         }
       } else {
-        // UPDATE
+        // UPDATE OR REORDER
+        const orderChanged = safeProds.some((np, idx) => products[idx]?.id !== np.id);
         const updated = safeProds.find(np => {
           const old = products.find(p => p.id === np.id);
           return old && JSON.stringify(old) !== JSON.stringify(np);
         });
-        if (updated) {
+        if (orderChanged) {
+          await safeFetchJson("/api/admin/restore-db", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({ products: safeProds })
+          });
+        } else if (updated) {
           const res = await safeFetchJson(`/api/admin/products/${updated.id}`, {
             method: "PUT",
             headers: {
@@ -811,11 +821,21 @@ export default function App() {
           synced = res.ok;
         }
       } else {
+        const orderChanged = safeCats.some((nc, idx) => categories[idx]?.id !== nc.id);
         const updated = safeCats.find(nc => {
           const old = categories.find(c => c.id === nc.id);
           return old && JSON.stringify(old) !== JSON.stringify(nc);
         });
-        if (updated) {
+        if (orderChanged) {
+          await safeFetchJson("/api/admin/restore-db", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({ categories: safeCats })
+          });
+        } else if (updated) {
           const res = await safeFetchJson("/api/admin/categories", {
             method: "POST",
             headers: {
@@ -874,12 +894,22 @@ export default function App() {
           }
         }
       } else {
+        const orderChanged = safeTests.some((nt, idx) => testimonials[idx]?.id !== nt.id);
         // Check if any review was marked approved
         const approved = safeTests.find(nt => {
           const old = testimonials.find(t => t.id === nt.id);
           return old && !old.approved && nt.approved;
         });
-        if (approved) {
+        if (orderChanged) {
+          await safeFetchJson("/api/admin/restore-db", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({ testimonials: safeTests })
+          });
+        } else if (approved) {
           const res = await safeFetchJson(`/api/admin/testimonials/${approved.id}/approve`, {
             method: "PUT",
             headers: { "Authorization": `Bearer ${token}` }
@@ -924,12 +954,22 @@ export default function App() {
           synced = res.ok;
         }
       } else {
+        const orderChanged = safeAnns.some((na, idx) => announcements[idx]?.id !== na.id);
         // Toggle active status
         const toggled = safeAnns.find(na => {
           const old = announcements.find(a => a.id === na.id);
           return old && old.active !== na.active;
         });
-        if (toggled) {
+        if (orderChanged) {
+          await safeFetchJson("/api/admin/restore-db", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({ announcements: safeAnns })
+          });
+        } else if (toggled) {
           const res = await safeFetchJson(`/api/admin/announcements/${toggled.id}/toggle`, {
             method: "PUT",
             headers: { "Authorization": `Bearer ${token}` }

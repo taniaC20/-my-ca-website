@@ -31,7 +31,8 @@ import {
   MessageSquare,
   Image,
   Search,
-  Megaphone
+  Megaphone,
+  GripVertical
 } from "lucide-react";
 import { Product, Category, Testimonial, Announcement, QuoteRequest, AnalyticsSummary, CustomizationSettings, CustomSection } from "../types";
 import { NicolettaLogo } from "./NicolettaLogo";
@@ -502,8 +503,117 @@ export default function AdminDashboard({
     }
 
     const final = sortedAll.map((sec, idx) => ({ ...sec, order: idx }));
+    sectionsRef.current = final;
     setSections(final);
     handleSaveCustomizer(undefined, final);
+  };
+
+  // Drag & Drop Reorder States & Helpers
+  const [draggedProductIdx, setDraggedProductIdx] = useState<number | null>(null);
+  const [dragOverProductIdx, setDragOverProductIdx] = useState<number | null>(null);
+
+  const [draggedCategoryIdx, setDraggedCategoryIdx] = useState<number | null>(null);
+  const [dragOverCategoryIdx, setDragOverCategoryIdx] = useState<number | null>(null);
+
+  const [draggedTestimonialIdx, setDraggedTestimonialIdx] = useState<number | null>(null);
+  const [dragOverTestimonialIdx, setDragOverTestimonialIdx] = useState<number | null>(null);
+
+  const [draggedAnnouncementIdx, setDraggedAnnouncementIdx] = useState<number | null>(null);
+  const [dragOverAnnouncementIdx, setDragOverAnnouncementIdx] = useState<number | null>(null);
+
+  const [sectionDragArmedId, setSectionDragArmedId] = useState<string | null>(null);
+  const [draggedSectionId, setDraggedSectionId] = useState<string | null>(null);
+  const [dragOverSectionId, setDragOverSectionId] = useState<string | null>(null);
+
+  const [slideDragArmedIdx, setSlideDragArmedIdx] = useState<number | null>(null);
+  const [draggedSlideIdx, setDraggedSlideIdx] = useState<number | null>(null);
+  const [dragOverSlideIdx, setDragOverSlideIdx] = useState<number | null>(null);
+
+  const [draggedHeroPhotoIdx, setDraggedHeroPhotoIdx] = useState<number | null>(null);
+  const [dragOverHeroPhotoIdx, setDragOverHeroPhotoIdx] = useState<number | null>(null);
+
+  const [draggedGalleryIdx, setDraggedGalleryIdx] = useState<number | null>(null);
+  const [dragOverGalleryIdx, setDragOverGalleryIdx] = useState<number | null>(null);
+
+  function reorderList<T>(list: T[], fromIndex: number, toIndex: number): T[] {
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= list.length || toIndex >= list.length) {
+      return list;
+    }
+    const updated = [...list];
+    const [moved] = updated.splice(fromIndex, 1);
+    updated.splice(toIndex, 0, moved);
+    return updated;
+  }
+
+  const handleReorderProducts = (fromIdx: number, toIdx: number) => {
+    if (fromIdx === toIdx) return;
+    onUpdateProducts(reorderList(products, fromIdx, toIdx));
+  };
+
+  const handleReorderCategories = (fromIdx: number, toIdx: number) => {
+    if (fromIdx === toIdx) return;
+    onUpdateCategories(reorderList(categories, fromIdx, toIdx));
+  };
+
+  const handleReorderTestimonials = (fromIdx: number, toIdx: number) => {
+    if (fromIdx === toIdx) return;
+    onUpdateTestimonials(reorderList(testimonials, fromIdx, toIdx));
+  };
+
+  const handleReorderAnnouncements = (fromIdx: number, toIdx: number) => {
+    if (fromIdx === toIdx) return;
+    onUpdateAnnouncements(reorderList(announcements, fromIdx, toIdx));
+  };
+
+  const handleDropSectionInTab = (sourceSecId: string, targetSecId: string) => {
+    if (!sourceSecId || !targetSecId || sourceSecId === targetSecId) return;
+    const sortedAll = [...(sectionsRef.current || sections)].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    const idxFrom = sortedAll.findIndex((s) => s.id === sourceSecId);
+    const idxTo = sortedAll.findIndex((s) => s.id === targetSecId);
+    if (idxFrom === -1 || idxTo === -1) return;
+    const reordered = reorderList(sortedAll, idxFrom, idxTo).map((sec, idx) => ({ ...sec, order: idx }));
+    sectionsRef.current = reordered;
+    setSections(reordered);
+    handleSaveCustomizer(undefined, reordered);
+  };
+
+  const handleReorderHeroSlides = (secId: string, currentUrls: string[], fromSlideIdx: number, toSlideIdx: number) => {
+    const numSlides = Math.max(1, Math.ceil(currentUrls.length / 3));
+    if (fromSlideIdx === toSlideIdx || fromSlideIdx < 0 || toSlideIdx < 0 || fromSlideIdx >= numSlides || toSlideIdx >= numSlides) return;
+    const groups: string[][] = [];
+    for (let i = 0; i < numSlides; i++) {
+      groups.push([
+        currentUrls[i * 3] || "",
+        currentUrls[i * 3 + 1] || "",
+        currentUrls[i * 3 + 2] || ""
+      ]);
+    }
+    const reorderedGroups = reorderList(groups, fromSlideIdx, toSlideIdx);
+    const updatedUrls = reorderedGroups.flat();
+    const firstValid = updatedUrls.find((u) => typeof u === "string" && u.trim().length > 0) || "";
+    const nextSections = (sectionsRef.current || sections).map((s) =>
+      s.id === secId ? { ...s, imageUrls: updatedUrls, imageUrl: firstValid } : s
+    );
+    sectionsRef.current = nextSections;
+    setSections(nextSections);
+    handleSaveCustomizer(undefined, nextSections);
+  };
+
+  const handleReorderHeroPhoto = (secId: string, currentUrls: string[], fromGlobalIdx: number, toGlobalIdx: number) => {
+    if (fromGlobalIdx === toGlobalIdx || fromGlobalIdx < 0 || toGlobalIdx < 0) return;
+    const maxIdx = Math.max(currentUrls.length - 1, fromGlobalIdx, toGlobalIdx);
+    const padded = [...currentUrls];
+    while (padded.length <= maxIdx) padded.push("");
+    const temp = padded[fromGlobalIdx];
+    padded[fromGlobalIdx] = padded[toGlobalIdx];
+    padded[toGlobalIdx] = temp;
+    const firstValid = padded.find((u) => typeof u === "string" && u.trim().length > 0) || "";
+    const nextSections = (sectionsRef.current || sections).map((s) =>
+      s.id === secId ? { ...s, imageUrls: padded, imageUrl: firstValid } : s
+    );
+    sectionsRef.current = nextSections;
+    setSections(nextSections);
+    handleSaveCustomizer(undefined, nextSections);
   };
 
   const toggleSectionVisibility = (id: string) => {
@@ -3327,8 +3437,42 @@ export default function AdminDashboard({
                       {(productForm.additionalImages || []).length > 0 && (
                         <div className="flex flex-wrap gap-2 pt-1">
                           {(productForm.additionalImages || []).map((imgUrl, idx) => (
-                            <div key={idx} className="relative group h-14 w-16 rounded-md overflow-hidden border border-stone-300 bg-white">
-                              <img src={imgUrl} alt={`Extra ${idx + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            <div
+                              key={idx}
+                              draggable
+                              onDragStart={() => setDraggedGalleryIdx(idx)}
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                if (dragOverGalleryIdx !== idx) setDragOverGalleryIdx(idx);
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                if (draggedGalleryIdx !== null && draggedGalleryIdx !== idx) {
+                                  setProductForm((prev) => ({
+                                    ...prev,
+                                    additionalImages: reorderList(prev.additionalImages || [], draggedGalleryIdx, idx)
+                                  }));
+                                }
+                                setDraggedGalleryIdx(null);
+                                setDragOverGalleryIdx(null);
+                              }}
+                              onDragEnd={() => {
+                                setDraggedGalleryIdx(null);
+                                setDragOverGalleryIdx(null);
+                              }}
+                              title="Drag to reorder gallery image"
+                              className={`relative group h-14 w-16 rounded-md overflow-hidden border bg-white cursor-grab active:cursor-grabbing transition-all ${
+                                dragOverGalleryIdx === idx
+                                  ? "border-amber-700 ring-2 ring-amber-600/50 scale-105"
+                                  : draggedGalleryIdx === idx
+                                  ? "opacity-40 border-stone-300"
+                                  : "border-stone-300"
+                              }`}
+                            >
+                              <img src={imgUrl} alt={`Extra ${idx + 1}`} className="w-full h-full object-cover pointer-events-none" referrerPolicy="no-referrer" />
+                              <span className="absolute bottom-0.5 left-0.5 bg-black/60 text-white text-[8px] font-bold px-1 rounded">
+                                #{idx + 2}
+                              </span>
                               <button
                                 type="button"
                                 onClick={() =>
@@ -3651,10 +3795,17 @@ export default function AdminDashboard({
             )}
 
             {/* List of Products Table */}
+            {products.length > 1 && (
+              <p className="text-[11px] text-stone-500 flex items-center gap-1.5">
+                <GripVertical className="h-3.5 w-3.5 text-amber-800" />
+                <span>Drag and drop rows (or use the &uarr; / &darr; arrows) to reorder how products appear in your storefront catalog.</span>
+              </p>
+            )}
             <div className="border border-stone-200 rounded-lg overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead className="bg-stone-100 text-stone-600 font-bold uppercase tracking-wider">
                   <tr>
+                    <th className="p-3.5 border-b border-stone-200 w-16">Order</th>
                     <th className="p-3.5 border-b border-stone-200">Image</th>
                     <th className="p-3.5 border-b border-stone-200">Name</th>
                     <th className="p-3.5 border-b border-stone-200">Category</th>
@@ -3666,7 +3817,7 @@ export default function AdminDashboard({
                 <tbody className="divide-y divide-stone-200">
                   {products.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="p-8 text-center text-stone-500">
+                      <td colSpan={7} className="p-8 text-center text-stone-500">
                         <p className="font-serif font-bold text-stone-800 text-sm mb-1">No Crafts Listed Yet</p>
                         <p className="text-stone-400 text-xs mb-3">Your workshop catalog is ready for your real handmade items.</p>
                         <button
@@ -3679,13 +3830,70 @@ export default function AdminDashboard({
                       </td>
                     </tr>
                   )}
-                  {products.map((p) => (
-                    <tr key={p.id} id={`row-product-${p.id}`} className="hover:bg-stone-50">
+                  {products.map((p, idx) => (
+                    <tr
+                      key={p.id}
+                      id={`row-product-${p.id}`}
+                      draggable
+                      onDragStart={(e) => {
+                        setDraggedProductIdx(idx);
+                        e.dataTransfer.effectAllowed = "move";
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        if (dragOverProductIdx !== idx) setDragOverProductIdx(idx);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (draggedProductIdx !== null && draggedProductIdx !== idx) {
+                          handleReorderProducts(draggedProductIdx, idx);
+                        }
+                        setDraggedProductIdx(null);
+                        setDragOverProductIdx(null);
+                      }}
+                      onDragEnd={() => {
+                        setDraggedProductIdx(null);
+                        setDragOverProductIdx(null);
+                      }}
+                      className={`transition-all cursor-grab active:cursor-grabbing ${
+                        dragOverProductIdx === idx
+                          ? "bg-amber-50/80 ring-2 ring-inset ring-amber-700"
+                          : draggedProductIdx === idx
+                          ? "opacity-40 bg-stone-100"
+                          : "hover:bg-stone-50"
+                      }`}
+                    >
+                      <td className="p-3.5">
+                        <div className="flex items-center gap-1">
+                          <GripVertical className="h-4 w-4 text-stone-400 hover:text-amber-800 shrink-0 cursor-grab" title="Drag to reorder product" />
+                          <div className="flex flex-col gap-0.5">
+                            <button
+                              type="button"
+                              disabled={idx === 0}
+                              onClick={() => handleReorderProducts(idx, idx - 1)}
+                              className="text-[9px] leading-none px-1 py-0.5 rounded border border-stone-200 bg-white hover:bg-stone-100 disabled:opacity-30 cursor-pointer"
+                              title="Move Up"
+                            >
+                              &uarr;
+                            </button>
+                            <button
+                              type="button"
+                              disabled={idx === products.length - 1}
+                              onClick={() => handleReorderProducts(idx, idx + 1)}
+                              className="text-[9px] leading-none px-1 py-0.5 rounded border border-stone-200 bg-white hover:bg-stone-100 disabled:opacity-30 cursor-pointer"
+                              title="Move Down"
+                            >
+                              &darr;
+                            </button>
+                          </div>
+                        </div>
+                      </td>
                       <td className="p-3.5">
                         <img
                           src={p.images[0]}
                           alt={p.name}
-                          className="h-10 w-12 object-cover rounded-md border border-stone-200"
+                          className="h-10 w-12 object-cover rounded-md border border-stone-200 pointer-events-none"
                           referrerPolicy="no-referrer"
                         />
                       </td>
@@ -3862,48 +4070,106 @@ export default function AdminDashboard({
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {categories.map((c) => (
-                  <div
-                    key={c.id}
-                    id={`admin-cat-${c.id}`}
-                    className="border border-stone-200 rounded-lg p-4 flex gap-4 bg-white"
-                  >
-                    <img
-                      src={c.image}
-                      alt={c.name}
-                      className="h-16 w-16 object-cover rounded-md border border-stone-200 shrink-0"
-                      referrerPolicy="no-referrer"
-                    />
-                    <div className="space-y-1 flex-1">
-                      <div className="flex justify-between items-start">
-                        <h4 className="font-serif font-bold text-stone-950 text-sm leading-tight">{c.name}</h4>
-                        <div className="flex gap-1">
-                          <button
-                            id={`edit-cat-btn-${c.id}`}
-                            onClick={() => startEditCategory(c)}
-                            className="text-stone-400 hover:text-amber-800 p-1 cursor-pointer transition-colors"
-                            title="Edit Category"
-                          >
-                            <Edit className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            id={`delete-cat-btn-${c.id}`}
-                            onClick={() => handleDeleteCategory(c.id)}
-                            className="text-stone-400 hover:text-red-700 p-1 cursor-pointer transition-colors"
-                            title="Delete Category"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
+              <div className="space-y-3">
+                {categories.length > 1 && (
+                  <p className="text-[11px] text-stone-500 flex items-center gap-1.5">
+                    <GripVertical className="h-3.5 w-3.5 text-amber-800" />
+                    <span>Drag and drop category cards (or use the &uarr; / &darr; arrows) to reorder how categories appear on the homepage and catalog.</span>
+                  </p>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {categories.map((c, idx) => (
+                    <div
+                      key={c.id}
+                      id={`admin-cat-${c.id}`}
+                      draggable
+                      onDragStart={(e) => {
+                        setDraggedCategoryIdx(idx);
+                        e.dataTransfer.effectAllowed = "move";
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        if (dragOverCategoryIdx !== idx) setDragOverCategoryIdx(idx);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (draggedCategoryIdx !== null && draggedCategoryIdx !== idx) {
+                          handleReorderCategories(draggedCategoryIdx, idx);
+                        }
+                        setDraggedCategoryIdx(null);
+                        setDragOverCategoryIdx(null);
+                      }}
+                      onDragEnd={() => {
+                        setDraggedCategoryIdx(null);
+                        setDragOverCategoryIdx(null);
+                      }}
+                      className={`border rounded-lg p-4 flex gap-3 bg-white cursor-grab active:cursor-grabbing transition-all ${
+                        dragOverCategoryIdx === idx
+                          ? "border-amber-700 ring-2 ring-amber-600/40 bg-amber-50/30 scale-[0.99]"
+                          : draggedCategoryIdx === idx
+                          ? "opacity-40 border-stone-300 bg-stone-50"
+                          : "border-stone-200 hover:border-amber-700/50"
+                      }`}
+                    >
+                      <div className="flex flex-col items-center justify-center gap-1 text-stone-400 shrink-0" title="Drag to reorder category">
+                        <GripVertical className="h-4 w-4 hover:text-amber-800 cursor-grab" />
+                        <span className="text-[9px] font-mono font-bold text-stone-400">#{idx + 1}</span>
                       </div>
-                      <p className="text-stone-600 text-xs line-clamp-2 leading-relaxed">{c.description}</p>
-                      <span className="text-[9px] bg-stone-100 text-stone-600 px-2 py-0.5 rounded-sm font-semibold inline-block">
-                        {products.filter((p) => p.categoryId === c.id).length} items listed
-                      </span>
+                      <img
+                        src={c.image}
+                        alt={c.name}
+                        className="h-16 w-16 object-cover rounded-md border border-stone-200 shrink-0 pointer-events-none"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="space-y-1 flex-1 min-w-0">
+                        <div className="flex justify-between items-start gap-2">
+                          <h4 className="font-serif font-bold text-stone-950 text-sm leading-tight truncate">{c.name}</h4>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              disabled={idx === 0}
+                              onClick={() => handleReorderCategories(idx, idx - 1)}
+                              className="text-[10px] px-1.5 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 disabled:opacity-30 cursor-pointer"
+                              title="Move Category Up"
+                            >
+                              &uarr;
+                            </button>
+                            <button
+                              type="button"
+                              disabled={idx === categories.length - 1}
+                              onClick={() => handleReorderCategories(idx, idx + 1)}
+                              className="text-[10px] px-1.5 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 disabled:opacity-30 cursor-pointer"
+                              title="Move Category Down"
+                            >
+                              &darr;
+                            </button>
+                            <button
+                              id={`edit-cat-btn-${c.id}`}
+                              onClick={() => startEditCategory(c)}
+                              className="text-stone-400 hover:text-amber-800 p-1 cursor-pointer transition-colors"
+                              title="Edit Category"
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              id={`delete-cat-btn-${c.id}`}
+                              onClick={() => handleDeleteCategory(c.id)}
+                              className="text-stone-400 hover:text-red-700 p-1 cursor-pointer transition-colors"
+                              title="Delete Category"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                        <p className="text-stone-600 text-xs line-clamp-2 leading-relaxed">{c.description}</p>
+                        <span className="text-[9px] bg-stone-100 text-stone-600 px-2 py-0.5 rounded-sm font-semibold inline-block">
+                          {products.filter((p) => p.categoryId === c.id).length} items listed
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -4025,33 +4291,97 @@ export default function AdminDashboard({
               </div>
             ) : (
               <div className="space-y-4">
-                {testimonials.map((t) => (
+                {testimonials.length > 1 && (
+                  <p className="text-[11px] text-stone-500 flex items-center gap-1.5">
+                    <GripVertical className="h-3.5 w-3.5 text-amber-800" />
+                    <span>Drag and drop reviews (or use the &uarr; / &darr; arrows) to customize the display order of client testimonials.</span>
+                  </p>
+                )}
+                {testimonials.map((t, idx) => (
                   <div
                     key={t.id}
                     id={`admin-testimonial-${t.id}`}
-                    className={`border rounded-lg p-4 space-y-2.5 transition-colors ${t.approved ? "border-stone-200 bg-white" : "border-amber-400/50 bg-amber-50/20"}`}
+                    draggable
+                    onDragStart={(e) => {
+                      setDraggedTestimonialIdx(idx);
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                      if (dragOverTestimonialIdx !== idx) setDragOverTestimonialIdx(idx);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (draggedTestimonialIdx !== null && draggedTestimonialIdx !== idx) {
+                        handleReorderTestimonials(draggedTestimonialIdx, idx);
+                      }
+                      setDraggedTestimonialIdx(null);
+                      setDragOverTestimonialIdx(null);
+                    }}
+                    onDragEnd={() => {
+                      setDraggedTestimonialIdx(null);
+                      setDragOverTestimonialIdx(null);
+                    }}
+                    className={`border rounded-lg p-4 space-y-2.5 transition-all cursor-grab active:cursor-grabbing ${
+                      dragOverTestimonialIdx === idx
+                        ? "border-amber-700 ring-2 ring-amber-600/40 bg-amber-50/40 scale-[0.99]"
+                        : draggedTestimonialIdx === idx
+                        ? "opacity-40 border-stone-300 bg-stone-50"
+                        : t.approved
+                        ? "border-stone-200 bg-white hover:border-amber-700/40"
+                        : "border-amber-400/50 bg-amber-50/20"
+                    }`}
                   >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <strong className="text-stone-900 text-sm">{t.author}</strong>
-                          {t.company && <span className="text-xs text-stone-500">({t.company})</span>}
-                          <span
-                            className={`text-[9px] font-bold px-2 py-0.5 rounded-sm uppercase tracking-wider ${
-                              t.approved ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
-                            }`}
-                          >
-                            {t.approved ? "Approved" : "Pending moderation"}
-                          </span>
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex items-start gap-2.5">
+                        <div className="flex items-center gap-1 text-stone-400 pt-0.5 shrink-0" title="Drag to reorder review">
+                          <GripVertical className="h-4 w-4 hover:text-amber-800 cursor-grab" />
+                          <span className="text-[9px] font-mono font-bold text-stone-400">#{idx + 1}</span>
                         </div>
-                        <span className="text-[10px] text-stone-400 font-mono">Submitted {t.date}</span>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <strong className="text-stone-900 text-sm">{t.author}</strong>
+                            {t.company && <span className="text-xs text-stone-500">({t.company})</span>}
+                            <span
+                              className={`text-[9px] font-bold px-2 py-0.5 rounded-sm uppercase tracking-wider ${
+                                t.approved ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                              }`}
+                            >
+                              {t.approved ? "Approved" : "Pending moderation"}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-stone-400 font-mono">Submitted {t.date}</span>
+                        </div>
                       </div>
 
-                      {/* Stars */}
-                      <div className="flex text-amber-500">
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <Star key={i} className={`h-3 w-3 ${i < t.rating ? "fill-amber-500 text-amber-500" : "text-stone-200"}`} />
-                        ))}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            disabled={idx === 0}
+                            onClick={() => handleReorderTestimonials(idx, idx - 1)}
+                            className="text-[10px] px-1.5 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 disabled:opacity-30 cursor-pointer"
+                            title="Move Review Up"
+                          >
+                            &uarr;
+                          </button>
+                          <button
+                            type="button"
+                            disabled={idx === testimonials.length - 1}
+                            onClick={() => handleReorderTestimonials(idx, idx + 1)}
+                            className="text-[10px] px-1.5 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 disabled:opacity-30 cursor-pointer"
+                            title="Move Review Down"
+                          >
+                            &darr;
+                          </button>
+                        </div>
+                        {/* Stars */}
+                        <div className="flex text-amber-500">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <Star key={i} className={`h-3 w-3 ${i < t.rating ? "fill-amber-500 text-amber-500" : "text-stone-200"}`} />
+                          ))}
+                        </div>
                       </div>
                     </div>
 
@@ -4298,29 +4628,89 @@ export default function AdminDashboard({
               </div>
             ) : (
               <div className="space-y-3">
-              {announcements.map((a) => (
+              {announcements.length > 1 && (
+                <p className="text-[11px] text-stone-500 flex items-center gap-1.5">
+                  <GripVertical className="h-3.5 w-3.5 text-amber-800" />
+                  <span>Drag and drop announcements (or use the &uarr; / &darr; arrows) to reorder priority.</span>
+                </p>
+              )}
+              {announcements.map((a, idx) => (
                 <div
                   key={a.id}
                   id={`admin-announcement-${a.id}`}
-                  className="border border-stone-200 rounded-lg p-4 flex justify-between items-center bg-white"
+                  draggable
+                  onDragStart={(e) => {
+                    setDraggedAnnouncementIdx(idx);
+                    e.dataTransfer.effectAllowed = "move";
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    if (dragOverAnnouncementIdx !== idx) setDragOverAnnouncementIdx(idx);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (draggedAnnouncementIdx !== null && draggedAnnouncementIdx !== idx) {
+                      handleReorderAnnouncements(draggedAnnouncementIdx, idx);
+                    }
+                    setDraggedAnnouncementIdx(null);
+                    setDragOverAnnouncementIdx(null);
+                  }}
+                  onDragEnd={() => {
+                    setDraggedAnnouncementIdx(null);
+                    setDragOverAnnouncementIdx(null);
+                  }}
+                  className={`border rounded-lg p-4 flex justify-between items-center bg-white cursor-grab active:cursor-grabbing transition-all ${
+                    dragOverAnnouncementIdx === idx
+                      ? "border-amber-700 ring-2 ring-amber-600/40 bg-amber-50/30 scale-[0.99]"
+                      : draggedAnnouncementIdx === idx
+                      ? "opacity-40 border-stone-300 bg-stone-50"
+                      : "border-stone-200 hover:border-amber-700/40"
+                  }`}
                 >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <strong className="text-stone-900 text-sm">{a.title}</strong>
-                      <span className="text-[9px] bg-stone-100 text-stone-600 px-1.5 py-0.5 rounded-sm uppercase tracking-wide">
-                        {a.type}
-                      </span>
-                      {!a.active && (
-                        <span className="text-[9px] bg-red-100 text-red-800 px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-wider">
-                          Suspended
-                        </span>
-                      )}
+                  <div className="flex items-start gap-3">
+                    <div className="flex items-center gap-1 text-stone-400 pt-0.5 shrink-0" title="Drag to reorder announcement">
+                      <GripVertical className="h-4 w-4 hover:text-amber-800 cursor-grab" />
+                      <span className="text-[9px] font-mono font-bold text-stone-400">#{idx + 1}</span>
                     </div>
-                    <p className="text-stone-600 text-xs leading-relaxed">{a.content}</p>
-                    <span className="text-[9px] text-stone-400 font-mono">Posted {a.date}</span>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <strong className="text-stone-900 text-sm">{a.title}</strong>
+                        <span className="text-[9px] bg-stone-100 text-stone-600 px-1.5 py-0.5 rounded-sm uppercase tracking-wide">
+                          {a.type}
+                        </span>
+                        {!a.active && (
+                          <span className="text-[9px] bg-red-100 text-red-800 px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-wider">
+                            Suspended
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-stone-600 text-xs leading-relaxed">{a.content}</p>
+                      <span className="text-[9px] text-stone-400 font-mono">Posted {a.date}</span>
+                    </div>
                   </div>
 
-                  <div className="flex gap-2 items-center">
+                  <div className="flex gap-2 items-center shrink-0">
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        disabled={idx === 0}
+                        onClick={() => handleReorderAnnouncements(idx, idx - 1)}
+                        className="text-[10px] px-1.5 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 disabled:opacity-30 cursor-pointer"
+                        title="Move Announcement Up"
+                      >
+                        &uarr;
+                      </button>
+                      <button
+                        type="button"
+                        disabled={idx === announcements.length - 1}
+                        onClick={() => handleReorderAnnouncements(idx, idx + 1)}
+                        className="text-[10px] px-1.5 py-0.5 rounded border border-stone-200 bg-stone-50 hover:bg-stone-100 disabled:opacity-30 cursor-pointer"
+                        title="Move Announcement Down"
+                      >
+                        &darr;
+                      </button>
+                    </div>
                     <button
                       id={`toggle-announcement-btn-${a.id}`}
                       onClick={() => handleToggleAnnouncement(a.id)}
@@ -4852,33 +5242,74 @@ export default function AdminDashboard({
                       <div
                         key={sec.id}
                         id={`admin-customizer-sec-${sec.id}`}
+                        draggable={sectionDragArmedId === sec.id}
+                        onDragStart={(e) => {
+                          setDraggedSectionId(sec.id);
+                          e.dataTransfer.effectAllowed = "move";
+                          e.dataTransfer.setData("text/plain", sec.id);
+                        }}
+                        onDragOver={(e) => {
+                          if (!draggedSectionId) return;
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "move";
+                          if (dragOverSectionId !== sec.id) {
+                            setDragOverSectionId(sec.id);
+                          }
+                        }}
+                        onDrop={(e) => {
+                          if (!draggedSectionId) return;
+                          e.preventDefault();
+                          handleDropSectionInTab(draggedSectionId, sec.id);
+                          setDraggedSectionId(null);
+                          setDragOverSectionId(null);
+                          setSectionDragArmedId(null);
+                        }}
+                        onDragEnd={() => {
+                          setDraggedSectionId(null);
+                          setDragOverSectionId(null);
+                          setSectionDragArmedId(null);
+                        }}
                         className={`border rounded-2xl p-5 bg-white shadow-3xs transition-all ${
                           sec.visible === false ? "opacity-60 border-stone-200 bg-stone-50" : "border-stone-200 hover:border-brand-primary/40"
+                        } ${draggedSectionId === sec.id ? "opacity-50" : ""} ${
+                          dragOverSectionId === sec.id && draggedSectionId !== sec.id
+                            ? "ring-2 ring-brand-primary bg-amber-50/20"
+                            : ""
                         }`}
                       >
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-stone-100">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h5 className="font-serif font-bold text-stone-900 text-sm">
-                                {sec.name || sec.title}
-                              </h5>
-                              <span className="text-[9px] bg-stone-100 text-stone-500 font-mono px-2 py-0.5 rounded-sm">
-                                ID: {sec.id}
-                              </span>
-                              {isCustom && (
-                                <span className="text-[9px] bg-amber-50 text-brand-primary font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm">
-                                  Custom CMS
+                          <div className="flex items-start gap-2.5">
+                            <span
+                              onMouseDown={() => setSectionDragArmedId(sec.id)}
+                              onMouseUp={() => setSectionDragArmedId(null)}
+                              className="cursor-grab active:cursor-grabbing text-stone-400 hover:text-brand-primary p-1 rounded hover:bg-stone-100 transition-colors mt-0.5"
+                              title="Drag to reorder section"
+                            >
+                              <GripVertical className="h-4 w-4" />
+                            </span>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h5 className="font-serif font-bold text-stone-900 text-sm">
+                                  {sec.name || sec.title}
+                                </h5>
+                                <span className="text-[9px] bg-stone-100 text-stone-500 font-mono px-2 py-0.5 rounded-sm">
+                                  ID: {sec.id}
                                 </span>
-                              )}
-                              {sec.visible === false && (
-                                <span className="text-[9px] bg-red-100 text-red-800 font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm">
-                                  Hidden/Deleted
-                                </span>
-                              )}
+                                {isCustom && (
+                                  <span className="text-[9px] bg-amber-50 text-brand-primary font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm">
+                                    Custom CMS
+                                  </span>
+                                )}
+                                {sec.visible === false && (
+                                  <span className="text-[9px] bg-red-100 text-red-800 font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm">
+                                    Hidden/Deleted
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-stone-400 text-[10px]">
+                                {activeSectionTab === "home" ? "Drag or use arrows to reorder, hide, or rewrite this homepage section." : "Drag to reorder or modify display titles and copy on the public page."}
+                              </p>
                             </div>
-                            <p className="text-stone-400 text-[10px]">
-                              {activeSectionTab === "home" ? "Re-order, hide or fully rewrite this homepage section." : "Modify display titles and copy on the public page."}
-                            </p>
                           </div>
 
                           {/* Order Actions & Visibility Toggles */}
@@ -5074,34 +5505,102 @@ export default function AdminDashboard({
 
                                       return Array.from({ length: numSlides }).map((_, slideIdx) => {
                                         return (
-                                          <div key={slideIdx} className="border border-stone-150 rounded-xl bg-white p-3.5 space-y-3 shadow-3xs">
+                                          <div
+                                            key={slideIdx}
+                                            draggable={slideDragArmedIdx === slideIdx}
+                                            onDragStart={(e) => {
+                                              setDraggedSlideIdx(slideIdx);
+                                              e.dataTransfer.effectAllowed = "move";
+                                              e.dataTransfer.setData("text/plain", String(slideIdx));
+                                            }}
+                                            onDragOver={(e) => {
+                                              if (draggedSlideIdx === null) return;
+                                              e.preventDefault();
+                                              e.dataTransfer.dropEffect = "move";
+                                              if (dragOverSlideIdx !== slideIdx) {
+                                                setDragOverSlideIdx(slideIdx);
+                                              }
+                                            }}
+                                            onDrop={(e) => {
+                                              if (draggedSlideIdx === null) return;
+                                              e.preventDefault();
+                                              handleReorderHeroSlides(sec.id, currentUrls, draggedSlideIdx, slideIdx);
+                                              setDraggedSlideIdx(null);
+                                              setDragOverSlideIdx(null);
+                                              setSlideDragArmedIdx(null);
+                                            }}
+                                            onDragEnd={() => {
+                                              setDraggedSlideIdx(null);
+                                              setDragOverSlideIdx(null);
+                                              setSlideDragArmedIdx(null);
+                                            }}
+                                            className={`border border-stone-150 rounded-xl bg-white p-3.5 space-y-3 shadow-3xs transition-all ${
+                                              draggedSlideIdx === slideIdx ? "opacity-50" : ""
+                                            } ${
+                                              dragOverSlideIdx === slideIdx && draggedSlideIdx !== slideIdx
+                                                ? "ring-2 ring-brand-primary bg-amber-50/20"
+                                                : ""
+                                            }`}
+                                          >
                                             <div className="flex items-center justify-between border-b border-stone-100 pb-2">
                                               <div className="flex items-center gap-1.5">
+                                                <span
+                                                  onMouseDown={() => setSlideDragArmedIdx(slideIdx)}
+                                                  onMouseUp={() => setSlideDragArmedIdx(null)}
+                                                  className="cursor-grab active:cursor-grabbing text-stone-400 hover:text-brand-primary p-0.5 rounded hover:bg-stone-100 transition-colors"
+                                                  title="Drag to reorder slide"
+                                                >
+                                                  <GripVertical className="h-3.5 w-3.5" />
+                                                </span>
                                                 <span className="flex h-4.5 w-4.5 items-center justify-center rounded-full bg-stone-900 text-[9px] font-bold text-white">
                                                   {slideIdx + 1}
                                                 </span>
                                                 <span className="text-[11px] font-bold text-stone-800">Slide {slideIdx + 1} Collage</span>
                                               </div>
-                                              {numSlides > 1 && (
-                                                <button
-                                                  type="button"
-                                                  onClick={() => {
-                                                    const updatedUrls = currentUrls.filter((_, idx) => {
-                                                      const sIdx = Math.floor(idx / 3);
-                                                      return sIdx !== slideIdx;
-                                                    });
-                                                    updateSectionText(sec.id, {
-                                                      imageUrls: updatedUrls,
-                                                      imageUrl: updatedUrls[0] || ""
-                                                    });
-                                                  }}
-                                                  className="text-[9px] font-bold text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded transition-colors flex items-center gap-1 cursor-pointer"
-                                                  title="Delete Slide"
-                                                >
-                                                  <Trash2 className="h-3 w-3" />
-                                                  Delete Slide
-                                                </button>
-                                              )}
+                                              <div className="flex items-center gap-1.5">
+                                                {numSlides > 1 && (
+                                                  <div className="flex items-center gap-0.5">
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => handleReorderHeroSlides(sec.id, currentUrls, slideIdx, slideIdx - 1)}
+                                                      disabled={slideIdx === 0}
+                                                      className="px-1.5 py-0.5 rounded border border-stone-200 bg-stone-50 text-[9px] text-stone-600 hover:bg-stone-100 disabled:opacity-30 cursor-pointer"
+                                                      title="Move Slide Up"
+                                                    >
+                                                      &uarr;
+                                                    </button>
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => handleReorderHeroSlides(sec.id, currentUrls, slideIdx, slideIdx + 1)}
+                                                      disabled={slideIdx === numSlides - 1}
+                                                      className="px-1.5 py-0.5 rounded border border-stone-200 bg-stone-50 text-[9px] text-stone-600 hover:bg-stone-100 disabled:opacity-30 cursor-pointer"
+                                                      title="Move Slide Down"
+                                                    >
+                                                      &darr;
+                                                    </button>
+                                                  </div>
+                                                )}
+                                                {numSlides > 1 && (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      const updatedUrls = currentUrls.filter((_, idx) => {
+                                                        const sIdx = Math.floor(idx / 3);
+                                                        return sIdx !== slideIdx;
+                                                      });
+                                                      updateSectionText(sec.id, {
+                                                        imageUrls: updatedUrls,
+                                                        imageUrl: updatedUrls[0] || ""
+                                                      });
+                                                    }}
+                                                    className="text-[9px] font-bold text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded transition-colors flex items-center gap-1 cursor-pointer"
+                                                    title="Delete Slide"
+                                                  >
+                                                    <Trash2 className="h-3 w-3" />
+                                                    Delete Slide
+                                                  </button>
+                                                )}
+                                              </div>
                                             </div>
 
                                             {/* 3 columns of images for this slide */}
@@ -5110,9 +5609,49 @@ export default function AdminDashboard({
                                                 const globalIdx = slideIdx * 3 + imgInSlideIdx;
                                                 const url = currentUrls[globalIdx] || "";
                                                 return (
-                                                  <div key={imgInSlideIdx} className="bg-stone-50 border border-stone-150 rounded-lg p-2.5 flex flex-col gap-2">
+                                                  <div
+                                                    key={imgInSlideIdx}
+                                                    draggable
+                                                    onDragStart={(e) => {
+                                                      e.stopPropagation();
+                                                      setDraggedHeroPhotoIdx(globalIdx);
+                                                      e.dataTransfer.effectAllowed = "move";
+                                                      e.dataTransfer.setData("text/plain", String(globalIdx));
+                                                    }}
+                                                    onDragOver={(e) => {
+                                                      if (draggedHeroPhotoIdx === null) return;
+                                                      e.preventDefault();
+                                                      e.stopPropagation();
+                                                      e.dataTransfer.dropEffect = "move";
+                                                      if (dragOverHeroPhotoIdx !== globalIdx) {
+                                                        setDragOverHeroPhotoIdx(globalIdx);
+                                                      }
+                                                    }}
+                                                    onDrop={(e) => {
+                                                      if (draggedHeroPhotoIdx === null) return;
+                                                      e.preventDefault();
+                                                      e.stopPropagation();
+                                                      handleReorderHeroPhoto(sec.id, currentUrls, draggedHeroPhotoIdx, globalIdx);
+                                                      setDraggedHeroPhotoIdx(null);
+                                                      setDragOverHeroPhotoIdx(null);
+                                                    }}
+                                                    onDragEnd={() => {
+                                                      setDraggedHeroPhotoIdx(null);
+                                                      setDragOverHeroPhotoIdx(null);
+                                                    }}
+                                                    className={`bg-stone-50 border border-stone-150 rounded-lg p-2.5 flex flex-col gap-2 transition-all ${
+                                                      draggedHeroPhotoIdx === globalIdx ? "opacity-50" : ""
+                                                    } ${
+                                                      dragOverHeroPhotoIdx === globalIdx && draggedHeroPhotoIdx !== globalIdx
+                                                        ? "ring-2 ring-brand-primary bg-amber-50/40"
+                                                        : ""
+                                                    }`}
+                                                  >
                                                     <div className="flex items-center justify-between text-[8px] font-bold text-stone-400 uppercase tracking-wider">
-                                                      <span>Photo {imgInSlideIdx + 1}</span>
+                                                      <span className="flex items-center gap-1 cursor-grab active:cursor-grabbing" title="Drag to swap/reorder photo">
+                                                        <GripVertical className="h-3 w-3 text-stone-400" />
+                                                        Photo {imgInSlideIdx + 1}
+                                                      </span>
                                                       {url && (
                                                         <button
                                                           type="button"
