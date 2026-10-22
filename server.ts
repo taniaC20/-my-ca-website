@@ -931,7 +931,7 @@ app.post("/api/upload", (req, res) => {
 
 // Admin Products CRUD operations
 app.post("/api/admin/products", requireAdmin, (req, res) => {
-  const { id: bodyId, name, description, categoryId, price, maxPrice, promoPrice, images, featured, inStock, customOptions, hideCustomOptions, hideOptionsAvailable, hasVisualizer, hasEngravingText, hasTypography, leadTime, dimensions, badge, seal, includedNotes, materialDetails, pricingNotice, alternativeRequestText } = req.body;
+  const { id: bodyId, name, description, categoryId, price, maxPrice, promoPrice, images, featured, inStock, customOptions, hideCustomOptions, hideOptionsAvailable, hasVisualizer, hasEngravingText, hasTypography, leadTime, dimensions, badge, seal, includedNotes, giftOccasions, materialDetails, pricingNotice, alternativeRequestText } = req.body;
 
   const cleanName = sanitizeString(name);
   const cleanDesc = sanitizeString(description);
@@ -966,6 +966,7 @@ app.post("/api/admin/products", requireAdmin, (req, res) => {
     badge: badge ? sanitizeString(badge) : undefined,
     seal: seal ? sanitizeString(seal) : undefined,
     includedNotes: Array.isArray(includedNotes) ? includedNotes.map(sanitizeString) : undefined,
+    giftOccasions: Array.isArray(giftOccasions) ? giftOccasions.map(sanitizeString).filter(Boolean) : undefined,
     materialDetails: materialDetails ? sanitizeString(materialDetails) : undefined,
     pricingNotice: pricingNotice ? sanitizeString(pricingNotice) : undefined,
     alternativeRequestText: alternativeRequestText ? sanitizeString(alternativeRequestText) : undefined
@@ -984,7 +985,7 @@ app.post("/api/admin/products", requireAdmin, (req, res) => {
 app.put("/api/admin/products/:id", requireAdmin, (req, res) => {
   const { id } = req.params;
   const index = dbState.products.findIndex((p) => p.id === id);
-  const { name, description, categoryId, price, maxPrice, promoPrice, images, featured, inStock, customOptions, hideCustomOptions, hideOptionsAvailable, hasVisualizer, hasEngravingText, hasTypography, leadTime, dimensions, badge, seal, includedNotes, materialDetails, pricingNotice, alternativeRequestText } = req.body;
+  const { name, description, categoryId, price, maxPrice, promoPrice, images, featured, inStock, customOptions, hideCustomOptions, hideOptionsAvailable, hasVisualizer, hasEngravingText, hasTypography, leadTime, dimensions, badge, seal, includedNotes, giftOccasions, materialDetails, pricingNotice, alternativeRequestText } = req.body;
 
   if (index === -1) {
     const isHideCustom = !!(hideCustomOptions || hideOptionsAvailable);
@@ -1010,6 +1011,7 @@ app.put("/api/admin/products/:id", requireAdmin, (req, res) => {
       badge: badge ? sanitizeString(badge) : undefined,
       seal: seal ? sanitizeString(seal) : undefined,
       includedNotes: Array.isArray(includedNotes) ? includedNotes.map(sanitizeString) : undefined,
+      giftOccasions: Array.isArray(giftOccasions) ? giftOccasions.map(sanitizeString).filter(Boolean) : undefined,
       materialDetails: materialDetails ? sanitizeString(materialDetails) : undefined,
       pricingNotice: pricingNotice ? sanitizeString(pricingNotice) : undefined,
       alternativeRequestText: alternativeRequestText ? sanitizeString(alternativeRequestText) : undefined
@@ -1047,6 +1049,7 @@ app.put("/api/admin/products/:id", requireAdmin, (req, res) => {
     badge: badge !== undefined ? (badge ? sanitizeString(badge) : undefined) : dbState.products[index].badge,
     seal: seal !== undefined ? (seal ? sanitizeString(seal) : undefined) : dbState.products[index].seal,
     includedNotes: includedNotes !== undefined ? (Array.isArray(includedNotes) ? includedNotes.map(sanitizeString) : undefined) : dbState.products[index].includedNotes,
+    giftOccasions: giftOccasions !== undefined ? (Array.isArray(giftOccasions) ? giftOccasions.map(sanitizeString).filter(Boolean) : undefined) : dbState.products[index].giftOccasions,
     materialDetails: materialDetails !== undefined ? (materialDetails ? sanitizeString(materialDetails) : undefined) : dbState.products[index].materialDetails,
     pricingNotice: pricingNotice !== undefined ? (pricingNotice ? sanitizeString(pricingNotice) : undefined) : dbState.products[index].pricingNotice,
     alternativeRequestText: alternativeRequestText !== undefined ? (alternativeRequestText ? sanitizeString(alternativeRequestText) : undefined) : dbState.products[index].alternativeRequestText

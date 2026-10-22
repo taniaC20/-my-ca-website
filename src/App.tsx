@@ -28,7 +28,7 @@ import {
   Paperclip,
   User
 } from "lucide-react";
-import { Product, Category, Testimonial, Announcement, QuoteRequest, AnalyticsSummary, CustomizationSettings, CustomSection } from "./types";
+import { Product, Category, Testimonial, Announcement, QuoteRequest, AnalyticsSummary, CustomizationSettings, CustomSection, GIFT_OCCASION_PRESETS } from "./types";
 import {
   INITIAL_CATEGORIES,
   INITIAL_PRODUCTS,
@@ -1176,13 +1176,31 @@ export default function App() {
     }
   };
 
-  // Filter products based on categories & search query
+  // Filter products based on categories, search query & gift occasion quick filters
   const filteredProducts = products.filter((p) => {
     const matchCategory = selectedCategoryId === "all" || p.categoryId === selectedCategoryId;
-    const matchSearch =
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.description.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchCategory && matchSearch;
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return matchCategory;
+
+    const matchNameOrDesc =
+      p.name.toLowerCase().includes(q) ||
+      p.description.toLowerCase().includes(q) ||
+      (p.badge || "").toLowerCase().includes(q) ||
+      (p.includedNotes || []).some((note) => note.toLowerCase().includes(q));
+
+    const matchGiftOccasion = (p.giftOccasions || []).some((occ) => {
+      const occLower = occ.toLowerCase();
+      if (occLower === q || occLower.includes(q)) return true;
+      const preset = GIFT_OCCASION_PRESETS.find(
+        (pr) => pr.name.toLowerCase() === occLower || pr.term.toLowerCase() === occLower
+      );
+      if (preset && (preset.term.toLowerCase() === q || preset.name.toLowerCase().includes(q))) {
+        return true;
+      }
+      return false;
+    });
+
+    return matchCategory && (matchNameOrDesc || matchGiftOccasion);
   });
 
   return (
@@ -2034,29 +2052,44 @@ export default function App() {
                 <div className="bg-brand-highlight/25 border border-brand-border/40 p-4 rounded-[20px] space-y-2.5">
                   <span className="text-[10px] text-brand-muted font-bold uppercase tracking-widest block">Gift Occasion Quick Filters:</span>
                   <div className="flex flex-wrap gap-2">
-                    {[
-                      { name: "💍 Wedding Heirlooms", term: "wedding" },
-                      { name: "🏢 Corporate Branding", term: "corporate" },
-                      { name: "🏡 Housewarming Gifts", term: "board" },
-                      { name: "🎁 Heritage Gifts", term: "heritage" },
-                      { name: "💼 Executive Leather", term: "leather" },
-                      { name: "🥃 Engraved Glassware", term: "glass" }
-                    ].map((occ) => (
-                      <button
-                        key={occ.name}
-                        onClick={() => {
-                          setSearchQuery(occ.term);
-                          setSelectedCategoryId("all");
-                        }}
-                        className={`px-3 py-1.5 text-[9px] font-bold rounded-lg transition-all cursor-pointer uppercase tracking-wider border ${
-                          searchQuery.toLowerCase() === occ.term.toLowerCase()
-                            ? "bg-brand-primary text-white border-brand-primary shadow-xs"
-                            : "bg-white hover:bg-brand-highlight text-brand-muted border-brand-border/40"
-                        }`}
-                      >
-                        {occ.name}
-                      </button>
-                    ))}
+                    {(() => {
+                      const presetNames = GIFT_OCCASION_PRESETS.map((o) => o.name as string);
+                      const customOccasions = Array.from(
+                        new Set<string>(
+                          products
+                            .flatMap((p) => p.giftOccasions || [])
+                            .filter((occ): occ is string => Boolean(occ) && !presetNames.includes(occ))
+                        )
+                      ).map((occ) => ({ name: occ, term: occ }));
+
+                      const allOccasions = [...GIFT_OCCASION_PRESETS, ...customOccasions];
+
+                      return allOccasions.map((occ) => {
+                        const isActive =
+                          searchQuery.trim().toLowerCase() === occ.term.toLowerCase() ||
+                          searchQuery.trim().toLowerCase() === occ.name.toLowerCase();
+                        return (
+                          <button
+                            key={occ.name}
+                            onClick={() => {
+                              if (isActive) {
+                                setSearchQuery("");
+                              } else {
+                                setSearchQuery(occ.term);
+                                setSelectedCategoryId("all");
+                              }
+                            }}
+                            className={`px-3 py-1.5 text-[9px] font-bold rounded-lg transition-all cursor-pointer uppercase tracking-wider border ${
+                              isActive
+                                ? "bg-brand-primary text-white border-brand-primary shadow-xs"
+                                : "bg-white hover:bg-brand-highlight text-brand-muted border-brand-border/40"
+                            }`}
+                          >
+                            {occ.name}
+                          </button>
+                        );
+                      });
+                    })()}
                     {searchQuery && (
                       <button
                         onClick={() => setSearchQuery("")}

@@ -1,3 +1,12 @@
+export const GIFT_OCCASION_PRESETS = [
+  { name: "💍 Wedding Heirlooms", term: "wedding" },
+  { name: "🏢 Corporate Branding", term: "corporate" },
+  { name: "🏡 Housewarming Gifts", term: "board" },
+  { name: "🎁 Heritage Gifts", term: "heritage" },
+  { name: "💼 Executive Leather", term: "leather" },
+  { name: "🥃 Engraved Glassware", term: "glass" }
+] as const;
+
 export interface Product {
   id: string;
   name: string;
@@ -20,6 +29,7 @@ export interface Product {
   badge?: string; // e.g. "Walnut Woodcraft"
   seal?: string; // e.g. "Artisan Bench Crafted"
   includedNotes?: string[]; // Perks list
+  giftOccasions?: string[]; // Gift Occasion Quick Filters (e.g. ["💍 Wedding Heirlooms", "🏡 Housewarming Gifts"])
   materialDetails?: string; // Detailed material info override
   pricingNotice?: string; // Custom note under pricing (e.g., "*The final cost will be calculated and sent by the crafter after reviewing your order details.")
   alternativeRequestText?: string; // Custom prompt for "Request a Similar or Alternative Craft"

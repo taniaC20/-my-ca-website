@@ -34,7 +34,7 @@ import {
   Megaphone,
   GripVertical
 } from "lucide-react";
-import { Product, Category, Testimonial, Announcement, QuoteRequest, AnalyticsSummary, CustomizationSettings, CustomSection } from "../types";
+import { Product, Category, Testimonial, Announcement, QuoteRequest, AnalyticsSummary, CustomizationSettings, CustomSection, GIFT_OCCASION_PRESETS } from "../types";
 import { NicolettaLogo } from "./NicolettaLogo";
 import { safeSetLocalStorage, persistKeyVal } from "../storage";
 
@@ -683,6 +683,7 @@ export default function AdminDashboard({
   // Edit / Creation states
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isAddingProduct, setIsAddingProduct] = useState(false);
+  const [customOccasionInput, setCustomOccasionInput] = useState("");
   const [productForm, setProductForm] = useState<{
     name: string;
     description: string;
@@ -704,6 +705,7 @@ export default function AdminDashboard({
     badge?: string;
     seal?: string;
     includedNotes?: string;
+    giftOccasions?: string[];
     materialDetails?: string;
     pricingNotice?: string;
     alternativeRequestText?: string;
@@ -728,6 +730,7 @@ export default function AdminDashboard({
     badge: "",
     seal: "",
     includedNotes: "",
+    giftOccasions: [],
     materialDetails: "",
     pricingNotice: "",
     alternativeRequestText: ""
@@ -974,6 +977,9 @@ export default function AdminDashboard({
 
     const parsedPromo = productForm.promoPrice ? Number(productForm.promoPrice) : undefined;
     const parsedMaxPrice = productForm.maxPrice ? Number(productForm.maxPrice) : undefined;
+    const occasionsArray = Array.isArray(productForm.giftOccasions)
+      ? productForm.giftOccasions.map((o) => o.trim()).filter(Boolean)
+      : [];
 
     if (editingProduct) {
       // Update
@@ -1001,6 +1007,7 @@ export default function AdminDashboard({
                 badge: productForm.badge || undefined,
                 seal: productForm.seal || undefined,
                 includedNotes: includedArray,
+                giftOccasions: occasionsArray,
                 materialDetails: productForm.materialDetails || undefined,
                 pricingNotice: productForm.pricingNotice || undefined,
                 alternativeRequestText: productForm.alternativeRequestText || undefined
@@ -1033,6 +1040,7 @@ export default function AdminDashboard({
         badge: productForm.badge || undefined,
         seal: productForm.seal || undefined,
         includedNotes: includedArray,
+        giftOccasions: occasionsArray,
         materialDetails: productForm.materialDetails || undefined,
         pricingNotice: productForm.pricingNotice || undefined,
         alternativeRequestText: productForm.alternativeRequestText || undefined
@@ -1042,6 +1050,7 @@ export default function AdminDashboard({
     }
 
     // Reset Form
+    setCustomOccasionInput("");
     setProductForm({
       name: "",
       description: "",
@@ -1063,6 +1072,7 @@ export default function AdminDashboard({
       badge: "",
       seal: "",
       includedNotes: "",
+      giftOccasions: [],
       materialDetails: "",
       pricingNotice: "",
       alternativeRequestText: ""
@@ -1072,6 +1082,7 @@ export default function AdminDashboard({
   const startEditProduct = (p: Product) => {
     setEditingProduct(p);
     setIsAddingProduct(false);
+    setCustomOccasionInput("");
     setProductForm({
       name: p.name,
       description: p.description,
@@ -1093,6 +1104,7 @@ export default function AdminDashboard({
       badge: p.badge || "",
       seal: p.seal || "",
       includedNotes: p.includedNotes ? p.includedNotes.join(", ") : "",
+      giftOccasions: Array.isArray(p.giftOccasions) ? [...p.giftOccasions] : [],
       materialDetails: p.materialDetails || "",
       pricingNotice: p.pricingNotice || "",
       alternativeRequestText: p.alternativeRequestText || ""
@@ -3583,6 +3595,108 @@ export default function AdminDashboard({
                   </div>
                 </div>
 
+                {/* Gift Occasion Quick Filters Selector */}
+                <div className="bg-amber-50/70 p-4 rounded-xl border border-amber-200 space-y-3 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <span className="text-[11px] uppercase font-bold tracking-wider text-amber-950 block">
+                        🎁 Gift Occasion Quick Filters
+                      </span>
+                      <span className="text-[10px] text-amber-800">
+                        Select which Gift Occasion Quick Filters on the Catalog page will show this product when clicked.
+                      </span>
+                    </div>
+                    {(productForm.giftOccasions || []).length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setProductForm({ ...productForm, giftOccasions: [] })}
+                        className="text-[10px] text-red-700 hover:underline font-bold cursor-pointer"
+                      >
+                        Clear All ({(productForm.giftOccasions || []).length})
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Preset & Active Gift Occasion Pills */}
+                  <div className="flex flex-wrap gap-2">
+                    {(() => {
+                      const presetNames = GIFT_OCCASION_PRESETS.map((o) => o.name);
+                      const existingCustom = Array.from(
+                        new Set(
+                          [
+                            ...products.flatMap((p) => p.giftOccasions || []),
+                            ...(productForm.giftOccasions || [])
+                          ].filter((name) => Boolean(name) && !presetNames.includes(name as any))
+                        )
+                      );
+                      const allOccasionNames = [...presetNames, ...existingCustom];
+
+                      return allOccasionNames.map((occName) => {
+                        const currentList = productForm.giftOccasions || [];
+                        const isSelected = currentList.includes(occName);
+                        return (
+                          <button
+                            key={occName}
+                            type="button"
+                            onClick={() => {
+                              const next = isSelected
+                                ? currentList.filter((item) => item !== occName)
+                                : [...currentList, occName];
+                              setProductForm({ ...productForm, giftOccasions: next });
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border transition-all cursor-pointer flex items-center gap-1.5 ${
+                              isSelected
+                                ? "bg-amber-800 text-white border-amber-900 shadow-2xs"
+                                : "bg-white hover:bg-amber-50 text-stone-700 border-stone-300"
+                            }`}
+                          >
+                            <span>{occName}</span>
+                            {isSelected && <Check className="h-3 w-3 shrink-0" />}
+                          </button>
+                        );
+                      });
+                    })()}
+                  </div>
+
+                  {/* Optional Custom Gift Occasion Filter Input */}
+                  <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                    <input
+                      type="text"
+                      value={customOccasionInput}
+                      onChange={(e) => setCustomOccasionInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          const trimmed = customOccasionInput.trim();
+                          if (!trimmed) return;
+                          const currentList = productForm.giftOccasions || [];
+                          if (!currentList.includes(trimmed)) {
+                            setProductForm({ ...productForm, giftOccasions: [...currentList, trimmed] });
+                          }
+                          setCustomOccasionInput("");
+                        }
+                      }}
+                      placeholder="Or add a custom Gift Occasion filter (e.g. 🎂 Anniversary Gifts)..."
+                      className="flex-1 bg-white border border-stone-300 rounded-sm py-1.5 px-2.5 text-xs focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const trimmed = customOccasionInput.trim();
+                        if (!trimmed) return;
+                        const currentList = productForm.giftOccasions || [];
+                        if (!currentList.includes(trimmed)) {
+                          setProductForm({ ...productForm, giftOccasions: [...currentList, trimmed] });
+                        }
+                        setCustomOccasionInput("");
+                      }}
+                      className="bg-white hover:bg-stone-100 text-stone-800 border border-stone-300 text-[10px] font-bold py-1.5 px-3 rounded-sm cursor-pointer transition-colors shrink-0"
+                    >
+                      + Add Filter Tag
+                    </button>
+                  </div>
+                </div>
+
                 {/* Artisan Tags & Production Specifications */}
                 <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-200/80 space-y-3 text-xs">
                   <div className="flex items-center justify-between">
@@ -3899,11 +4013,21 @@ export default function AdminDashboard({
                       </td>
                       <td className="p-3.5">
                         <div className="font-semibold text-stone-900">{p.name}</div>
-                        {p.featured && (
-                          <span className="text-[8px] bg-amber-100 text-amber-800 font-bold uppercase px-1.5 py-0.5 rounded-sm">
-                            ★ Featured
-                          </span>
-                        )}
+                        <div className="flex flex-wrap gap-1 mt-0.5">
+                          {p.featured && (
+                            <span className="text-[8px] bg-amber-100 text-amber-800 font-bold uppercase px-1.5 py-0.5 rounded-sm">
+                              ★ Featured
+                            </span>
+                          )}
+                          {(p.giftOccasions || []).map((occ) => (
+                            <span
+                              key={occ}
+                              className="text-[8px] bg-stone-100 text-stone-700 border border-stone-200 font-semibold px-1.5 py-0.5 rounded-sm"
+                            >
+                              {occ}
+                            </span>
+                          ))}
+                        </div>
                       </td>
                       <td className="p-3.5 text-stone-600">
                         {categories.find((c) => c.id === p.categoryId)?.name || "Uncategorized"}
