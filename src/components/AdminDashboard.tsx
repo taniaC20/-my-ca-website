@@ -708,6 +708,9 @@ export default function AdminDashboard({
     additionalImages?: string[];
     featured: boolean;
     inStock: boolean;
+    readyForPickup?: boolean;
+    isEngravingProduct?: boolean;
+    isHandmadeFlowers?: boolean;
     customOptions: string;
     hideCustomOptions?: boolean;
     hasVisualizer: boolean;
@@ -733,6 +736,9 @@ export default function AdminDashboard({
     additionalImages: [],
     featured: false,
     inStock: true,
+    readyForPickup: false,
+    isEngravingProduct: false,
+    isHandmadeFlowers: false,
     customOptions: "",
     hideCustomOptions: false,
     hasVisualizer: true,
@@ -1009,6 +1015,9 @@ export default function AdminDashboard({
                 images: [productForm.image || p.images[0], ...(productForm.additionalImages || [])].filter(Boolean),
                 featured: productForm.featured,
                 inStock: productForm.inStock,
+                readyForPickup: Boolean(productForm.readyForPickup),
+                isEngravingProduct: Boolean(productForm.isEngravingProduct),
+                isHandmadeFlowers: Boolean(productForm.isHandmadeFlowers),
                 customOptions: optionsArray,
                 hideCustomOptions: productForm.hideCustomOptions,
                 hideOptionsAvailable: productForm.hideCustomOptions,
@@ -1042,6 +1051,9 @@ export default function AdminDashboard({
         images: [productForm.image || imagePresets[0].url, ...(productForm.additionalImages || [])].filter(Boolean),
         featured: productForm.featured,
         inStock: productForm.inStock,
+        readyForPickup: Boolean(productForm.readyForPickup),
+        isEngravingProduct: Boolean(productForm.isEngravingProduct),
+        isHandmadeFlowers: Boolean(productForm.isHandmadeFlowers),
         customOptions: optionsArray,
         hideCustomOptions: productForm.hideCustomOptions,
         hideOptionsAvailable: productForm.hideCustomOptions,
@@ -1075,6 +1087,9 @@ export default function AdminDashboard({
       additionalImages: [],
       featured: false,
       inStock: true,
+      readyForPickup: false,
+      isEngravingProduct: false,
+      isHandmadeFlowers: false,
       customOptions: "",
       hideCustomOptions: false,
       hasVisualizer: true,
@@ -1107,6 +1122,9 @@ export default function AdminDashboard({
       additionalImages: p.images.slice(1),
       featured: p.featured,
       inStock: p.inStock,
+      readyForPickup: Boolean(p.readyForPickup),
+      isEngravingProduct: Boolean(p.isEngravingProduct),
+      isHandmadeFlowers: Boolean(p.isHandmadeFlowers),
       customOptions: p.customOptions ? p.customOptions.join(", ") : "",
       hideCustomOptions: !!(p.hideCustomOptions || p.hideOptionsAvailable),
       hasVisualizer: p.hasVisualizer !== false,
@@ -3191,7 +3209,7 @@ export default function AdminDashboard({
                         },
                         {
                           id: "pipecleaner",
-                          name: "Pipe Cleaner Flowers",
+                          name: "Handmade Flowers",
                           desc: "Colorful custom hand-twisted everlasting blooms",
                           icon: "🌸",
                           values: {
@@ -3204,8 +3222,13 @@ export default function AdminDashboard({
                             image: "https://images.unsplash.com/photo-1526047932273-341f2a7631f9?auto=format&fit=crop&q=80&w=600",
                             featured: false,
                             inStock: true,
+                            readyForPickup: true,
+                            isEngravingProduct: false,
+                            isHandmadeFlowers: true,
                             customOptions: "Flower Types (Sunflower, Pink Tulip, Lavender, Red Rose), Stem Count (3 Stems, 6 Stems, 12 Stems), Gift Felt Wrap Theme",
-                            hasVisualizer: false
+                            hasVisualizer: false,
+                            hasEngravingText: false,
+                            hasTypography: false
                           }
                         }
                       ].map((t) => (
@@ -3989,7 +4012,14 @@ export default function AdminDashboard({
                       <input
                         type="checkbox"
                         checked={productForm.hasEngravingText}
-                        onChange={(e) => setProductForm({ ...productForm, hasEngravingText: e.target.checked, hasTypography: e.target.checked })}
+                        onChange={(e) =>
+                          setProductForm({
+                            ...productForm,
+                            hasEngravingText: e.target.checked,
+                            hasTypography: e.target.checked,
+                            isEngravingProduct: e.target.checked
+                          })
+                        }
                         className="rounded-sm border-stone-300 text-amber-800 focus:ring-amber-800 mt-0.5"
                       />
                       <div>
@@ -3997,10 +4027,39 @@ export default function AdminDashboard({
                         <span className="text-[10px] text-stone-500 block leading-tight font-light mt-0.5">Custom text input and font style selection</span>
                       </div>
                     </label>
+
+                    {/* Handmade Flowers Layout Toggle */}
+                    <label className="flex items-start gap-2.5 bg-white p-3 rounded-lg border border-amber-200/90 cursor-pointer hover:border-amber-400 transition-colors shadow-3xs sm:col-span-2">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(productForm.isHandmadeFlowers)}
+                        onChange={(e) =>
+                          setProductForm({
+                            ...productForm,
+                            isHandmadeFlowers: e.target.checked,
+                            ...(e.target.checked
+                              ? {
+                                  hasVisualizer: false,
+                                  hasEngravingText: false,
+                                  hasTypography: false,
+                                  isEngravingProduct: false
+                                }
+                              : {})
+                          })
+                        }
+                        className="rounded-sm border-stone-300 text-amber-800 focus:ring-amber-800 mt-0.5"
+                      />
+                      <div>
+                        <span className="font-bold text-stone-900 text-xs block">🌸 Handmade Flowers Product (&ldquo;Get a Quote&rdquo; Form)</span>
+                        <span className="text-[10px] text-stone-500 block leading-tight font-light mt-0.5">
+                          Displays &ldquo;Get a Quote&rdquo; and flower availability, ordering, payment, and pickup/delivery instructions instead of engraving fields
+                        </span>
+                      </div>
+                    </label>
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 pt-1 text-xs">
+                <div className="flex flex-wrap gap-4 sm:gap-6 pt-1 text-xs">
                   <label className="flex items-center gap-2 font-bold text-stone-700 cursor-pointer">
                     <input
                       type="checkbox"
@@ -4019,6 +4078,26 @@ export default function AdminDashboard({
                       className="rounded-sm border-stone-300"
                     />
                     In Stock (Ready to Order)
+                  </label>
+
+                  <label className="flex items-center gap-2 font-bold text-emerald-800 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(productForm.readyForPickup)}
+                      onChange={(e) => setProductForm({ ...productForm, readyForPickup: e.target.checked })}
+                      className="rounded-sm border-stone-300 text-emerald-700 focus:ring-emerald-700"
+                    />
+                    Ready for Pickup
+                  </label>
+
+                  <label className="flex items-center gap-2 font-bold text-amber-900 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(productForm.isEngravingProduct)}
+                      onChange={(e) => setProductForm({ ...productForm, isEngravingProduct: e.target.checked })}
+                      className="rounded-sm border-stone-300 text-amber-800 focus:ring-amber-800"
+                    />
+                    Ready for Custom Engraving
                   </label>
 
                   <label className="flex items-center gap-2 font-bold text-amber-900 cursor-pointer">

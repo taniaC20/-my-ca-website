@@ -23,6 +23,9 @@ export interface Product {
   images: string[];
   featured: boolean;
   inStock: boolean;
+  readyForPickup?: boolean; // Shows "Ready for Pickup" badge on product page
+  isEngravingProduct?: boolean; // Shows "Ready for Custom Engraving" badge on product page
+  isHandmadeFlowers?: boolean; // Uses "Get a Quote" and handmade flower contact/order copy
   customOptions?: string[]; // e.g., ["Monogram Style", "Wood Type"]
   hideCustomOptions?: boolean; // Toggles hiding the "Options Available" section
   hideOptionsAvailable?: boolean; // Alias for hiding the "Options Available" section

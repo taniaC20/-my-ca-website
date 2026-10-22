@@ -931,7 +931,7 @@ app.post("/api/upload", (req, res) => {
 
 // Admin Products CRUD operations
 app.post("/api/admin/products", requireAdmin, (req, res) => {
-  const { id: bodyId, name, description, categoryId, price, maxPrice, promoPrice, images, featured, inStock, customOptions, hideCustomOptions, hideOptionsAvailable, hasVisualizer, hasEngravingText, hasTypography, leadTime, dimensions, badge, seal, includedNotes, giftOccasions, materialDetails, pricingNotice, alternativeRequestText } = req.body;
+  const { id: bodyId, name, description, categoryId, price, maxPrice, promoPrice, images, featured, inStock, readyForPickup, isEngravingProduct, isHandmadeFlowers, customOptions, hideCustomOptions, hideOptionsAvailable, hasVisualizer, hasEngravingText, hasTypography, leadTime, dimensions, badge, seal, includedNotes, giftOccasions, materialDetails, pricingNotice, alternativeRequestText } = req.body;
 
   const cleanName = sanitizeString(name);
   const cleanDesc = sanitizeString(description);
@@ -955,6 +955,9 @@ app.post("/api/admin/products", requireAdmin, (req, res) => {
     images: Array.isArray(images) ? images.filter((img) => typeof img === "string" && img.trim().length > 0) : [],
     featured: !!featured,
     inStock: inStock !== undefined ? !!inStock : true,
+    readyForPickup: !!readyForPickup,
+    isEngravingProduct: isEngravingProduct !== undefined ? !!isEngravingProduct : undefined,
+    isHandmadeFlowers: !!isHandmadeFlowers,
     customOptions: Array.isArray(customOptions) ? customOptions.map(sanitizeString) : [],
     hideCustomOptions: isHideCustom,
     hideOptionsAvailable: isHideCustom,
@@ -985,7 +988,7 @@ app.post("/api/admin/products", requireAdmin, (req, res) => {
 app.put("/api/admin/products/:id", requireAdmin, (req, res) => {
   const { id } = req.params;
   const index = dbState.products.findIndex((p) => p.id === id);
-  const { name, description, categoryId, price, maxPrice, promoPrice, images, featured, inStock, customOptions, hideCustomOptions, hideOptionsAvailable, hasVisualizer, hasEngravingText, hasTypography, leadTime, dimensions, badge, seal, includedNotes, giftOccasions, materialDetails, pricingNotice, alternativeRequestText } = req.body;
+  const { name, description, categoryId, price, maxPrice, promoPrice, images, featured, inStock, readyForPickup, isEngravingProduct, isHandmadeFlowers, customOptions, hideCustomOptions, hideOptionsAvailable, hasVisualizer, hasEngravingText, hasTypography, leadTime, dimensions, badge, seal, includedNotes, giftOccasions, materialDetails, pricingNotice, alternativeRequestText } = req.body;
 
   if (index === -1) {
     const isHideCustom = !!(hideCustomOptions || hideOptionsAvailable);
@@ -1000,6 +1003,9 @@ app.put("/api/admin/products/:id", requireAdmin, (req, res) => {
       images: Array.isArray(images) ? images.filter((img) => typeof img === "string" && img.trim().length > 0) : [],
       featured: !!featured,
       inStock: inStock !== undefined ? !!inStock : true,
+      readyForPickup: !!readyForPickup,
+      isEngravingProduct: isEngravingProduct !== undefined ? !!isEngravingProduct : undefined,
+      isHandmadeFlowers: !!isHandmadeFlowers,
       customOptions: Array.isArray(customOptions) ? customOptions.map(sanitizeString) : [],
       hideCustomOptions: isHideCustom,
       hideOptionsAvailable: isHideCustom,
@@ -1038,6 +1044,9 @@ app.put("/api/admin/products/:id", requireAdmin, (req, res) => {
     images: Array.isArray(images) ? images.filter((img) => typeof img === "string" && img.trim().length > 0) : dbState.products[index].images,
     featured: featured !== undefined ? !!featured : dbState.products[index].featured,
     inStock: inStock !== undefined ? !!inStock : dbState.products[index].inStock,
+    readyForPickup: readyForPickup !== undefined ? !!readyForPickup : dbState.products[index].readyForPickup,
+    isEngravingProduct: isEngravingProduct !== undefined ? !!isEngravingProduct : dbState.products[index].isEngravingProduct,
+    isHandmadeFlowers: isHandmadeFlowers !== undefined ? !!isHandmadeFlowers : dbState.products[index].isHandmadeFlowers,
     customOptions: Array.isArray(customOptions) ? customOptions.map(sanitizeString) : dbState.products[index].customOptions,
     hideCustomOptions: updatedHideCustom,
     hideOptionsAvailable: updatedHideCustom,

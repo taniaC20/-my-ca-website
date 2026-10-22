@@ -339,12 +339,22 @@ export default function ProductDetails({
     return "text-2xl md:text-3xl";
   };
 
-  const isSublimation = product.categoryId === "sublimation";
-  const isPipeCleaner = product.categoryId === "pipecleaner";
-  const isEngraving = !isSublimation && !isPipeCleaner;
+  const flowerPattern = /flower|floral|bouquet|pipe\s*cleaner|pipecleaner|rose|tulip|lily|lilies|sunflower|daisy|daisies|lavender|orchid|peony|peonies|carnation|blossom|petal|stem/i;
+  const isSublimation = product.categoryId === "sublimation" || /sublimation/i.test(categoryName || "");
+  const isPipeCleaner =
+    Boolean(product.isHandmadeFlowers) ||
+    product.categoryId === "pipecleaner" ||
+    flowerPattern.test(categoryName || "") ||
+    flowerPattern.test(product.categoryId || "") ||
+    flowerPattern.test(product.name || "") ||
+    flowerPattern.test(product.badge || "");
   const hasVisualizer = product.hasVisualizer !== false && !isPipeCleaner;
   const hasEngravingText = product.hasEngravingText !== undefined ? product.hasEngravingText : hasVisualizer;
   const hasTypography = product.hasTypography !== undefined ? product.hasTypography : hasEngravingText;
+  const isEngraving =
+    !isPipeCleaner &&
+    !isSublimation &&
+    (product.isEngravingProduct === true || (product.isEngravingProduct !== false && Boolean(hasEngravingText)));
 
   return (
     <div id="product-detail-view" className="space-y-8 animate-fade-in max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -477,17 +487,27 @@ export default function ProductDetails({
                   <Ruler className="h-3 w-3 text-brand-primary" /> {product.dimensions.trim()}
                 </span>
               )}
-              <div className="flex items-center gap-1.5 text-xs text-brand-primary">
-                {product.inStock ? (
+              {product.readyForPickup && (
+                <div className="flex items-center gap-1.5 text-xs text-emerald-700">
                   <span className="flex items-center gap-1 font-semibold text-[11px]">
-                    <CheckCircle className="h-3.5 w-3.5" /> {isSublimation ? "Ready for Custom Printing" : isPipeCleaner ? "Ready for Custom Design" : "Ready for Custom Engraving"}
+                    <CheckCircle className="h-3.5 w-3.5" /> Ready for Pickup
                   </span>
-                ) : (
+                </div>
+              )}
+              {isEngraving && product.inStock && (
+                <div className="flex items-center gap-1.5 text-xs text-brand-primary">
+                  <span className="flex items-center gap-1 font-semibold text-[11px]">
+                    <CheckCircle className="h-3.5 w-3.5" /> Ready for Custom Engraving
+                  </span>
+                </div>
+              )}
+              {!product.inStock && (
+                <div className="flex items-center gap-1.5 text-xs text-brand-primary">
                   <span className="text-brand-muted flex items-center gap-1 font-semibold text-[11px]">
                     <AlertTriangle className="h-3.5 w-3.5" /> Custom Workshop Only
                   </span>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -522,9 +542,6 @@ export default function ProductDetails({
                   )}
                 </div>
               </div>
-              <span className="text-[8px] bg-emerald-600/10 text-emerald-700 border border-emerald-600/20 px-2.5 py-1.5 rounded-full font-bold uppercase tracking-wider">
-                All-Inclusive Setup
-              </span>
             </div>
 
             {product.includedNotes && product.includedNotes.filter((n) => n && n.trim()).length > 0 && (
@@ -578,11 +595,13 @@ export default function ProductDetails({
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-brand-primary animate-pulse" />
                   <h3 className="font-serif font-bold text-lg text-brand-dark">
-                    {isSublimation ? "Personalize This Creation" : isPipeCleaner ? "Customize Your Floral Arrangement" : "Personalize This Creation"}
+                    {isPipeCleaner || (!hasVisualizer && !hasEngravingText) ? "Get a Quote" : "Personalize This Creation"}
                   </h3>
                 </div>
                 <p className="text-brand-muted text-[11px] leading-relaxed font-light">
-                  Fill in your custom details below. The crafter will review your order and contact you soon.
+                  {isPipeCleaner || (!hasVisualizer && !hasEngravingText)
+                    ? "Fill in your contact information and the crafter will get back to you soon with availability and how to order information, with payment instructions and pickup/delivery instructions."
+                    : "Fill in your custom details below. The crafter will review your order and contact you soon."}
                 </p>
               </div>
 
