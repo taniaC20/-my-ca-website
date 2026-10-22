@@ -457,20 +457,24 @@ export default function ProductDetails({
               {product.name}
             </h1>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[9px] bg-brand-highlight text-brand-primary border border-brand-border/80 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">
-                {product.badge || material.badge}
-              </span>
-              <span className="text-[9px] bg-amber-800/10 text-amber-800 border border-amber-800/20 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">
-                {product.seal || material.seal}
-              </span>
-              {product.leadTime && (
-                <span className="text-[9px] bg-stone-100 text-stone-800 border border-stone-200 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider flex items-center gap-1">
-                  <Clock className="h-3 w-3 text-brand-primary" /> {product.leadTime}
+              {product.badge && product.badge.trim() && (
+                <span className="text-[9px] bg-brand-highlight text-brand-primary border border-brand-border/80 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">
+                  {product.badge.trim()}
                 </span>
               )}
-              {product.dimensions && (
+              {product.seal && product.seal.trim() && (
+                <span className="text-[9px] bg-amber-800/10 text-amber-800 border border-amber-800/20 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">
+                  {product.seal.trim()}
+                </span>
+              )}
+              {product.leadTime && product.leadTime.trim() && (
                 <span className="text-[9px] bg-stone-100 text-stone-800 border border-stone-200 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider flex items-center gap-1">
-                  <Ruler className="h-3 w-3 text-brand-primary" /> {product.dimensions}
+                  <Clock className="h-3 w-3 text-brand-primary" /> {product.leadTime.trim()}
+                </span>
+              )}
+              {product.dimensions && product.dimensions.trim() && (
+                <span className="text-[9px] bg-stone-100 text-stone-800 border border-stone-200 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider flex items-center gap-1">
+                  <Ruler className="h-3 w-3 text-brand-primary" /> {product.dimensions.trim()}
                 </span>
               )}
               <div className="flex items-center gap-1.5 text-xs text-brand-primary">
@@ -489,7 +493,11 @@ export default function ProductDetails({
 
           {/* Pricing Box & Transparent Fee Breakdown */}
           <div className="bg-brand-highlight border border-brand-border rounded-[24px] p-5 space-y-3.5">
-            <div className="flex justify-between items-center border-b border-brand-border/60 pb-3">
+            <div className={`flex justify-between items-center ${
+              (product.includedNotes && product.includedNotes.some((n) => n && n.trim())) || (product.pricingNotice && product.pricingNotice.trim())
+                ? "border-b border-brand-border/60 pb-3"
+                : ""
+            }`}>
               <div>
                 <span className="text-[10px] text-brand-muted font-bold uppercase tracking-widest block mb-0.5">
                   Transparent Price Range
@@ -519,34 +527,23 @@ export default function ProductDetails({
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-[10px] text-brand-dark font-medium">
-              {product.includedNotes && product.includedNotes.length > 0 ? (
-                product.includedNotes.map((note, idx) => (
-                  <div key={idx} className="flex items-center gap-1.5">
-                    <CheckCircle className="h-3.5 w-3.5 text-brand-primary shrink-0" />
-                    <span>{note}</span>
-                  </div>
-                ))
-              ) : (
-                <>
-                  <div className="flex items-center gap-1.5">
-                    <CheckCircle className="h-3.5 w-3.5 text-brand-primary shrink-0" />
-                    <span>{isSublimation ? "Base Product Item Included" : isPipeCleaner ? "Felt & Pipe Cleaner Stems" : "Base Wood/Craft Included"}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <CheckCircle className="h-3.5 w-3.5 text-brand-primary shrink-0" />
-                    <span>{isSublimation ? "Free Print Setup & Align" : isPipeCleaner ? "Complimentary Arrangement" : "Free Font Engravings"}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <CheckCircle className="h-3.5 w-3.5 text-brand-primary shrink-0" />
-                    <span>{isSublimation ? "Free Print Layout Proof" : isPipeCleaner ? "Gift Inscription Card" : "Free Digital Layout Mockup"}</span>
-                  </div>
-                </>
-              )}
-            </div>
-            <p className="text-[10px] text-brand-muted leading-relaxed font-light">
-              {product.pricingNotice || "*The final cost will be calculated and sent by the crafter after reviewing your order details."}
-            </p>
+            {product.includedNotes && product.includedNotes.filter((n) => n && n.trim()).length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-[10px] text-brand-dark font-medium">
+                {product.includedNotes
+                  .filter((n) => n && n.trim())
+                  .map((note, idx) => (
+                    <div key={idx} className="flex items-center gap-1.5">
+                      <CheckCircle className="h-3.5 w-3.5 text-brand-primary shrink-0" />
+                      <span>{note.trim()}</span>
+                    </div>
+                  ))}
+              </div>
+            )}
+            {product.pricingNotice && product.pricingNotice.trim() && (
+              <p className="text-[10px] text-brand-muted leading-relaxed font-light">
+                {product.pricingNotice.trim()}
+              </p>
+            )}
           </div>
 
           {/* Custom Options Display */}
@@ -732,45 +729,41 @@ export default function ProductDetails({
                 )}
 
                 {/* Similar or Alternative Craft Request Toggle */}
-                <div className="bg-amber-50/60 border border-amber-200 p-4 rounded-[16px] space-y-3 mt-4">
-                  <label className="flex items-start gap-2.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      name="alternativeRequest"
-                      checked={formData.alternativeRequest}
-                      onChange={(e) => setFormData(prev => ({ ...prev, alternativeRequest: e.target.checked }))}
-                      className="rounded border-amber-300 text-amber-800 focus:ring-amber-500 h-4.5 w-4.5 cursor-pointer mt-0.5 shrink-0"
-                    />
-                    <div className="space-y-0.5">
-                      <span className="font-serif font-bold text-brand-dark text-sm block">Request a Similar or Alternative Craft?</span>
-                      <span className="text-xs text-brand-muted leading-relaxed block font-light">
-                        {product.alternativeRequestText || (
-                          isPipeCleaner 
-                            ? "If you want a custom rose, lavender, or customized bouquet instead of this specific piece, check this box to tell us what you'd like! We will quote a custom price."
-                            : isSublimation
-                              ? "Would you like a similar sublimation item (e.g. custom size mug, alternative button style) not listed in our standard options? Check here to describe it!"
-                              : "If you want a different species of hardwood, specialized sizing, or similar items not in our standard list, check this box to specify! We will quote a custom price."
-                        )}
-                      </span>
-                    </div>
-                  </label>
-                  
-                  {formData.alternativeRequest && (
-                    <div className="space-y-2 pl-7 animate-fade-in">
-                      <label className="text-[10px] font-bold text-amber-900 uppercase tracking-wider block">
-                        Describe what you would like instead (and ask for a price quote):
-                      </label>
-                      <textarea
-                        name="alternativeDetails"
-                        rows={2}
-                        value={formData.alternativeDetails}
-                        onChange={(e) => setFormData(prev => ({ ...prev, alternativeDetails: e.target.value }))}
-                        placeholder={isPipeCleaner ? "e.g. Can I request a hand-made Lavender and Rose bouquet instead of the Sunflower? Please provide pricing for 3 stems..." : "e.g. Can I request this printed on an 11oz gloss porcelain mug instead of the ceramic one?"}
-                        className="w-full bg-white border border-amber-300 rounded-[8px] py-2 px-3 text-brand-text text-sm focus:outline-none focus:ring-1 focus:ring-amber-800 focus:border-amber-800"
+                {product.alternativeRequestText && product.alternativeRequestText.trim() && (
+                  <div className="bg-amber-50/60 border border-amber-200 p-4 rounded-[16px] space-y-3 mt-4">
+                    <label className="flex items-start gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        name="alternativeRequest"
+                        checked={formData.alternativeRequest}
+                        onChange={(e) => setFormData(prev => ({ ...prev, alternativeRequest: e.target.checked }))}
+                        className="rounded border-amber-300 text-amber-800 focus:ring-amber-500 h-4.5 w-4.5 cursor-pointer mt-0.5 shrink-0"
                       />
-                    </div>
-                  )}
-                </div>
+                      <div className="space-y-0.5">
+                        <span className="font-serif font-bold text-brand-dark text-sm block">Request a Similar or Alternative Craft?</span>
+                        <span className="text-xs text-brand-muted leading-relaxed block font-light">
+                          {product.alternativeRequestText.trim()}
+                        </span>
+                      </div>
+                    </label>
+                    
+                    {formData.alternativeRequest && (
+                      <div className="space-y-2 pl-7 animate-fade-in">
+                        <label className="text-[10px] font-bold text-amber-900 uppercase tracking-wider block">
+                          Describe what you would like instead (and ask for a price quote):
+                        </label>
+                        <textarea
+                          name="alternativeDetails"
+                          rows={2}
+                          value={formData.alternativeDetails}
+                          onChange={(e) => setFormData(prev => ({ ...prev, alternativeDetails: e.target.value }))}
+                          placeholder={isPipeCleaner ? "e.g. Can I request a hand-made Lavender and Rose bouquet instead of the Sunflower? Please provide pricing for 3 stems..." : "e.g. Can I request this printed on an 11oz gloss porcelain mug instead of the ceramic one?"}
+                          className="w-full bg-white border border-amber-300 rounded-[8px] py-2 px-3 text-brand-text text-sm focus:outline-none focus:ring-1 focus:ring-amber-800 focus:border-amber-800"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Special instructions */}
                 <div className="flex flex-col gap-1.5 border-t border-brand-border/40 pt-4 mt-2">

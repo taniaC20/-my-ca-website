@@ -986,7 +986,7 @@ export default function AdminDashboard({
       : [];
     const includedArray = productForm.includedNotes
       ? productForm.includedNotes.split(",").map((o) => o.trim()).filter((o) => o.length > 0)
-      : undefined;
+      : [];
 
     const parsedPromo = productForm.promoPrice ? Number(productForm.promoPrice) : undefined;
     const parsedMaxPrice = productForm.maxPrice ? Number(productForm.maxPrice) : undefined;
@@ -1015,15 +1015,15 @@ export default function AdminDashboard({
                 hasVisualizer: productForm.hasVisualizer,
                 hasEngravingText: productForm.hasEngravingText,
                 hasTypography: productForm.hasTypography,
-                leadTime: productForm.leadTime || undefined,
-                dimensions: productForm.dimensions || undefined,
-                badge: productForm.badge || undefined,
-                seal: productForm.seal || undefined,
+                leadTime: (productForm.leadTime || "").trim(),
+                dimensions: (productForm.dimensions || "").trim(),
+                badge: (productForm.badge || "").trim(),
+                seal: (productForm.seal || "").trim(),
                 includedNotes: includedArray,
                 giftOccasions: occasionsArray,
-                materialDetails: productForm.materialDetails || undefined,
-                pricingNotice: productForm.pricingNotice || undefined,
-                alternativeRequestText: productForm.alternativeRequestText || undefined
+                materialDetails: (productForm.materialDetails || "").trim(),
+                pricingNotice: (productForm.pricingNotice || "").trim(),
+                alternativeRequestText: (productForm.alternativeRequestText || "").trim()
               }
               : p
       );
@@ -1048,15 +1048,15 @@ export default function AdminDashboard({
         hasVisualizer: productForm.hasVisualizer !== undefined ? productForm.hasVisualizer : true,
         hasEngravingText: productForm.hasEngravingText !== undefined ? productForm.hasEngravingText : true,
         hasTypography: productForm.hasTypography !== undefined ? productForm.hasTypography : true,
-        leadTime: productForm.leadTime || undefined,
-        dimensions: productForm.dimensions || undefined,
-        badge: productForm.badge || undefined,
-        seal: productForm.seal || undefined,
+        leadTime: (productForm.leadTime || "").trim(),
+        dimensions: (productForm.dimensions || "").trim(),
+        badge: (productForm.badge || "").trim(),
+        seal: (productForm.seal || "").trim(),
         includedNotes: includedArray,
         giftOccasions: occasionsArray,
-        materialDetails: productForm.materialDetails || undefined,
-        pricingNotice: productForm.pricingNotice || undefined,
-        alternativeRequestText: productForm.alternativeRequestText || undefined
+        materialDetails: (productForm.materialDetails || "").trim(),
+        pricingNotice: (productForm.pricingNotice || "").trim(),
+        alternativeRequestText: (productForm.alternativeRequestText || "").trim()
       };
       onUpdateProducts([...products, newProduct]);
       setIsAddingProduct(false);
