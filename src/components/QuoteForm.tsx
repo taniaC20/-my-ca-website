@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { MessageSquare, Calendar, PenTool, Hash, Send, Sparkles, Upload, Trash2, Paperclip, CheckCircle } from "lucide-react";
+import { MessageSquare, Calendar, PenTool, Hash, Send, Sparkles, Upload, Trash2, Paperclip, CheckCircle, Mail, Phone } from "lucide-react";
 import { Product, QuoteRequest } from "../types";
 import { getStoredCustomerSession } from "../supabaseClient";
 
@@ -17,6 +17,7 @@ export default function QuoteForm({ products, selectedProduct, onSubmitQuote, on
     customerName: activeCustomer?.fullName || "",
     customerEmail: activeCustomer?.email || "",
     customerPhone: activeCustomer?.phone || "",
+    contactPreference: "email" as "email" | "phone",
     engravingText: "",
     fontPreference: "Classic Cursive (Dancing Script)",
     specialInstructions: "",
@@ -204,11 +205,28 @@ export default function QuoteForm({ products, selectedProduct, onSubmitQuote, on
     if (!formData.customerName.trim()) {
       newErrors.customerName = "Name is required.";
     }
-    if (!formData.customerEmail.trim()) {
-      newErrors.customerEmail = "Email is required.";
-    } else if (!/\S+@\S+\.\S+/.test(formData.customerEmail)) {
-      newErrors.customerEmail = "Please enter a valid email address.";
+
+    if (!formData.contactPreference) {
+      newErrors.contactPreference = "Please select how you would like to be contacted.";
     }
+
+    if (formData.contactPreference === "email") {
+      if (!formData.customerEmail.trim()) {
+        newErrors.customerEmail = "Email address is required when Email is selected as preferred contact.";
+      } else if (!/\S+@\S+\.\S+/.test(formData.customerEmail)) {
+        newErrors.customerEmail = "Please enter a valid email address.";
+      }
+    } else if (formData.contactPreference === "phone") {
+      if (!formData.customerPhone.trim()) {
+        newErrors.customerPhone = "Phone number is required when Phone is selected as preferred contact.";
+      } else if (formData.customerPhone.trim().replace(/\D/g, "").length < 7) {
+        newErrors.customerPhone = "Please enter a valid phone number (at least 7 digits).";
+      }
+      if (formData.customerEmail.trim() && !/\S+@\S+\.\S+/.test(formData.customerEmail)) {
+        newErrors.customerEmail = "Please enter a valid email address.";
+      }
+    }
+
     if (formData.quantity < 1) {
       newErrors.quantity = "Quantity must be at least 1.";
     }
@@ -220,13 +238,15 @@ export default function QuoteForm({ products, selectedProduct, onSubmitQuote, on
     const validationErrors = validate();
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
-      // Scroll to error
       const firstError = Object.keys(validationErrors)[0];
       document.getElementById(firstError)?.focus();
       return;
     }
 
     let finalInstructions = formData.specialInstructions || "";
+    if (formData.contactPreference) {
+      finalInstructions = `[PREFERRED CONTACT: ${formData.contactPreference === "phone" ? "PHONE (Call/Text)" : "EMAIL"}]\n` + finalInstructions;
+    }
     if (formData.alternativeRequest && formData.alternativeDetails.trim()) {
       finalInstructions = `[ALTERNATIVE CRAFT REQUESTED: "${formData.alternativeDetails.trim()}"]\n\n` + finalInstructions;
     }
@@ -237,9 +257,10 @@ export default function QuoteForm({ products, selectedProduct, onSubmitQuote, on
       customerName: formData.customerName,
       customerEmail: formData.customerEmail,
       customerPhone: formData.customerPhone || undefined,
+      contactPreference: formData.contactPreference,
       engravingText: formData.engravingText || undefined,
       fontPreference: formData.fontPreference,
-      specialInstructions: finalInstructions || undefined,
+      specialInstructions: finalInstructions.trim() || undefined,
       quantity: Number(formData.quantity),
       deadline: formData.deadline || undefined,
       uploadedFiles: uploadedFiles.length > 0 ? uploadedFiles : undefined,
@@ -252,6 +273,7 @@ export default function QuoteForm({ products, selectedProduct, onSubmitQuote, on
       customerName: "",
       customerEmail: "",
       customerPhone: "",
+      contactPreference: "email",
       engravingText: "",
       fontPreference: "Classic Cursive (Dancing Script)",
       specialInstructions: "",
@@ -408,6 +430,63 @@ export default function QuoteForm({ products, selectedProduct, onSubmitQuote, on
             )}
           </div>
 
+          {/* Preferred Contact Method Selection */}
+          <div className="flex flex-col gap-2 p-3.5 bg-brand-highlight/40 border border-brand-border rounded-[14px]">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-bold text-brand-dark uppercase tracking-wider flex items-center gap-1">
+                <span>How would you like us to contact you?</span>
+                <span className="text-red-500">*</span>
+              </label>
+              <span className="text-[9px] text-brand-primary font-bold uppercase tracking-wider">Required</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setFormData((prev) => ({ ...prev, contactPreference: "email" }));
+                  setErrors((prev) => {
+                    const copy = { ...prev };
+                    delete copy.contactPreference;
+                    delete copy.customerPhone;
+                    return copy;
+                  });
+                }}
+                className={`flex items-center justify-center gap-2 p-2.5 rounded-[10px] border cursor-pointer transition-all text-xs font-bold ${
+                  formData.contactPreference === "email"
+                    ? "bg-brand-primary text-white border-brand-primary shadow-xs"
+                    : "bg-white text-brand-dark border-brand-border hover:border-brand-primary/40"
+                }`}
+              >
+                <Mail className="h-3.5 w-3.5" />
+                <span>By Email</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setFormData((prev) => ({ ...prev, contactPreference: "phone" }));
+                  setErrors((prev) => {
+                    const copy = { ...prev };
+                    delete copy.contactPreference;
+                    delete copy.customerEmail;
+                    return copy;
+                  });
+                }}
+                className={`flex items-center justify-center gap-2 p-2.5 rounded-[10px] border cursor-pointer transition-all text-xs font-bold ${
+                  formData.contactPreference === "phone"
+                    ? "bg-brand-primary text-white border-brand-primary shadow-xs"
+                    : "bg-white text-brand-dark border-brand-border hover:border-brand-primary/40"
+                }`}
+              >
+                <Phone className="h-3.5 w-3.5" />
+                <span>By Phone</span>
+              </button>
+            </div>
+            {errors.contactPreference && (
+              <span className="text-[10px] text-red-600 font-medium">{errors.contactPreference}</span>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Customer Name */}
             <div className="flex flex-col gap-1.5">
@@ -431,7 +510,7 @@ export default function QuoteForm({ products, selectedProduct, onSubmitQuote, on
             {/* Customer Email */}
             <div className="flex flex-col gap-1.5">
               <label htmlFor="customerEmail" className="text-[10px] font-bold text-brand-muted uppercase tracking-wider">
-                Email Address <span className="text-red-500">*</span>
+                Email Address {formData.contactPreference === "email" ? <span className="text-red-500">*</span> : <span className="text-brand-muted font-normal">(Optional)</span>}
               </label>
               <input
                 id="customerEmail"
@@ -452,7 +531,7 @@ export default function QuoteForm({ products, selectedProduct, onSubmitQuote, on
             {/* Customer Phone */}
             <div className="flex flex-col gap-1.5">
               <label htmlFor="customerPhone" className="text-[10px] font-bold text-brand-muted uppercase tracking-wider">
-                Phone Number (Optional)
+                Phone Number {formData.contactPreference === "phone" ? <span className="text-red-500">*</span> : <span className="text-brand-muted font-normal">(Optional)</span>}
               </label>
               <input
                 id="customerPhone"
@@ -460,9 +539,12 @@ export default function QuoteForm({ products, selectedProduct, onSubmitQuote, on
                 type="text"
                 value={formData.customerPhone}
                 onChange={handleInputChange}
-                placeholder="(555) 123-4567"
-                className="bg-brand-highlight/30 border border-brand-border rounded-[8px] py-2 px-3 text-brand-text text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary"
+                placeholder="(709) 555-0199"
+                className={`bg-brand-highlight/30 border rounded-[8px] py-2 px-3 text-brand-text text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary ${errors.customerPhone ? "border-red-500" : "border-brand-border"}`}
               />
+              {errors.customerPhone && (
+                <span className="text-[10px] text-red-600 font-medium">{errors.customerPhone}</span>
+              )}
             </div>
 
             {/* Quantity */}
@@ -558,7 +640,23 @@ export default function QuoteForm({ products, selectedProduct, onSubmitQuote, on
             </div>
           </div>
 
-          {/* Similar or Alternative Craft Request Toggle */}
+          {/* Special Instructions */}
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="specialInstructions" className="text-[10px] font-bold text-brand-muted uppercase tracking-wider">
+              Special Instructions or Design Ideas
+            </label>
+            <textarea
+              id="specialInstructions"
+              name="specialInstructions"
+              rows={3}
+              value={formData.specialInstructions}
+              onChange={handleInputChange}
+              placeholder={isSublimation ? "Describe any design preferences, background colors, or specific positioning of your photo..." : isPipeCleaner ? "Request custom wrapping papers, specific ribbon colors, or packaging ideas..." : "Please engrave the family crest in the middle. We would also like leather straps added if possible..."}
+              className="bg-brand-highlight/30 border border-brand-border rounded-[8px] py-2.5 px-3 text-brand-text text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary"
+            />
+          </div>
+
+          {/* Similar or Alternative Craft Request Toggle - Below Special Instructions */}
           <div className="bg-amber-50/60 border border-amber-200 p-4 rounded-[16px] space-y-3 mt-4">
             <label className="flex items-start gap-2.5 cursor-pointer">
               <input
@@ -591,22 +689,6 @@ export default function QuoteForm({ products, selectedProduct, onSubmitQuote, on
                 />
               </div>
             )}
-          </div>
-
-          {/* Special Instructions */}
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="specialInstructions" className="text-[10px] font-bold text-brand-muted uppercase tracking-wider">
-              Special Instructions or Design Ideas
-            </label>
-            <textarea
-              id="specialInstructions"
-              name="specialInstructions"
-              rows={3}
-              value={formData.specialInstructions}
-              onChange={handleInputChange}
-              placeholder={isSublimation ? "Describe any design preferences, background colors, or specific positioning of your photo..." : isPipeCleaner ? "Request custom wrapping papers, specific ribbon colors, or packaging ideas..." : "Please engrave the family crest in the middle. We would also like leather straps added if possible..."}
-              className="bg-brand-highlight/30 border border-brand-border rounded-[8px] py-2.5 px-3 text-brand-text text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary"
-            />
           </div>
 
           {/* File Upload Segment */}
@@ -715,7 +797,7 @@ export default function QuoteForm({ products, selectedProduct, onSubmitQuote, on
             className="w-full bg-brand-primary hover:bg-brand-primary-hover text-white font-sans font-bold py-3.5 px-4 rounded-full transition-colors text-[10px] uppercase tracking-widest shadow-xs flex items-center justify-center gap-2 cursor-pointer mt-4"
           >
             <Send className="h-3.5 w-3.5" />
-            Submit Bespoke Quote Request
+            Inquire to Order
           </button>
 
           {submitted && (

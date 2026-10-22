@@ -129,10 +129,10 @@ export default function ProductCard({ product, categoryName, onRequestQuote }: P
               e.stopPropagation();
               onRequestQuote(product);
             }}
-            className="flex items-center gap-1 bg-brand-primary hover:bg-brand-primary-hover text-white text-[10px] uppercase tracking-widest font-bold px-3 py-1.5 rounded-full cursor-pointer transition-colors"
+            className="flex items-center gap-1.5 bg-brand-primary hover:bg-brand-primary-hover text-white text-[10px] uppercase tracking-widest font-bold px-3 py-1.5 rounded-full cursor-pointer transition-colors"
           >
             <MessageSquare className="h-2.5 w-2.5" />
-            Quote
+            Inquire to Order
           </button>
         </div>
       </div>

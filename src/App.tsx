@@ -1776,7 +1776,7 @@ export default function App() {
                                     <div className="p-5 pt-0 flex justify-between items-center mt-auto border-t border-brand-border/10">
                                       <span className="font-serif font-bold text-brand-dark text-sm">${p.price}</span>
                                       <span className="text-[9px] text-brand-primary font-bold uppercase tracking-widest flex items-center gap-1 group-hover:underline">
-                                        Request Mockup <ChevronRight className="h-3 w-3" />
+                                        Inquire to Order <ChevronRight className="h-3 w-3" />
                                       </span>
                                     </div>
                                   </div>
@@ -2359,16 +2359,22 @@ export default function App() {
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
                 {(() => {
                   const sec = customization.sections?.find(s => s.id === "testimonials-header");
+                  const subtitle = !sec?.subtitle || sec.subtitle === "Patron Testimonials" ? "Customer Reviews" : sec.subtitle;
+                  const title = !sec?.title || sec.title === "Bespoke Stories" || sec.title === "Stories from the Mantle" ? "Kind Words from Our Customers" : sec.title;
+                  const description = !sec?.description || sec.description.includes("Verified reviews left by our luxury gift patrons")
+                    ? "Every creation has a story, and we love being part of yours! Read what our customers have to say about their personalized gifts and handmade creations. Have you ordered from Nicoletta? We'd love to hear about your experience! Leave us a review."
+                    : sec.description;
+
                   return (
                     <div className="text-center max-w-xl mx-auto mb-8 space-y-2">
                       <span className="text-[10px] text-brand-primary font-bold uppercase tracking-widest block">
-                        {sec?.subtitle || "Patron Testimonials"}
+                        {subtitle}
                       </span>
                       <h3 className="font-serif font-bold text-brand-dark text-2xl md:text-3xl">
-                        {sec?.title || "Bespoke Stories"}
+                        {title}
                       </h3>
-                      <p className="text-brand-muted text-xs font-light">
-                        {sec?.description || "Verified reviews left by our luxury gift patrons. Submit your own workshop review below."}
+                      <p className="text-brand-muted text-xs font-light leading-relaxed">
+                        {description}
                       </p>
                     </div>
                   );
@@ -2387,16 +2393,22 @@ export default function App() {
                 {/* Header segment */}
                 {(() => {
                   const sec = customization.sections?.find(s => s.id === "contact-header");
+                  const subtitle = !sec?.subtitle || sec.subtitle === "Inquire & Locate" || sec.subtitle === "Visit Our Studio" ? "We'd Love to Hear from You" : sec.subtitle;
+                  const title = !sec?.title || sec.title === "The St. John's Workshop & Gallery" ? "Connect with Nicoletta" : sec.title;
+                  const description = !sec?.description || sec.description.includes("Have an inquiry about an event order") || sec.description.includes("Our physical workshop is located")
+                    ? "Have a question, a custom request, or a special gift in mind? We'd love to help you create something meaningful. Send us a message and let's make your idea a reality!"
+                    : sec.description;
+
                   return (
                     <div className="text-center max-w-xl mx-auto space-y-2">
                       <span className="text-[10px] text-brand-primary font-bold uppercase tracking-widest block">
-                        {sec?.subtitle || "Inquire & Locate"}
+                        {subtitle}
                       </span>
                       <h3 className="font-serif font-bold text-brand-dark text-2xl md:text-3xl">
-                        {sec?.title || "Connect with Nicoletta"}
+                        {title}
                       </h3>
-                      <p className="text-brand-muted text-xs font-light">
-                        {sec?.description || "Have an inquiry about an event order, custom dimension timber board, or corporate bulk engraving? Send us a direct message below."}
+                      <p className="text-brand-muted text-xs font-light leading-relaxed">
+                        {description}
                       </p>
                     </div>
                   );

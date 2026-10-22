@@ -32,7 +32,9 @@ import {
   Image,
   Search,
   Megaphone,
-  GripVertical
+  GripVertical,
+  Download,
+  Phone
 } from "lucide-react";
 import { Product, Category, Testimonial, Announcement, QuoteRequest, AnalyticsSummary, CustomizationSettings, CustomSection, GIFT_OCCASION_PRESETS, GiftOccasionFilter } from "../types";
 import { NicolettaLogo } from "./NicolettaLogo";
@@ -864,6 +866,44 @@ export default function AdminDashboard({
     setEmailSubject(defaultSubject);
     setEmailBody(defaultBody);
     setEmailStatus("idle");
+  };
+
+  const handleDownloadAttachment = (fileUrl: string, fileName: string) => {
+    try {
+      const cleanName = fileName || "client_attachment.png";
+      if (fileUrl.startsWith("data:")) {
+        const a = document.createElement("a");
+        a.href = fileUrl;
+        a.download = cleanName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } else {
+        fetch(fileUrl)
+          .then((res) => res.blob())
+          .then((blob) => {
+            const blobUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = blobUrl;
+            a.download = cleanName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1500);
+          })
+          .catch(() => {
+            const a = document.createElement("a");
+            a.href = fileUrl;
+            a.download = cleanName;
+            a.target = "_blank";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          });
+      }
+    } catch (err) {
+      console.error("Attachment download error:", err);
+    }
   };
 
   const handleSendEmailSimulated = () => {
@@ -1724,6 +1764,15 @@ export default function AdminDashboard({
                               Callback Phone: <strong className="text-stone-800">{q.customerPhone}</strong>
                             </p>
                           )}
+                          {q.contactPreference && (
+                            <p className="text-stone-600 flex items-center gap-1.5">
+                              <span>Preferred Contact:</span>
+                              <span className="font-bold text-amber-900 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 text-[10px] uppercase tracking-wider inline-flex items-center gap-1">
+                                {q.contactPreference === "phone" ? <Phone className="h-2.5 w-2.5" /> : <Mail className="h-2.5 w-2.5" />}
+                                {q.contactPreference === "phone" ? "By Phone" : "By Email"}
+                              </span>
+                            </p>
+                          )}
                           {q.specialInstructions && (
                             <div className="mt-2 p-2 bg-stone-50 border border-stone-200 text-stone-600 rounded-sm">
                               <strong>Note from client:</strong> {q.specialInstructions}
@@ -1734,30 +1783,49 @@ export default function AdminDashboard({
                               <p className="text-stone-500 uppercase tracking-widest text-[9px] font-bold">Client Attachments ({q.uploadedFiles.length})</p>
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {q.uploadedFiles.map((f, idx) => (
-                                  <a
+                                  <div
                                     key={idx}
-                                    href={f.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-2 p-2 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-md transition-colors cursor-pointer group"
+                                    className="flex items-center justify-between gap-2 p-2 bg-stone-50 border border-stone-200 rounded-md group hover:border-amber-700/40 transition-colors"
                                   >
-                                    {f.url && (f.url.endsWith(".png") || f.url.endsWith(".jpg") || f.url.endsWith(".jpeg") || f.url.endsWith(".gif") || f.url.includes("data:image")) ? (
-                                      <img
-                                        src={f.url}
-                                        alt="attachment preview"
-                                        className="h-8 w-8 object-cover rounded border border-stone-300"
-                                        referrerPolicy="no-referrer"
-                                      />
-                                    ) : (
-                                      <div className="h-8 w-8 bg-stone-200 text-stone-600 rounded flex items-center justify-center border border-stone-300">
-                                        <Paperclip className="h-4 w-4" />
+                                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                                      {f.url && (f.url.endsWith(".png") || f.url.endsWith(".jpg") || f.url.endsWith(".jpeg") || f.url.endsWith(".gif") || f.url.includes("data:image")) ? (
+                                        <img
+                                          src={f.url}
+                                          alt="attachment preview"
+                                          className="h-8 w-8 object-cover rounded border border-stone-300 shrink-0"
+                                          referrerPolicy="no-referrer"
+                                        />
+                                      ) : (
+                                        <div className="h-8 w-8 bg-stone-200 text-stone-600 rounded flex items-center justify-center border border-stone-300 shrink-0">
+                                          <Paperclip className="h-4 w-4" />
+                                        </div>
+                                      )}
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-[11px] font-medium text-stone-900 truncate" title={f.name}>{f.name}</p>
+                                        {f.size && <p className="text-[9px] text-stone-500">{Math.round(f.size / 1024)} KB</p>}
                                       </div>
-                                    )}
-                                    <div className="min-w-0 flex-1">
-                                      <p className="text-[11px] font-medium text-stone-900 truncate group-hover:text-amber-800">{f.name}</p>
-                                      {f.size && <p className="text-[9px] text-stone-500">{Math.round(f.size / 1024)} KB</p>}
                                     </div>
-                                  </a>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDownloadAttachment(f.url, f.name)}
+                                        className="flex items-center gap-1 bg-amber-800 hover:bg-amber-900 text-white text-[10px] font-bold px-2 py-1 rounded transition-colors cursor-pointer shadow-3xs"
+                                        title="Download image to your device"
+                                      >
+                                        <Download className="h-3 w-3" />
+                                        <span>Download</span>
+                                      </button>
+                                      <a
+                                        href={f.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="p-1 text-stone-500 hover:text-stone-800 rounded hover:bg-stone-200/60 transition-colors"
+                                        title="View full size in new tab"
+                                      >
+                                        <Eye className="h-3.5 w-3.5" />
+                                      </a>
+                                    </div>
+                                  </div>
                                 ))}
                               </div>
                             </div>
@@ -2164,30 +2232,49 @@ export default function AdminDashboard({
                               <p className="text-stone-500 uppercase tracking-widest text-[9px] font-bold">Client Attachments ({q.uploadedFiles.length})</p>
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {q.uploadedFiles.map((f, idx) => (
-                                  <a
+                                  <div
                                     key={idx}
-                                    href={f.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-2 p-2 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-md transition-colors cursor-pointer group"
+                                    className="flex items-center justify-between gap-2 p-2 bg-stone-50 border border-stone-200 rounded-md group hover:border-amber-700/40 transition-colors"
                                   >
-                                    {f.url && (f.url.endsWith(".png") || f.url.endsWith(".jpg") || f.url.endsWith(".jpeg") || f.url.endsWith(".gif") || f.url.includes("data:image")) ? (
-                                      <img
-                                        src={f.url}
-                                        alt="attachment preview"
-                                        className="h-8 w-8 object-cover rounded border border-stone-300"
-                                        referrerPolicy="no-referrer"
-                                      />
-                                    ) : (
-                                      <div className="h-8 w-8 bg-stone-200 text-stone-600 rounded flex items-center justify-center border border-stone-300">
-                                        <Paperclip className="h-4 w-4" />
+                                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                                      {f.url && (f.url.endsWith(".png") || f.url.endsWith(".jpg") || f.url.endsWith(".jpeg") || f.url.endsWith(".gif") || f.url.includes("data:image")) ? (
+                                        <img
+                                          src={f.url}
+                                          alt="attachment preview"
+                                          className="h-8 w-8 object-cover rounded border border-stone-300 shrink-0"
+                                          referrerPolicy="no-referrer"
+                                        />
+                                      ) : (
+                                        <div className="h-8 w-8 bg-stone-200 text-stone-600 rounded flex items-center justify-center border border-stone-300 shrink-0">
+                                          <Paperclip className="h-4 w-4" />
+                                        </div>
+                                      )}
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-[11px] font-medium text-stone-900 truncate" title={f.name}>{f.name}</p>
+                                        {f.size && <p className="text-[9px] text-stone-500">{Math.round(f.size / 1024)} KB</p>}
                                       </div>
-                                    )}
-                                    <div className="min-w-0 flex-1">
-                                      <p className="text-[11px] font-medium text-stone-900 truncate group-hover:text-amber-800">{f.name}</p>
-                                      {f.size && <p className="text-[9px] text-stone-500">{Math.round(f.size / 1024)} KB</p>}
                                     </div>
-                                  </a>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDownloadAttachment(f.url, f.name)}
+                                        className="flex items-center gap-1 bg-amber-800 hover:bg-amber-900 text-white text-[10px] font-bold px-2 py-1 rounded transition-colors cursor-pointer shadow-3xs"
+                                        title="Download image to your device"
+                                      >
+                                        <Download className="h-3 w-3" />
+                                        <span>Download</span>
+                                      </button>
+                                      <a
+                                        href={f.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="p-1 text-stone-500 hover:text-stone-800 rounded hover:bg-stone-200/60 transition-colors"
+                                        title="View full size in new tab"
+                                      >
+                                        <Eye className="h-3.5 w-3.5" />
+                                      </a>
+                                    </div>
+                                  </div>
                                 ))}
                               </div>
                             </div>

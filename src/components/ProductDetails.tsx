@@ -17,7 +17,9 @@ import {
   Trash2,
   Send,
   Clock,
-  Ruler
+  Ruler,
+  Mail,
+  Phone
 } from "lucide-react";
 import { Product, QuoteRequest } from "../types";
 
@@ -43,6 +45,7 @@ export default function ProductDetails({
     customerName: "",
     customerEmail: "",
     customerPhone: "",
+    contactPreference: "email" as "email" | "phone",
     engravingText: "",
     fontPreference: "Classic Cursive (Dancing Script)",
     specialInstructions: "",
@@ -277,11 +280,28 @@ export default function ProductDetails({
   const validate = () => {
     const newErrors: { [key: string]: string } = {};
     if (!formData.customerName.trim()) newErrors.customerName = "Full Name is required.";
-    if (!formData.customerEmail.trim()) {
-      newErrors.customerEmail = "Email address is required.";
-    } else if (!/\S+@\S+\.\S+/.test(formData.customerEmail)) {
-      newErrors.customerEmail = "Please enter a valid email.";
+
+    if (!formData.contactPreference) {
+      newErrors.contactPreference = "Please select how you would like to be contacted.";
     }
+
+    if (formData.contactPreference === "email") {
+      if (!formData.customerEmail.trim()) {
+        newErrors.customerEmail = "Email address is required when Email is selected as preferred contact.";
+      } else if (!/\S+@\S+\.\S+/.test(formData.customerEmail)) {
+        newErrors.customerEmail = "Please enter a valid email address.";
+      }
+    } else if (formData.contactPreference === "phone") {
+      if (!formData.customerPhone.trim()) {
+        newErrors.customerPhone = "Phone number is required when Phone is selected as preferred contact.";
+      } else if (formData.customerPhone.trim().replace(/\D/g, "").length < 7) {
+        newErrors.customerPhone = "Please enter a valid phone number (at least 7 digits).";
+      }
+      if (formData.customerEmail.trim() && !/\S+@\S+\.\S+/.test(formData.customerEmail)) {
+        newErrors.customerEmail = "Please enter a valid email address.";
+      }
+    }
+
     if (formData.quantity < 1) newErrors.quantity = "Quantity must be at least 1.";
     return newErrors;
   };
@@ -295,6 +315,9 @@ export default function ProductDetails({
     }
 
     let finalInstructions = formData.specialInstructions || "";
+    if (formData.contactPreference) {
+      finalInstructions = `[PREFERRED CONTACT: ${formData.contactPreference === "phone" ? "PHONE (Call/Text)" : "EMAIL"}]\n` + finalInstructions;
+    }
     if (formData.alternativeRequest && formData.alternativeDetails.trim()) {
       finalInstructions = `[ALTERNATIVE CRAFT REQUESTED: "${formData.alternativeDetails.trim()}"]\n\n` + finalInstructions;
     }
@@ -306,9 +329,10 @@ export default function ProductDetails({
         customerName: formData.customerName,
         customerEmail: formData.customerEmail,
         customerPhone: formData.customerPhone || undefined,
+        contactPreference: formData.contactPreference,
         engravingText: formData.engravingText || undefined,
         fontPreference: formData.fontPreference,
-        specialInstructions: finalInstructions || undefined,
+        specialInstructions: finalInstructions.trim() || undefined,
         quantity: Number(formData.quantity),
         deadline: formData.deadline || undefined,
         uploadedFiles: uploadedFiles.length > 0 ? uploadedFiles : undefined,
@@ -320,8 +344,9 @@ export default function ProductDetails({
       customerName: "",
       customerEmail: "",
       customerPhone: "",
+      contactPreference: "email",
       engravingText: "",
-      fontPreference: "Serif Classic",
+      fontPreference: "Classic Cursive (Dancing Script)",
       specialInstructions: "",
       quantity: 1,
       deadline: "",
@@ -606,6 +631,63 @@ export default function ProductDetails({
               </div>
 
               <form onSubmit={handleSubmitQuoteForm} className="space-y-4">
+                {/* Preferred Contact Method Section */}
+                <div className="flex flex-col gap-2 p-3.5 bg-white border border-brand-border rounded-[16px] shadow-3xs">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-brand-dark uppercase tracking-wider flex items-center gap-1">
+                      <span>How would you like us to contact you?</span>
+                      <span className="text-red-500">*</span>
+                    </label>
+                    <span className="text-[9px] text-brand-primary font-bold uppercase tracking-wider">Required</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData((prev) => ({ ...prev, contactPreference: "email" }));
+                        setErrors((prev) => {
+                          const copy = { ...prev };
+                          delete copy.contactPreference;
+                          delete copy.customerPhone;
+                          return copy;
+                        });
+                      }}
+                      className={`flex items-center justify-center gap-2 p-2.5 rounded-[10px] border cursor-pointer transition-all text-xs font-bold ${
+                        formData.contactPreference === "email"
+                          ? "bg-brand-primary text-white border-brand-primary shadow-xs"
+                          : "bg-brand-highlight/30 text-brand-dark border-brand-border hover:border-brand-primary/40"
+                      }`}
+                    >
+                      <Mail className="h-3.5 w-3.5" />
+                      <span>By Email</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData((prev) => ({ ...prev, contactPreference: "phone" }));
+                        setErrors((prev) => {
+                          const copy = { ...prev };
+                          delete copy.contactPreference;
+                          delete copy.customerEmail;
+                          return copy;
+                        });
+                      }}
+                      className={`flex items-center justify-center gap-2 p-2.5 rounded-[10px] border cursor-pointer transition-all text-xs font-bold ${
+                        formData.contactPreference === "phone"
+                          ? "bg-brand-primary text-white border-brand-primary shadow-xs"
+                          : "bg-brand-highlight/30 text-brand-dark border-brand-border hover:border-brand-primary/40"
+                      }`}
+                    >
+                      <Phone className="h-3.5 w-3.5" />
+                      <span>By Phone</span>
+                    </button>
+                  </div>
+                  {errors.contactPreference && (
+                    <span className="text-[9px] text-red-600 font-medium">{errors.contactPreference}</span>
+                  )}
+                </div>
+
                 {/* Contact Fields */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1.5">
@@ -628,7 +710,7 @@ export default function ProductDetails({
 
                   <div className="flex flex-col gap-1.5">
                     <label htmlFor="customerEmail" className="text-[10px] font-bold text-brand-muted uppercase tracking-wider">
-                      Email Address <span className="text-red-500">*</span>
+                      Email Address {formData.contactPreference === "email" ? <span className="text-red-500">*</span> : <span className="text-brand-muted font-normal">(Optional)</span>}
                     </label>
                     <input
                       id="customerEmail"
@@ -648,7 +730,7 @@ export default function ProductDetails({
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="flex flex-col gap-1.5">
                     <label htmlFor="customerPhone" className="text-[10px] font-bold text-brand-muted uppercase tracking-wider">
-                      Phone Number (Optional)
+                      Phone Number {formData.contactPreference === "phone" ? <span className="text-red-500">*</span> : <span className="text-brand-muted font-normal">(Optional)</span>}
                     </label>
                     <input
                       id="customerPhone"
@@ -656,9 +738,12 @@ export default function ProductDetails({
                       type="text"
                       value={formData.customerPhone}
                       onChange={handleInputChange}
-                      placeholder="(503) 555-0199"
-                      className="bg-white border border-brand-border rounded-[8px] py-2 px-3 text-brand-text text-xs focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                      placeholder="(709) 555-0199"
+                      className={`bg-white border rounded-[8px] py-2 px-3 text-brand-text text-xs focus:outline-none focus:ring-1 focus:ring-brand-primary ${errors.customerPhone ? "border-red-500" : "border-brand-border"}`}
                     />
+                    {errors.customerPhone && (
+                      <span className="text-[9px] text-red-600 font-medium">{errors.customerPhone}</span>
+                    )}
                   </div>
 
                   <div className="flex flex-col gap-1.5">
@@ -747,9 +832,25 @@ export default function ProductDetails({
                   </div>
                 )}
 
-                {/* Similar or Alternative Craft Request Toggle */}
+                {/* Special instructions */}
+                <div className="flex flex-col gap-1.5 border-t border-brand-border/40 pt-4 mt-2">
+                  <label htmlFor="specialInstructions" className="text-[10px] font-bold text-brand-muted uppercase tracking-wider">
+                    {isSublimation ? "Additional Customization Preferences" : isPipeCleaner ? "Bouquet Wrapping & Packaging Preferences" : "Special Design Instructions or Sizing Ideas"}
+                  </label>
+                  <textarea
+                    id="specialInstructions"
+                    name="specialInstructions"
+                    rows={2.5}
+                    value={formData.specialInstructions}
+                    onChange={handleInputChange}
+                    placeholder={isSublimation ? "Describe any background colors, placement of your image, or specific print details..." : isPipeCleaner ? "Request specific ribbon colors, wrapping paper styles, or card notes..." : "E.g., Please align the engraving in the lower right-hand corner. Wood oil coat finishes only..."}
+                    className="bg-white border border-brand-border rounded-[8px] py-2 px-3 text-brand-text text-xs focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                  />
+                </div>
+
+                {/* Similar or Alternative Craft Request Toggle - Located immediately below Special Design Instructions */}
                 {product.alternativeRequestText && product.alternativeRequestText.trim() && (
-                  <div className="bg-amber-50/60 border border-amber-200 p-4 rounded-[16px] space-y-3 mt-4">
+                  <div className="bg-amber-50/60 border border-amber-200 p-4 rounded-[16px] space-y-3 mt-2">
                     <label className="flex items-start gap-2.5 cursor-pointer">
                       <input
                         type="checkbox"
@@ -783,22 +884,6 @@ export default function ProductDetails({
                     )}
                   </div>
                 )}
-
-                {/* Special instructions */}
-                <div className="flex flex-col gap-1.5 border-t border-brand-border/40 pt-4 mt-2">
-                  <label htmlFor="specialInstructions" className="text-[10px] font-bold text-brand-muted uppercase tracking-wider">
-                    {isSublimation ? "Additional Customization Preferences" : isPipeCleaner ? "Bouquet Wrapping & Packaging Preferences" : "Special Design Instructions or Sizing Ideas"}
-                  </label>
-                  <textarea
-                    id="specialInstructions"
-                    name="specialInstructions"
-                    rows={2.5}
-                    value={formData.specialInstructions}
-                    onChange={handleInputChange}
-                    placeholder={isSublimation ? "Describe any background colors, placement of your image, or specific print details..." : isPipeCleaner ? "Request specific ribbon colors, wrapping paper styles, or card notes..." : "E.g., Please align the engraving in the lower right-hand corner. Wood oil coat finishes only..."}
-                    className="bg-white border border-brand-border rounded-[8px] py-2 px-3 text-brand-text text-xs focus:outline-none focus:ring-1 focus:ring-brand-primary"
-                  />
-                </div>
 
                 {/* Secure, optional file drag upload */}
                 <div className="flex flex-col gap-1.5 border-t border-brand-border/40 pt-4 mt-2">
@@ -913,7 +998,7 @@ export default function ProductDetails({
                   className="w-full bg-brand-primary hover:bg-brand-primary-hover text-white font-sans font-bold py-3.5 px-4 rounded-full transition-colors text-[10px] uppercase tracking-widest shadow-xs flex items-center justify-center gap-2 cursor-pointer mt-4"
                 >
                   <Send className="h-3.5 w-3.5" />
-                  Submit Customized Quote Request
+                  Inquire to Order
                 </button>
 
                 {submitted && (
