@@ -34,7 +34,7 @@ import {
   Megaphone,
   GripVertical
 } from "lucide-react";
-import { Product, Category, Testimonial, Announcement, QuoteRequest, AnalyticsSummary, CustomizationSettings, CustomSection, GIFT_OCCASION_PRESETS } from "../types";
+import { Product, Category, Testimonial, Announcement, QuoteRequest, AnalyticsSummary, CustomizationSettings, CustomSection, GIFT_OCCASION_PRESETS, GiftOccasionFilter } from "../types";
 import { NicolettaLogo } from "./NicolettaLogo";
 import { safeSetLocalStorage, persistKeyVal } from "../storage";
 
@@ -241,6 +241,12 @@ export default function AdminDashboard({
   const [logoHideBorder, setLogoHideBorder] = useState(customization?.logoHideBorder !== false);
   const [philosophyQuote, setPhilosophyQuote] = useState(customization?.philosophyQuote || "An engraving isn't just marks burnt into surface; it's the transfer of a family signature across generations.");
   const [philosophyAuthor, setPhilosophyAuthor] = useState(customization?.philosophyAuthor || "Nicoletta, Founder & Creative Director");
+  const [giftOccasionFilters, setGiftOccasionFilters] = useState<GiftOccasionFilter[]>(() => {
+    return Array.isArray(customization?.giftOccasionFilters)
+      ? [...customization.giftOccasionFilters]
+      : [...GIFT_OCCASION_PRESETS];
+  });
+  const [showOccasionEmojiPicker, setShowOccasionEmojiPicker] = useState(false);
   const [activeSectionTab, setActiveSectionTab] = useState<"home" | "catalog" | "quote" | "reviews" | "workshop">("home");
   const [sections, setSections] = useState<CustomSection[]>(() => {
     return customization?.sections && customization?.sections.length > 0
@@ -327,6 +333,9 @@ export default function AdminDashboard({
       setLogoHideBorder(customization.logoHideBorder !== false);
       setPhilosophyQuote(customization.philosophyQuote || "An engraving isn't just marks burnt into surface; it's the transfer of a family signature across generations.");
       setPhilosophyAuthor(customization.philosophyAuthor || "Nicoletta, Founder & Creative Director");
+      if (Array.isArray(customization.giftOccasionFilters)) {
+        setGiftOccasionFilters([...customization.giftOccasionFilters]);
+      }
       if (Array.isArray(customization.sections) && customization.sections.length > 0) {
         sectionsRef.current = [...customization.sections];
         setSections([...customization.sections]);
@@ -379,7 +388,8 @@ export default function AdminDashboard({
   const handleSaveCustomizer = async (
     e?: React.FormEvent,
     sectionsOverride?: CustomSection[],
-    logoUrlOverride?: string
+    logoUrlOverride?: string,
+    occasionFiltersOverride?: GiftOccasionFilter[]
   ) => {
     if (e) e.preventDefault();
     setIsSavingCustomizer(true);
@@ -390,6 +400,7 @@ export default function AdminDashboard({
       ? rawSections.filter((s): s is CustomSection => Boolean(s && typeof s === "object" && typeof s.id === "string"))
       : [];
     const targetLogoUrl = logoUrlOverride !== undefined ? logoUrlOverride : logoImageUrl;
+    const targetOccasionFilters = occasionFiltersOverride !== undefined ? occasionFiltersOverride : giftOccasionFilters;
     const payload: CustomizationSettings = {
       logoText: logoText || "Nicoletta",
       logoSubtext: logoSubtext || "Crafts & Decor",
@@ -399,12 +410,14 @@ export default function AdminDashboard({
       logoHideBorder: logoHideBorder !== false,
       philosophyQuote,
       philosophyAuthor,
+      giftOccasionFilters: targetOccasionFilters,
       sections: targetSections
     };
 
     // Always persist locally (both localStorage and IndexedDB) & update live app state immediately
     sectionsRef.current = targetSections;
     setSections(targetSections);
+    setGiftOccasionFilters(targetOccasionFilters);
     onUpdateCustomization(payload);
     persistKeyVal("nicoletta_customization", payload);
 
@@ -3603,97 +3616,230 @@ export default function AdminDashboard({
                         🎁 Gift Occasion Quick Filters
                       </span>
                       <span className="text-[10px] text-amber-800">
-                        Select which Gift Occasion Quick Filters on the Catalog page will show this product when clicked.
+                        Click a filter tag to select it for this product, or click <strong>×</strong> to delete a filter tag from the list.
                       </span>
                     </div>
-                    {(productForm.giftOccasions || []).length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setProductForm({ ...productForm, giftOccasions: [] })}
-                        className="text-[10px] text-red-700 hover:underline font-bold cursor-pointer"
-                      >
-                        Clear All ({(productForm.giftOccasions || []).length})
-                      </button>
-                    )}
+                    <div className="flex items-center gap-3">
+                      {giftOccasionFilters.length < GIFT_OCCASION_PRESETS.length && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const restored = [...GIFT_OCCASION_PRESETS];
+                            setGiftOccasionFilters(restored);
+                            handleSaveCustomizer(undefined, undefined, undefined, restored);
+                          }}
+                          className="text-[10px] text-amber-900 hover:underline font-bold cursor-pointer"
+                          title="Restore default Gift Occasion Quick Filters"
+                        >
+                          Restore Defaults
+                        </button>
+                      )}
+                      {(productForm.giftOccasions || []).length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setProductForm({ ...productForm, giftOccasions: [] })}
+                          className="text-[10px] text-red-700 hover:underline font-bold cursor-pointer"
+                        >
+                          Unselect All ({(productForm.giftOccasions || []).length})
+                        </button>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Preset & Active Gift Occasion Pills */}
+                  {/* Preset & Active Gift Occasion Pills with Delete Button */}
                   <div className="flex flex-wrap gap-2">
                     {(() => {
-                      const presetNames = GIFT_OCCASION_PRESETS.map((o) => o.name);
+                      const presetNames = giftOccasionFilters.map((o) => o.name);
                       const existingCustom = Array.from(
-                        new Set(
+                        new Set<string>(
                           [
                             ...products.flatMap((p) => p.giftOccasions || []),
                             ...(productForm.giftOccasions || [])
-                          ].filter((name) => Boolean(name) && !presetNames.includes(name as any))
+                          ].filter((name): name is string => Boolean(name) && !presetNames.includes(name))
                         )
                       );
                       const allOccasionNames = [...presetNames, ...existingCustom];
+
+                      if (allOccasionNames.length === 0) {
+                        return (
+                          <p className="text-[10px] text-stone-500 italic py-1">
+                            No filter tags in the list yet. Add a new filter tag below or click &ldquo;Restore Defaults&rdquo;.
+                          </p>
+                        );
+                      }
 
                       return allOccasionNames.map((occName) => {
                         const currentList = productForm.giftOccasions || [];
                         const isSelected = currentList.includes(occName);
                         return (
-                          <button
+                          <div
                             key={occName}
-                            type="button"
-                            onClick={() => {
-                              const next = isSelected
-                                ? currentList.filter((item) => item !== occName)
-                                : [...currentList, occName];
-                              setProductForm({ ...productForm, giftOccasions: next });
-                            }}
-                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider border transition-all cursor-pointer flex items-center gap-1.5 ${
+                            className={`inline-flex items-center rounded-lg text-[10px] font-bold uppercase tracking-wider border transition-all overflow-hidden ${
                               isSelected
                                 ? "bg-amber-800 text-white border-amber-900 shadow-2xs"
                                 : "bg-white hover:bg-amber-50 text-stone-700 border-stone-300"
                             }`}
                           >
-                            <span>{occName}</span>
-                            {isSelected && <Check className="h-3 w-3 shrink-0" />}
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = isSelected
+                                  ? currentList.filter((item) => item !== occName)
+                                  : [...currentList, occName];
+                                setProductForm({ ...productForm, giftOccasions: next });
+                              }}
+                              className="px-2.5 py-1.5 cursor-pointer flex items-center gap-1.5"
+                              title={isSelected ? "Click to unselect for this product" : "Click to select for this product"}
+                            >
+                              <span>{occName}</span>
+                              {isSelected && <Check className="h-3 w-3 shrink-0" />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const nextFilters = giftOccasionFilters.filter((f) => f.name !== occName);
+                                setGiftOccasionFilters(nextFilters);
+                                handleSaveCustomizer(undefined, undefined, undefined, nextFilters);
+                                setProductForm((prev) => ({
+                                  ...prev,
+                                  giftOccasions: (prev.giftOccasions || []).filter((item) => item !== occName)
+                                }));
+                                const anyProductHasIt = products.some((p) => (p.giftOccasions || []).includes(occName));
+                                if (anyProductHasIt) {
+                                  const cleanedProducts = products.map((p) =>
+                                    (p.giftOccasions || []).includes(occName)
+                                      ? { ...p, giftOccasions: (p.giftOccasions || []).filter((item) => item !== occName) }
+                                      : p
+                                  );
+                                  onUpdateProducts(cleanedProducts);
+                                }
+                              }}
+                              className={`px-1.5 py-1.5 border-l text-[11px] leading-none font-extrabold cursor-pointer transition-colors ${
+                                isSelected
+                                  ? "border-amber-700 text-amber-200 hover:bg-red-700 hover:text-white"
+                                  : "border-stone-200 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                              }`}
+                              title={`Delete "${occName}" from filter list`}
+                            >
+                              ×
+                            </button>
+                          </div>
                         );
                       });
                     })()}
                   </div>
 
-                  {/* Optional Custom Gift Occasion Filter Input */}
-                  <div className="flex flex-col sm:flex-row gap-2 pt-1">
-                    <input
-                      type="text"
-                      value={customOccasionInput}
-                      onChange={(e) => setCustomOccasionInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
+                  {/* Custom Gift Occasion Filter Input + Emoji Picker */}
+                  <div className="space-y-2 pt-1">
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <div className="flex flex-1 gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setShowOccasionEmojiPicker((prev) => !prev)}
+                          className={`px-2.5 py-1.5 rounded-sm border text-xs font-bold cursor-pointer transition-colors flex items-center gap-1 shrink-0 ${
+                            showOccasionEmojiPicker
+                              ? "bg-amber-800 text-white border-amber-900"
+                              : "bg-white hover:bg-amber-50 text-stone-700 border-stone-300"
+                          }`}
+                          title="Choose an emoji for your filter tag"
+                        >
+                          <span>😊</span>
+                          <span className="text-[10px]">Emojis</span>
+                        </button>
+                        <input
+                          type="text"
+                          value={customOccasionInput}
+                          onChange={(e) => setCustomOccasionInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              const trimmed = customOccasionInput.trim();
+                              if (!trimmed) return;
+                              const currentList = productForm.giftOccasions || [];
+                              if (!currentList.includes(trimmed)) {
+                                setProductForm({ ...productForm, giftOccasions: [...currentList, trimmed] });
+                              }
+                              if (!giftOccasionFilters.some((f) => f.name.toLowerCase() === trimmed.toLowerCase())) {
+                                const updatedFilters = [...giftOccasionFilters, { name: trimmed, term: trimmed }];
+                                setGiftOccasionFilters(updatedFilters);
+                                handleSaveCustomizer(undefined, undefined, undefined, updatedFilters);
+                              }
+                              setCustomOccasionInput("");
+                            }
+                          }}
+                          placeholder="Add a new Gift Occasion filter (e.g. 🎂 Anniversary Gifts)..."
+                          className="flex-1 bg-white border border-stone-300 rounded-sm py-1.5 px-2.5 text-xs focus:outline-none"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
                           const trimmed = customOccasionInput.trim();
                           if (!trimmed) return;
                           const currentList = productForm.giftOccasions || [];
                           if (!currentList.includes(trimmed)) {
                             setProductForm({ ...productForm, giftOccasions: [...currentList, trimmed] });
                           }
+                          if (!giftOccasionFilters.some((f) => f.name.toLowerCase() === trimmed.toLowerCase())) {
+                            const updatedFilters = [...giftOccasionFilters, { name: trimmed, term: trimmed }];
+                            setGiftOccasionFilters(updatedFilters);
+                            handleSaveCustomizer(undefined, undefined, undefined, updatedFilters);
+                          }
                           setCustomOccasionInput("");
-                        }
-                      }}
-                      placeholder="Or add a custom Gift Occasion filter (e.g. 🎂 Anniversary Gifts)..."
-                      className="flex-1 bg-white border border-stone-300 rounded-sm py-1.5 px-2.5 text-xs focus:outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const trimmed = customOccasionInput.trim();
-                        if (!trimmed) return;
-                        const currentList = productForm.giftOccasions || [];
-                        if (!currentList.includes(trimmed)) {
-                          setProductForm({ ...productForm, giftOccasions: [...currentList, trimmed] });
-                        }
-                        setCustomOccasionInput("");
-                      }}
-                      className="bg-white hover:bg-stone-100 text-stone-800 border border-stone-300 text-[10px] font-bold py-1.5 px-3 rounded-sm cursor-pointer transition-colors shrink-0"
-                    >
-                      + Add Filter Tag
-                    </button>
+                        }}
+                        className="bg-amber-800 hover:bg-stone-900 text-white border border-amber-900 text-[10px] font-bold py-1.5 px-3 rounded-sm cursor-pointer transition-colors shrink-0"
+                      >
+                        + Add Filter Tag
+                      </button>
+                    </div>
+
+                    {/* Quick Emoji Bar / Expandable Emoji Palette */}
+                    <div className="bg-white border border-amber-200/80 rounded-lg p-2.5 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-stone-500">
+                          Click an emoji to add it to your filter tag:
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setShowOccasionEmojiPicker((prev) => !prev)}
+                          className="text-[9px] text-amber-800 hover:underline font-bold cursor-pointer"
+                        >
+                          {showOccasionEmojiPicker ? "Show Fewer" : "Show All Emojis"}
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {(showOccasionEmojiPicker
+                          ? [
+                              "🎁", "💍", "🏢", "🏡", "💼", "🥃", "🎂", "🎄", "❤️", "🌹",
+                              "🌸", "🌻", "💐", "✨", "🕯️", "🪵", "🥂", "🍾", "👶", "🎓",
+                              "🏆", "🐾", "🍁", "⭐", "🎀", "💎", "🎨", "🌿", "☕", "🎃",
+                              "💝", "🕊️", "👑", "🧸", "🎈", "🎉", "🥂", "🍷", "🍺", "🍽️",
+                              "🔪", "🧀", "🖼️", "🕰️", "🔑", "🏠", "👰", "🤵", "👨‍👩‍👧‍👦", "🐶",
+                              "🐱", "🦌", "🌲", "🔥", "❄️", "☀️", "🌙", "⚓", "🧭", "🎵"
+                            ]
+                          : [
+                              "🎁", "💍", "🏢", "🏡", "💼", "🥃", "🎂", "🎄", "❤️", "🌹",
+                              "🌸", "💐", "✨", "🕯️", "🪵", "🥂", "👶", "🎓", "🏆", "🐾"
+                            ]
+                        ).map((emoji, idx) => (
+                          <button
+                            key={`${emoji}-${idx}`}
+                            type="button"
+                            onClick={() => {
+                              setCustomOccasionInput((prev) => {
+                                const trimmedLeading = prev.trimStart();
+                                return prev ? `${prev}${prev.endsWith(" ") ? "" : " "}${emoji} ` : `${emoji} `;
+                              });
+                            }}
+                            className="h-7 w-7 flex items-center justify-center rounded border border-stone-200 hover:border-amber-600 hover:bg-amber-50 text-sm cursor-pointer transition-transform active:scale-95"
+                            title={`Insert ${emoji}`}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
 

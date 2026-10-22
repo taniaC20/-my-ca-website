@@ -1238,7 +1238,7 @@ app.put("/api/admin/quotes/:id/details", requireAdmin, (req, res) => {
 });
 
 app.post("/api/admin/customization", requireAdmin, (req, res) => {
-  const { logoText, logoSubtext, logoImageUrl, logoShowText, sections, logoSize, logoHideBorder, philosophyQuote, philosophyAuthor } = req.body;
+  const { logoText, logoSubtext, logoImageUrl, logoShowText, sections, logoSize, logoHideBorder, philosophyQuote, philosophyAuthor, giftOccasionFilters } = req.body;
   
   if (!dbState.customization) {
     dbState.customization = DEFAULT_CUSTOMIZATION;
@@ -1253,8 +1253,13 @@ app.post("/api/admin/customization", requireAdmin, (req, res) => {
     logoHideBorder: typeof logoHideBorder === "boolean" ? logoHideBorder : dbState.customization.logoHideBorder,
     philosophyQuote: typeof philosophyQuote === "string" ? philosophyQuote : dbState.customization.philosophyQuote,
     philosophyAuthor: typeof philosophyAuthor === "string" ? philosophyAuthor : dbState.customization.philosophyAuthor,
+    ...(Array.isArray(giftOccasionFilters)
+      ? { giftOccasionFilters }
+      : (dbState.customization as any).giftOccasionFilters
+      ? { giftOccasionFilters: (dbState.customization as any).giftOccasionFilters }
+      : {}),
     sections: Array.isArray(sections) ? sections : dbState.customization.sections
-  };
+  } as any;
   
   saveDatabase();
   res.json(dbState.customization);

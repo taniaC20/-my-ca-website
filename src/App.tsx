@@ -1177,6 +1177,10 @@ export default function App() {
   };
 
   // Filter products based on categories, search query & gift occasion quick filters
+  const configuredOccasionFilters = Array.isArray(customization.giftOccasionFilters)
+    ? customization.giftOccasionFilters
+    : GIFT_OCCASION_PRESETS;
+
   const filteredProducts = products.filter((p) => {
     const matchCategory = selectedCategoryId === "all" || p.categoryId === selectedCategoryId;
     const q = searchQuery.trim().toLowerCase();
@@ -1188,10 +1192,11 @@ export default function App() {
       (p.badge || "").toLowerCase().includes(q) ||
       (p.includedNotes || []).some((note) => note.toLowerCase().includes(q));
 
+    const allKnownFilters = [...configuredOccasionFilters, ...GIFT_OCCASION_PRESETS];
     const matchGiftOccasion = (p.giftOccasions || []).some((occ) => {
       const occLower = occ.toLowerCase();
       if (occLower === q || occLower.includes(q)) return true;
-      const preset = GIFT_OCCASION_PRESETS.find(
+      const preset = allKnownFilters.find(
         (pr) => pr.name.toLowerCase() === occLower || pr.term.toLowerCase() === occLower
       );
       if (preset && (preset.term.toLowerCase() === q || preset.name.toLowerCase().includes(q))) {
@@ -2053,7 +2058,7 @@ export default function App() {
                   <span className="text-[10px] text-brand-muted font-bold uppercase tracking-widest block">Gift Occasion Quick Filters:</span>
                   <div className="flex flex-wrap gap-2">
                     {(() => {
-                      const presetNames = GIFT_OCCASION_PRESETS.map((o) => o.name as string);
+                      const presetNames = configuredOccasionFilters.map((o) => o.name as string);
                       const customOccasions = Array.from(
                         new Set<string>(
                           products
@@ -2062,7 +2067,7 @@ export default function App() {
                         )
                       ).map((occ) => ({ name: occ, term: occ }));
 
-                      const allOccasions = [...GIFT_OCCASION_PRESETS, ...customOccasions];
+                      const allOccasions = [...configuredOccasionFilters, ...customOccasions];
 
                       return allOccasions.map((occ) => {
                         const isActive =

@@ -1,11 +1,16 @@
-export const GIFT_OCCASION_PRESETS = [
+export interface GiftOccasionFilter {
+  name: string;
+  term: string;
+}
+
+export const GIFT_OCCASION_PRESETS: GiftOccasionFilter[] = [
   { name: "💍 Wedding Heirlooms", term: "wedding" },
   { name: "🏢 Corporate Branding", term: "corporate" },
   { name: "🏡 Housewarming Gifts", term: "board" },
   { name: "🎁 Heritage Gifts", term: "heritage" },
   { name: "💼 Executive Leather", term: "leather" },
   { name: "🥃 Engraved Glassware", term: "glass" }
-] as const;
+];
 
 export interface Product {
   id: string;
@@ -135,6 +140,7 @@ export interface CustomizationSettings {
   logoHideBorder?: boolean;
   philosophyQuote?: string;
   philosophyAuthor?: string;
+  giftOccasionFilters?: GiftOccasionFilter[];
   sections: CustomSection[];
 }
 
