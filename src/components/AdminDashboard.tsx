@@ -40,6 +40,7 @@ import { Product, Category, Testimonial, Announcement, QuoteRequest, AnalyticsSu
 import { NicolettaLogo } from "./NicolettaLogo";
 import { safeSetLocalStorage, persistKeyVal } from "../storage";
 import { pushCloudStore, subscribeCloudSync, CloudSyncState } from "../cloudStore";
+import { dispatchClientProposal, openGmailCompose, DEFAULT_ADMIN_EMAIL } from "../emailService";
 
 interface AdminDashboardProps {
   products: Product[];
@@ -856,16 +857,137 @@ export default function AdminDashboard({
   const [emailSubject, setEmailSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
   const [emailStatus, setEmailStatus] = useState<"idle" | "sending" | "sent">("idle");
+  const [emailError, setEmailError] = useState<string>("");
+
+  // Gmail Configuration States
+  const [gmailPasswordInput, setGmailPasswordInput] = useState(
+    customization.emailSettings?.gmailAppPassword || ""
+  );
+  const [showGmailPassword, setShowGmailPassword] = useState(false);
+  const [emailConfigSaved, setEmailConfigSaved] = useState(false);
+  const [testEmailStatus, setTestEmailStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
+  const [testEmailMsg, setTestEmailMsg] = useState("");
 
   const handleOpenEmailCompose = (q: QuoteRequest) => {
     const currentPrice = q.quoteAmount || quotePrice || (q.productId ? products.find((p) => p.id === q.productId)?.price || 85 : 85);
-    const defaultSubject = `Custom Design Quote Proposal - ${q.productName} [Nicoletta Artisan Studio]`;
-    const defaultBody = `Hi ${q.customerName},\n\nThank you for your interest in Nicoletta Artisan Studio! We have reviewed your custom personalization request for the "${q.productName}".\n\nBased on your design details:\n- Custom Text/Message: ${q.engravingText ? `"${q.engravingText}"` : "[No custom text requested]"}\n- Typography Preference: ${q.fontPreference || "Serif Classic"}\n- Quantity: ${q.quantity} unit(s)\n- Customization Details & Notes: ${q.specialInstructions || "None"}\n\nWe have generated a custom estimate for your project:\n👉 Total Quote Estimate: $${currentPrice} USD\n\nAll of our materials are of premium quality, crafted with custom care and precision in our studio. If this estimate looks good, let us know and we will lock in your design and begin crafting your personalized order!\n\nWarmest regards,\nNicoletta & Co.\nArtisan Studio & Custom Crafts`;
+    const defaultSubject = `Custom Craft Quote & Preview - ${q.productName} [Nicoletta Crafts & Decor]`;
+    const defaultBody = `Hi ${q.customerName},\n\nThank you for reaching out to Nicoletta Crafts & Decor! We have reviewed your request for the "${q.productName}".\n\nBased on your details:\n${q.engravingText ? `- Custom Personalization: "${q.engravingText}"\n` : ""}${q.fontPreference ? `- Typography Preference: ${q.fontPreference}\n` : ""}- Quantity: ${q.quantity} unit(s)\n${q.deadline ? `- Target Deadline: ${q.deadline}\n` : ""}${q.specialInstructions ? `- Notes & Instructions: ${q.specialInstructions}\n` : ""}\nWe are delighted to provide your custom quote estimate:\n👉 Total Quote Estimate: $${currentPrice} CAD\n\nIf you have any questions or would like to confirm your order, simply reply to this email (sales@nicolettacraftsdecor.ca). Once your order is confirmed, we'll send you a design preview for approval before bringing your idea to life!\n\nWarm regards,\nNicoletta\nNicoletta Crafts & Decor\nsales@nicolettacraftsdecor.ca\nhttps://www.nicolettacraftsdecor.ca`;
     
     setEmailQuote(q);
     setEmailSubject(defaultSubject);
     setEmailBody(defaultBody);
     setEmailStatus("idle");
+    setEmailError("");
+  };
+
+  const handleSendEmail = async () => {
+    if (!emailQuote) return;
+    setEmailStatus("sending");
+    setEmailError("");
+
+    const currentPrice = emailQuote.quoteAmount || quotePrice || (emailQuote.productId ? products.find((p) => p.id === emailQuote.productId)?.price || 85 : 85);
+
+    const result = await dispatchClientProposal(
+      {
+        clientEmail: emailQuote.customerEmail,
+        clientName: emailQuote.customerName,
+        subject: emailSubject,
+        body: emailBody,
+        quoteAmount: Number(currentPrice),
+        quoteId: emailQuote.id
+      },
+      customization.emailSettings
+    );
+
+    const updated = quotes.map((q) =>
+      q.id === emailQuote.id
+        ? {
+            ...q,
+            status: "quoted" as const,
+            quoteAmount: Number(currentPrice),
+            adminNotes: `${q.adminNotes || ""}\n[System: Sent customized email quote proposal via ${result.method === "smtp" ? "Gmail SMTP (sales@nicolettacraftsdecor.ca)" : "Gmail Web"} on ${new Date().toLocaleDateString()}]`.trim(),
+            updatedAt: new Date().toISOString()
+          }
+        : q
+    );
+    onUpdateQuotes(updated);
+
+    if (result.success) {
+      setEmailStatus("sent");
+      setTimeout(() => {
+        setEmailQuote(null);
+        setSelectedQuoteId(null);
+      }, 1500);
+    } else {
+      if (result.error) {
+        setEmailError(result.error);
+      }
+      openGmailCompose({
+        to: emailQuote.customerEmail,
+        subject: emailSubject,
+        body: emailBody
+      });
+      setEmailStatus("sent");
+      setTimeout(() => {
+        setEmailQuote(null);
+        setSelectedQuoteId(null);
+      }, 2500);
+    }
+  };
+
+  const handleOpenDirectGmail = () => {
+    if (!emailQuote) return;
+    openGmailCompose({
+      to: emailQuote.customerEmail,
+      subject: emailSubject,
+      body: emailBody
+    });
+  };
+
+  const handleSaveGmailConfig = () => {
+    const updatedCustomization: CustomizationSettings = {
+      ...customization,
+      emailSettings: {
+        ...customization.emailSettings,
+        adminEmail: "sales@nicolettacraftsdecor.ca",
+        gmailUser: "sales@nicolettacraftsdecor.ca",
+        gmailAppPassword: gmailPasswordInput.trim().replace(/\s+/g, ""),
+        emailNotificationsEnabled: true
+      }
+    };
+    onUpdateCustomization(updatedCustomization);
+    pushCloudStore({ customization: updatedCustomization }).catch(() => {});
+    setEmailConfigSaved(true);
+    setTimeout(() => setEmailConfigSaved(false), 3000);
+  };
+
+  const handleSendTestEmail = async () => {
+    setTestEmailStatus("testing");
+    setTestEmailMsg("");
+    try {
+      const res = await fetch("/api/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: "sales@nicolettacraftsdecor.ca",
+          from: "sales@nicolettacraftsdecor.ca",
+          subject: "[Nicoletta Portal] Gmail Automation Engine Test Email",
+          text: "Congratulations! Your Gmail automation engine for sales@nicolettacraftsdecor.ca is successfully connected and operational.",
+          appPassword: gmailPasswordInput.trim().replace(/\s+/g, "")
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        setTestEmailStatus("success");
+        setTestEmailMsg("Test email delivered successfully to sales@nicolettacraftsdecor.ca!");
+      } else {
+        setTestEmailStatus("error");
+        setTestEmailMsg(data.error || "Could not connect to Gmail SMTP. Please verify your 16-character App Password.");
+      }
+    } catch (err: any) {
+      setTestEmailStatus("error");
+      setTestEmailMsg(err.message || "Failed to reach email API.");
+    }
   };
 
   const handleDownloadAttachment = (fileUrl: string, fileName: string) => {
@@ -2577,13 +2699,13 @@ export default function AdminDashboard({
                       </div>
                       <div className="space-y-1">
                         <h5 className="font-serif font-bold text-stone-900 text-lg">Email Dispatched Successfully!</h5>
-                        <p className="text-stone-500 text-xs">A customized quote of <strong>${emailQuote.quoteAmount || quotePrice} USD</strong> is now in {emailQuote.customerName}'s inbox.</p>
+                        <p className="text-stone-500 text-xs">A customized quote of <strong>${emailQuote.quoteAmount || quotePrice} CAD</strong> was sent from sales@nicolettacraftsdecor.ca to {emailQuote.customerName}.</p>
                       </div>
                       <p className="text-[10px] text-stone-400 font-mono">Status updated to: "quoted" | Logged in workshop dashboard.</p>
                     </div>
                   ) : (
                     <div className="space-y-4 text-xs">
-                      {/* Email headers simulated */}
+                      {/* Email headers */}
                       <div className="bg-stone-50 p-4 rounded-xl border border-stone-200 space-y-2">
                         <div className="flex items-center gap-1.5 text-stone-600">
                           <span className="font-bold w-12 text-stone-400">To:</span>
@@ -2591,7 +2713,9 @@ export default function AdminDashboard({
                         </div>
                         <div className="flex items-center gap-1.5 text-stone-600 border-t border-stone-200/60 pt-2">
                           <span className="font-bold w-12 text-stone-400">From:</span>
-                          <span className="font-mono text-stone-900">Nicoletta Artisan Studio &lt;office@nicolettastudio.com&gt;</span>
+                          <span className="font-mono text-emerald-800 font-bold flex items-center gap-1">
+                            <Mail className="h-3 w-3" /> Nicoletta Crafts &amp; Decor &lt;sales@nicolettacraftsdecor.ca&gt;
+                          </span>
                         </div>
                         <div className="flex items-center gap-1.5 text-stone-600 border-t border-stone-200/60 pt-2">
                           <span className="font-bold w-12 text-stone-400">Subject:</span>
@@ -2615,27 +2739,47 @@ export default function AdminDashboard({
                         />
                       </div>
 
-                      <div className="flex justify-between items-center pt-2">
-                        <span className="text-[10px] text-stone-400 italic">This is an automated artisan proposal draft. Edit before sending.</span>
-                        <div className="flex gap-2.5">
+                      {emailError && (
+                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-xs flex items-start gap-2">
+                          <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="font-bold">Email Engine Notice</p>
+                            <p className="text-[11px] leading-relaxed">{emailError}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-2">
+                        <span className="text-[10px] text-stone-400 italic">Dispatches from your verified Gmail address (sales@nicolettacraftsdecor.ca).</span>
+                        <div className="flex flex-wrap items-center gap-2">
                           <button
                             type="button"
                             onClick={() => setEmailQuote(null)}
-                            className="bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold py-2 px-4 rounded-md cursor-pointer transition-colors"
+                            className="bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold py-2 px-3 rounded-md cursor-pointer transition-colors"
                           >
                             Close
                           </button>
+
+                          <button
+                            type="button"
+                            onClick={handleOpenDirectGmail}
+                            className="bg-stone-800 hover:bg-stone-900 text-white font-bold py-2 px-3.5 rounded-md cursor-pointer transition-colors flex items-center gap-1.5 shadow-xs"
+                            title="Open pre-filled proposal directly in Gmail compose"
+                          >
+                            <Mail className="h-3.5 w-3.5" /> Open in Gmail
+                          </button>
+
                           <button
                             type="button"
                             id="confirm-send-email-btn"
                             disabled={emailStatus === "sending"}
-                            onClick={handleSendEmailSimulated}
-                            className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-2 px-5 rounded-md cursor-pointer transition-colors flex items-center gap-1.5 shadow-md active:scale-98"
+                            onClick={handleSendEmail}
+                            className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-2 px-4 rounded-md cursor-pointer transition-colors flex items-center gap-1.5 shadow-md active:scale-98"
                           >
                             {emailStatus === "sending" ? (
                               <>
                                 <span className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                                Sending...
+                                Dispatching...
                               </>
                             ) : (
                               <>
@@ -6717,7 +6861,130 @@ export default function AdminDashboard({
         )}
 
         {activeTab === "security" && (
-          <div id="admin-tab-security-panel" className="space-y-6 max-w-xl animate-fade-in">
+          <div id="admin-tab-security-panel" className="space-y-8 max-w-2xl animate-fade-in">
+            {/* 1. Gmail Automation & Notification Hub */}
+            <div className="bg-white border border-stone-200 rounded-2xl p-6 md:p-8 space-y-6 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-stone-100">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <h3 className="font-serif font-bold text-stone-900 text-lg">Gmail Automation Engine</h3>
+                  </div>
+                  <p className="text-stone-500 text-xs mt-0.5">
+                    Integrated directly with <strong>sales@nicolettacraftsdecor.ca</strong> for client proposals and inbound quote notifications.
+                  </p>
+                </div>
+                <span className="self-start sm:self-auto text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-1 rounded-full font-mono font-bold uppercase tracking-wider flex items-center gap-1.5">
+                  <Mail className="h-3 w-3 text-emerald-600" /> sales@nicolettacraftsdecor.ca
+                </span>
+              </div>
+
+              {/* Inbound Alerts Notice */}
+              <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-4 flex items-start gap-3">
+                <Check className="h-5 w-5 text-emerald-700 shrink-0 mt-0.5" />
+                <div className="text-xs space-y-1">
+                  <h4 className="font-bold text-emerald-950">Inbound Client Alerts are Active</h4>
+                  <p className="text-emerald-900/90 leading-relaxed font-light">
+                    Every time a customer submits a bespoke quote, requests a handmade bouquet, or sends a contact message, an email alert with all client details is sent to <strong>sales@nicolettacraftsdecor.ca</strong>.
+                  </p>
+                </div>
+              </div>
+
+              {/* Outbound Dispatch Password Configuration */}
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-stone-800 block">
+                    Google App Password (for automated client proposals)
+                  </label>
+                  <p className="text-stone-500 text-[11px] mt-0.5">
+                    Enables the portal to automatically dispatch proposal estimates and custom mockups to clients from your Gmail address.
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type={showGmailPassword ? "text" : "password"}
+                      value={gmailPasswordInput}
+                      onChange={(e) => setGmailPasswordInput(e.target.value)}
+                      placeholder="16-character Google App Password (e.g. abcd efgh ijkl mnop)"
+                      className="w-full text-xs p-3 pr-10 rounded-xl border border-stone-200 focus:outline-none focus:border-brand-primary bg-stone-50 font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowGmailPassword(!showGmailPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 cursor-pointer"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSaveGmailConfig}
+                    className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-2.5 px-5 rounded-xl text-xs cursor-pointer transition-colors shadow-xs shrink-0 flex items-center justify-center gap-1.5"
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                    <span>Save Password</span>
+                  </button>
+                </div>
+
+                {emailConfigSaved && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-lg animate-fade-in flex items-center gap-2">
+                    <Check className="h-4 w-4 text-emerald-600" />
+                    <span>Gmail settings saved and synced across all devices!</span>
+                  </div>
+                )}
+
+                {/* Instructions Accordion */}
+                <div className="bg-stone-50 border border-stone-200 p-4 rounded-xl space-y-2 text-xs text-stone-700">
+                  <span className="font-bold text-stone-900 block">How to get your 16-character Google App Password:</span>
+                  <ol className="list-decimal pl-5 space-y-1 text-[11px] text-stone-600 leading-relaxed font-light">
+                    <li>Sign in to your Google Account at <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer" className="text-emerald-700 font-bold underline">myaccount.google.com/apppasswords</a> with <strong>sales@nicolettacraftsdecor.ca</strong>.</li>
+                    <li>Ensure <strong>2-Step Verification</strong> is enabled for your account.</li>
+                    <li>Under App Passwords, name it "Nicoletta Portal" and click <strong>Create</strong>.</li>
+                    <li>Copy the 16-letter code generated by Google and paste it above, then click <strong>Save Password</strong>.</li>
+                  </ol>
+                </div>
+
+                {/* Test Email Action */}
+                <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t border-stone-100">
+                  <span className="text-[11px] text-stone-500">Test your outbound email engine:</span>
+                  <button
+                    type="button"
+                    onClick={handleSendTestEmail}
+                    disabled={testEmailStatus === "testing"}
+                    className="bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 font-bold py-2 px-4 rounded-xl text-xs cursor-pointer transition-colors flex items-center gap-1.5 shadow-3xs"
+                  >
+                    {testEmailStatus === "testing" ? (
+                      <>
+                        <span className="h-3 w-3 border-2 border-stone-700 border-t-transparent rounded-full animate-spin" />
+                        <span>Sending Test...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-3.5 w-3.5" />
+                        <span>Send Test Email to sales@nicolettacraftsdecor.ca</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {testEmailStatus === "success" && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-lg animate-fade-in flex items-center gap-2">
+                    <Check className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span>{testEmailMsg}</span>
+                  </div>
+                )}
+                {testEmailStatus === "error" && (
+                  <div className="p-3 bg-red-50 border border-red-200 text-red-800 text-xs rounded-lg animate-fade-in flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+                    <span>{testEmailMsg}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 2. Portal Password Configuration */}
             <div className="pb-4 border-b border-stone-200">
               <h3 className="font-serif font-bold text-stone-900 text-lg">Portal Security Settings</h3>
               <p className="text-stone-500 text-xs mt-1">

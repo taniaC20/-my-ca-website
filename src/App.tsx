@@ -47,6 +47,7 @@ import CustomerAuthPortal from "./components/CustomerAuthPortal";
 import { CustomerProfile, getStoredCustomerSession } from "./supabaseClient";
 import { safeSetLocalStorage, safeParseLocal, persistKeyVal, idbGet } from "./storage";
 import { fetchCloudStore, pushCloudStore, scoreCustomizationRichness } from "./cloudStore";
+import { sendQuoteNotificationToAdmin } from "./emailService";
 
 async function safeFetchJson(url: string, options?: RequestInit): Promise<{ ok: boolean; status: number; data: any }> {
   try {
@@ -1187,18 +1188,21 @@ export default function App() {
         setQuotes(nextQuotes);
         persistKeyVal("nicoletta_quotes", nextQuotes);
         pushCloudStore({ quotes: nextQuotes }).catch(() => {});
+        sendQuoteNotificationToAdmin(savedQuote, customization.emailSettings).catch(() => {});
         await fetchAllData();
       } else {
         const nextQuotes = [fallbackQuote, ...quotes];
         setQuotes(nextQuotes);
         persistKeyVal("nicoletta_quotes", nextQuotes);
         pushCloudStore({ quotes: nextQuotes }).catch(() => {});
+        sendQuoteNotificationToAdmin(fallbackQuote, customization.emailSettings).catch(() => {});
       }
     } catch (err) {
       const nextQuotes = [fallbackQuote, ...quotes];
       setQuotes(nextQuotes);
       persistKeyVal("nicoletta_quotes", nextQuotes);
       pushCloudStore({ quotes: nextQuotes }).catch(() => {});
+      sendQuoteNotificationToAdmin(fallbackQuote, customization.emailSettings).catch(() => {});
     }
   };
 
@@ -2517,18 +2521,21 @@ export default function App() {
                             setQuotes(nextQuotes);
                             persistKeyVal("nicoletta_quotes", nextQuotes);
                             pushCloudStore({ quotes: nextQuotes }).catch(() => {});
+                            sendQuoteNotificationToAdmin(saved, customization.emailSettings).catch(() => {});
                             await fetchAllData();
                           } else {
                             const nextQuotes = [fallbackContactQuote, ...quotes];
                             setQuotes(nextQuotes);
                             persistKeyVal("nicoletta_quotes", nextQuotes);
                             pushCloudStore({ quotes: nextQuotes }).catch(() => {});
+                            sendQuoteNotificationToAdmin(fallbackContactQuote, customization.emailSettings).catch(() => {});
                           }
                         } catch (err) {
                           const nextQuotes = [fallbackContactQuote, ...quotes];
                           setQuotes(nextQuotes);
                           persistKeyVal("nicoletta_quotes", nextQuotes);
                           pushCloudStore({ quotes: nextQuotes }).catch(() => {});
+                          sendQuoteNotificationToAdmin(fallbackContactQuote, customization.emailSettings).catch(() => {});
                         }
                         setContactSubmitted(true);
                         setContactUploadedFiles([]);

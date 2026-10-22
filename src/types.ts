@@ -89,6 +89,8 @@ export interface QuoteRequest {
   adminNotes?: string;
   quoteAmount?: number;
   deadline?: string;
+  alternativeRequest?: boolean;
+  alternativeDetails?: string;
   uploadedFiles?: { name: string; size: number; url: string }[];
   adminPhotos?: { name: string; size?: number; url: string }[];
 }
@@ -145,6 +147,12 @@ export interface CustomizationSettings {
   philosophyQuote?: string;
   philosophyAuthor?: string;
   giftOccasionFilters?: GiftOccasionFilter[];
+  emailSettings?: {
+    adminEmail?: string;
+    gmailUser?: string;
+    gmailAppPassword?: string;
+    emailNotificationsEnabled?: boolean;
+  };
   sections: CustomSection[];
 }
 

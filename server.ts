@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import crypto from "crypto";
 import dotenv from "dotenv";
+import nodemailer from "nodemailer";
 import { createServer as createViteServer } from "vite";
 
 
@@ -824,6 +825,56 @@ app.post("/api/quotes", (req, res) => {
   saveDatabase();
 
   res.status(201).json(newQuote);
+});
+
+app.post("/api/send-email", async (req, res) => {
+  const { to, from, subject, text, html, appPassword, replyTo } = req.body || {};
+
+  if (!to || !subject || (!text && !html)) {
+    return res.status(400).json({ error: "Missing required fields (to, subject, text/html)." });
+  }
+
+  const senderEmail = from || process.env.GMAIL_USER || "sales@nicolettacraftsdecor.ca";
+  const password = (appPassword || process.env.GMAIL_APP_PASSWORD || "").trim().replace(/\s+/g, "");
+
+  if (!password) {
+    return res.status(400).json({
+      error: "Gmail App Password is not configured yet. Please enter your 16-character Google App Password in Admin Settings or set GMAIL_APP_PASSWORD in environment variables.",
+      needsPassword: true
+    });
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: senderEmail,
+        pass: password
+      }
+    });
+
+    const info = await transporter.sendMail({
+      from: `"Nicoletta Crafts & Decor" <${senderEmail}>`,
+      to,
+      replyTo: replyTo || senderEmail,
+      subject,
+      text,
+      html: html || (text ? text.replace(/\n/g, "<br/>") : "")
+    });
+
+    return res.status(200).json({
+      success: true,
+      messageId: info.messageId,
+      sentFrom: senderEmail,
+      sentTo: to
+    });
+  } catch (error: any) {
+    console.error("Nodemailer send error:", error);
+    return res.status(500).json({
+      error: error.message || "Failed to send email via Gmail SMTP.",
+      details: error.code || "SMTP_ERROR"
+    });
+  }
 });
 
 app.post("/api/testimonials", (req, res) => {
