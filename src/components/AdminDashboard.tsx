@@ -55,6 +55,113 @@ interface AdminDashboardProps {
 
 type AdminTab = "analytics" | "products" | "categories" | "testimonials" | "quotes" | "messages" | "announcements" | "site-customizer" | "security";
 
+async function compressImageToDataUrl(file: File, maxDimension = 1200, quality = 0.82): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Error reading file."));
+    reader.onload = () => {
+      const rawDataUrl = reader.result as string;
+      // Preserve SVGs, GIFs, and PDFs without canvas rasterization
+      if (
+        file.type === "image/svg+xml" ||
+        file.type === "image/gif" ||
+        file.type === "application/pdf" ||
+        !file.type.startsWith("image/")
+      ) {
+        resolve(rawDataUrl);
+        return;
+      }
+
+      const img = new window.Image();
+      img.onload = () => {
+        try {
+          let width = img.naturalWidth || img.width;
+          let height = img.naturalHeight || img.height;
+          if (!width || !height) {
+            resolve(rawDataUrl);
+            return;
+          }
+
+          if (width > maxDimension || height > maxDimension) {
+            if (width >= height) {
+              height = Math.round((height * maxDimension) / width);
+              width = maxDimension;
+            } else {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
+            }
+          }
+
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            resolve(rawDataUrl);
+            return;
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Preserve transparency for PNG/WebP logos or smaller PNGs; otherwise use compact WebP/JPEG
+          const isTransparentFormat = file.type === "image/png" || file.type === "image/webp";
+          const outputMime = isTransparentFormat ? "image/webp" : "image/jpeg";
+          let compressed = canvas.toDataURL(outputMime, quality);
+          if (!compressed || compressed === "data:," || compressed.length > rawDataUrl.length) {
+            compressed = rawDataUrl;
+          }
+          resolve(compressed);
+        } catch {
+          resolve(rawDataUrl);
+        }
+      };
+      img.onerror = () => resolve(rawDataUrl);
+      img.src = rawDataUrl;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function uploadImageAsset(
+  file: File,
+  maxDimension = 1200
+): Promise<{ url: string; name: string; size: number }> {
+  const compressedData = await compressImageToDataUrl(file, maxDimension);
+  const mimeMatch = compressedData.match(/^data:([^;]+);base64,/);
+  const effectiveType = mimeMatch ? mimeMatch[1] : file.type || "image/png";
+  const approxSizeKB = Math.max(1, Math.round((compressedData.length * 0.75) / 1024));
+
+  try {
+    const res = await fetch("/api/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: file.name,
+        type: effectiveType,
+        data: compressedData
+      })
+    });
+    const contentType = res.headers.get("content-type") || "";
+    if (res.ok && contentType.includes("application/json")) {
+      const data = await res.json();
+      if (data && typeof data.url === "string" && data.url.length > 0) {
+        return {
+          url: data.url,
+          name: data.name || file.name,
+          size: data.size || approxSizeKB
+        };
+      }
+    }
+  } catch {
+    // Fallback to compact compressed data URL when running in static mode
+  }
+
+  return {
+    url: compressedData,
+    name: file.name,
+    size: approxSizeKB
+  };
+}
+
 export default function AdminDashboard({
   products,
   categories,
@@ -218,7 +325,7 @@ export default function AdminDashboard({
     e.target.value = "";
   };
 
-  const uploadLogoFile = (file: File) => {
+  const uploadLogoFile = async (file: File) => {
     if (file.size > 10 * 1024 * 1024) {
       setLogoUploadError("Logo file size exceeds the 10MB limit.");
       return;
@@ -227,40 +334,15 @@ export default function AdminDashboard({
     setLogoUploading(true);
     setLogoUploadError("");
 
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = async () => {
-      const base64Data = reader.result as string;
-      let resolvedUrl = base64Data;
-
-      try {
-        const res = await fetch("/api/upload", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: file.name,
-            type: file.type || "image/png",
-            data: base64Data
-          })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.url) {
-            resolvedUrl = data.url;
-          }
-        }
-      } catch {
-        // Fallback to inline base64Data when running in static mode
-      }
-
-      setLogoImageUrl(resolvedUrl);
+    try {
+      const uploaded = await uploadImageAsset(file, 600);
+      setLogoImageUrl(uploaded.url);
       setLogoUploading(false);
-      await handleSaveCustomizer(undefined, undefined, resolvedUrl);
-    };
-    reader.onerror = () => {
+      await handleSaveCustomizer(undefined, undefined, uploaded.url);
+    } catch {
       setLogoUploadError("Error reading file.");
       setLogoUploading(false);
-    };
+    }
   };
 
   const handleSaveCustomizer = async (
@@ -272,15 +354,18 @@ export default function AdminDashboard({
     setIsSavingCustomizer(true);
     setCustomizerSuccess(null);
 
-    const targetSections = sectionsOverride || sections;
+    const rawSections = sectionsOverride || sections;
+    const targetSections = Array.isArray(rawSections)
+      ? rawSections.filter((s): s is CustomSection => Boolean(s && typeof s === "object" && typeof s.id === "string"))
+      : [];
     const targetLogoUrl = logoUrlOverride !== undefined ? logoUrlOverride : logoImageUrl;
     const payload: CustomizationSettings = {
-      logoText,
-      logoSubtext,
-      logoImageUrl: targetLogoUrl,
-      logoShowText,
-      logoSize,
-      logoHideBorder,
+      logoText: logoText || "Nicoletta",
+      logoSubtext: logoSubtext || "Crafts & Decor",
+      logoImageUrl: targetLogoUrl || "",
+      logoShowText: logoShowText !== false,
+      logoSize: Number(logoSize) || 48,
+      logoHideBorder: logoHideBorder !== false,
       philosophyQuote,
       philosophyAuthor,
       sections: targetSections
@@ -304,14 +389,25 @@ export default function AdminDashboard({
         body: JSON.stringify(payload)
       });
 
-      if (res.ok) {
+      const contentType = res.headers.get("content-type") || "";
+      if (res.ok && contentType.includes("application/json")) {
         const updated = await res.json();
-        onUpdateCustomization(updated);
+        if (updated && typeof updated === "object" && Array.isArray(updated.sections) && updated.sections.length > 0) {
+          onUpdateCustomization(updated);
+          localStorage.removeItem("nicoletta_customization_unsynced");
+        }
+      } else {
+        localStorage.setItem("nicoletta_customization_unsynced", "true");
       }
       setCustomizerSuccess("Site settings and logo customization saved successfully!");
       setTimeout(() => setCustomizerSuccess(null), 4000);
     } catch (err) {
       console.warn("Saved customization locally (server offline):", err);
+      try {
+        localStorage.setItem("nicoletta_customization_unsynced", "true");
+      } catch {
+        // Ignore storage error
+      }
       setCustomizerSuccess("Site settings and logo customization saved!");
       setTimeout(() => setCustomizerSuccess(null), 4000);
     } finally {
@@ -590,7 +686,7 @@ export default function AdminDashboard({
     }, 1200);
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -602,116 +698,62 @@ export default function AdminDashboard({
     setUploadingImage(true);
     setUploadError("");
 
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => {
-      const base64Data = reader.result as string;
-      fetch("/api/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: file.name,
-          type: file.type,
-          data: base64Data
-        })
-      })
-        .then((res) => {
-          if (!res.ok) throw new Error("Upload failed");
-          return res.json();
-        })
-        .then((data) => {
-          setProductForm((prev) => ({ ...prev, image: data.url || base64Data }));
-          setUploadingImage(false);
-        })
-        .catch(() => {
-          setProductForm((prev) => ({ ...prev, image: base64Data }));
-          setUploadingImage(false);
-        });
-    };
-    reader.onerror = () => {
+    try {
+      const uploaded = await uploadImageAsset(file, 1200);
+      setProductForm((prev) => ({ ...prev, image: uploaded.url }));
+    } catch {
       setUploadError("Error reading file.");
+    } finally {
       setUploadingImage(false);
-    };
+      e.target.value = "";
+    }
   };
 
-  const handleAdditionalImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAdditionalImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     setUploadingImage(true);
     setUploadError("");
 
-    let processed = 0;
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+    const fileList: File[] = Array.from(files);
+    e.target.value = "";
+
+    for (const file of fileList) {
       if (file.size > 10 * 1024 * 1024) {
         setUploadError(`"${file.name}" exceeds the 10MB limit.`);
-        processed++;
-        if (processed === files.length) setUploadingImage(false);
         continue;
       }
-
-      const reader = new FileReader();
-      reader.onload = () => {
-        const base64Data = reader.result as string;
-        fetch("/api/upload", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: file.name,
-            type: file.type,
-            data: base64Data
-          })
-        })
-          .then((res) => {
-            if (!res.ok) throw new Error("Upload failed");
-            return res.json();
-          })
-          .then((data) => {
-            setProductForm((prev) => ({
-              ...prev,
-              additionalImages: [...(prev.additionalImages || []), data.url || base64Data]
-            }));
-          })
-          .catch(() => {
-            setProductForm((prev) => ({
-              ...prev,
-              additionalImages: [...(prev.additionalImages || []), base64Data]
-            }));
-          })
-          .finally(() => {
-            processed++;
-            if (processed === files.length) setUploadingImage(false);
-          });
-      };
-      reader.readAsDataURL(file);
+      try {
+        const uploaded = await uploadImageAsset(file, 1200);
+        setProductForm((prev) => ({
+          ...prev,
+          additionalImages: [...(prev.additionalImages || []), uploaded.url]
+        }));
+      } catch {
+        setUploadError(`Failed to read "${file.name}".`);
+      }
     }
-    e.target.value = "";
+    setUploadingImage(false);
   };
 
-  const handleCategoryImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCategoryImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    e.target.value = "";
     if (file.size > 10 * 1024 * 1024) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64Data = reader.result as string;
-      fetch("/api/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: file.name, type: file.type, data: base64Data })
-      })
-        .then((res) => (res.ok ? res.json() : Promise.reject()))
-        .then((data) => setCategoryForm((prev) => ({ ...prev, image: data.url || base64Data })))
-        .catch(() => setCategoryForm((prev) => ({ ...prev, image: base64Data })));
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
+    try {
+      const uploaded = await uploadImageAsset(file, 1000);
+      setCategoryForm((prev) => ({ ...prev, image: uploaded.url }));
+    } catch {
+      // Ignore error
+    }
   };
 
-  const handleSectionImageUpload = (e: React.ChangeEvent<HTMLInputElement>, sectionId: string, slideIndex?: number) => {
+  const handleSectionImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, sectionId: string, slideIndex?: number) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    e.target.value = "";
 
     if (file.size > 10 * 1024 * 1024) {
       setSectionUploadError("Image file exceeds the 10MB limit.");
@@ -725,73 +767,35 @@ export default function AdminDashboard({
     }
     setSectionUploadError("");
 
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => {
-      const base64Data = reader.result as string;
-      fetch("/api/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: file.name,
-          type: file.type,
-          data: base64Data
-        })
-      })
-        .then((res) => {
-          if (!res.ok) throw new Error("Upload failed");
-          return res.json();
-        })
-        .then((data) => {
+    try {
+      const uploaded = await uploadImageAsset(file, 1400);
+      setSections((prevSections) => {
+        const updatedSections = prevSections.map((s) => {
+          if (s.id !== sectionId) return s;
           if (sectionId === "home-hero") {
-            const currentSec = sections.find((s) => s.id === sectionId);
-            const currentUrls = currentSec?.imageUrls && currentSec.imageUrls.length > 0
-              ? [...currentSec.imageUrls]
-              : (currentSec?.imageUrl ? [currentSec.imageUrl] : []);
-            
+            const currentUrls = s.imageUrls && s.imageUrls.length > 0
+              ? [...s.imageUrls]
+              : (s.imageUrl ? [s.imageUrl] : []);
             if (slideIndex !== undefined) {
-              currentUrls[slideIndex] = data.url;
+              while (currentUrls.length <= slideIndex) {
+                currentUrls.push("");
+              }
+              currentUrls[slideIndex] = uploaded.url;
             } else {
-              currentUrls.push(data.url);
+              currentUrls.push(uploaded.url);
             }
-            
-            const updatedSections = sections.map((s) =>
-              s.id === sectionId ? { ...s, imageUrl: currentUrls[0] || "", imageUrls: currentUrls } : s
-            );
-            setSections(updatedSections);
-          } else {
-            updateSectionText(sectionId, "imageUrl", data.url);
+            return { ...s, imageUrl: currentUrls[0] || uploaded.url, imageUrls: currentUrls };
           }
-          setUploadingSectionId(null);
-          setUploadingSlideIndex(null);
-        })
-        .catch(() => {
-          if (sectionId === "home-hero") {
-            const currentSec = sections.find((s) => s.id === sectionId);
-            const currentUrls = currentSec?.imageUrls && currentSec.imageUrls.length > 0
-              ? [...currentSec.imageUrls]
-              : (currentSec?.imageUrl ? [currentSec.imageUrl] : []);
-            if (slideIndex !== undefined) {
-              currentUrls[slideIndex] = base64Data;
-            } else {
-              currentUrls.push(base64Data);
-            }
-            const updatedSections = sections.map((s) =>
-              s.id === sectionId ? { ...s, imageUrl: currentUrls[0] || "", imageUrls: currentUrls } : s
-            );
-            setSections(updatedSections);
-          } else {
-            updateSectionText(sectionId, "imageUrl", base64Data);
-          }
-          setUploadingSectionId(null);
-          setUploadingSlideIndex(null);
+          return { ...s, imageUrl: uploaded.url };
         });
-    };
-    reader.onerror = () => {
+        return updatedSections;
+      });
+    } catch {
       setSectionUploadError("Error reading file.");
+    } finally {
       setUploadingSectionId(null);
       setUploadingSlideIndex(null);
-    };
+    }
   };
 
   // PRESET PRODUCTS IMAGES library for convenience
@@ -1099,53 +1103,28 @@ export default function AdminDashboard({
     }
   };
 
-  const handleAdminPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAdminPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     setUploadingAdminPhoto(true);
     setAdminPhotoError("");
 
-    let doneCount = 0;
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+    const fileList: File[] = Array.from(files);
+    e.target.value = "";
+
+    for (const file of fileList) {
       if (file.size > 10 * 1024 * 1024) {
         setAdminPhotoError(`File "${file.name}" exceeds 10MB limit.`);
-        doneCount++;
-        if (doneCount === files.length) setUploadingAdminPhoto(false);
         continue;
       }
-
-      const reader = new FileReader();
-      reader.onload = () => {
-        const base64Data = reader.result as string;
-        fetch("/api/upload", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: file.name, type: file.type, data: base64Data })
-        })
-          .then((res) => {
-            if (!res.ok) throw new Error("Upload failed");
-            return res.json();
-          })
-          .then((data) => {
-            setQuotePhotos((prev) => [...prev, { name: data.name || file.name, url: data.url || base64Data, size: data.size }]);
-          })
-          .catch(() => {
-            setQuotePhotos((prev) => [...prev, { name: file.name, url: base64Data, size: Math.round(file.size / 1024) }]);
-          })
-          .finally(() => {
-            doneCount++;
-            if (doneCount === files.length) setUploadingAdminPhoto(false);
-          });
-      };
-      reader.onerror = () => {
+      try {
+        const uploaded = await uploadImageAsset(file, 1200);
+        setQuotePhotos((prev) => [...prev, { name: uploaded.name, url: uploaded.url, size: uploaded.size }]);
+      } catch {
         setAdminPhotoError(`Failed to read "${file.name}".`);
-        doneCount++;
-        if (doneCount === files.length) setUploadingAdminPhoto(false);
-      };
-      reader.readAsDataURL(file);
+      }
     }
-    e.target.value = "";
+    setUploadingAdminPhoto(false);
   };
 
   const removeAdminPhoto = (idx: number) => {
@@ -4716,7 +4695,8 @@ export default function AdminDashboard({
                   { id: "reviews", label: "Patron Reviews" },
                   { id: "workshop", label: "The Workshop" }
                 ].map((t) => {
-                  const count = sections.filter((sec) => {
+                  const safeSecs = Array.isArray(sections) ? sections.filter((s) => Boolean(s && typeof s.id === "string")) : [];
+                  const count = safeSecs.filter((sec) => {
                     if (t.id === "home") {
                       return sec.page === "home" || sec.id.startsWith("home-") || sec.id.startsWith("custom_");
                     }
@@ -4765,8 +4745,10 @@ export default function AdminDashboard({
               {/* Sections Reordering List */}
               <div className="space-y-4 pt-1">
                 {(() => {
-                  const sortedAll = [...sections].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+                  const safeSecs = Array.isArray(sections) ? sections.filter((s) => Boolean(s && typeof s.id === "string")) : [];
+                  const sortedAll = [...safeSecs].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
                   const isOfActiveTab = (sec: CustomSection) => {
+                    if (!sec || typeof sec.id !== "string") return false;
                     if (activeSectionTab === "home") {
                       return sec.page === "home" || sec.id.startsWith("home-") || sec.id.startsWith("custom_");
                     }

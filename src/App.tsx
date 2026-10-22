@@ -46,48 +46,85 @@ import ProductDetails from "./components/ProductDetails";
 import CustomerAuthPortal from "./components/CustomerAuthPortal";
 import { CustomerProfile, getStoredCustomerSession } from "./supabaseClient";
 
+function safeSetLocalStorage(key: string, value: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (err) {
+    console.warn(`LocalStorage quota or write warning for key "${key}":`, err);
+    try {
+      // Remove non-essential cache keys and retry once
+      localStorage.removeItem("nicoletta_sample_data_cleared_v1");
+      localStorage.setItem(key, value);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+function safeParseLocal<T>(key: string, fallback: T, validator?: (val: any) => boolean): T {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    if (validator && !validator(parsed)) return fallback;
+    return parsed as T;
+  } catch (err) {
+    console.warn(`Failed to parse localStorage key "${key}", using fallback:`, err);
+    return fallback;
+  }
+}
+
+async function safeFetchJson(url: string, options?: RequestInit): Promise<{ ok: boolean; status: number; data: any }> {
+  try {
+    const res = await fetch(url, options);
+    const contentType = res.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      return { ok: false, status: res.status, data: null };
+    }
+    const data = await res.json();
+    return { ok: res.ok, status: res.status, data };
+  } catch {
+    return { ok: false, status: 0, data: null };
+  }
+}
+
 export default function App() {
   // Ensure legacy sample dummy data is purged from local browser cache on initial boot
   if (typeof window !== "undefined" && !localStorage.getItem("nicoletta_sample_data_cleared_v2")) {
-    localStorage.removeItem("nicoletta_products");
-    localStorage.removeItem("nicoletta_categories");
-    localStorage.removeItem("nicoletta_testimonials");
-    localStorage.removeItem("nicoletta_announcements");
-    localStorage.removeItem("nicoletta_quotes");
-    localStorage.setItem("nicoletta_sample_data_cleared_v2", "true");
+    try {
+      localStorage.removeItem("nicoletta_products");
+      localStorage.removeItem("nicoletta_categories");
+      localStorage.removeItem("nicoletta_testimonials");
+      localStorage.removeItem("nicoletta_announcements");
+      localStorage.removeItem("nicoletta_quotes");
+      safeSetLocalStorage("nicoletta_sample_data_cleared_v2", "true");
+    } catch {
+      // Ignore storage errors
+    }
   }
 
   // Persistence state
-  const [products, setProducts] = useState<Product[]>(() => {
-    const local = localStorage.getItem("nicoletta_products");
-    return local ? JSON.parse(local) : [];
-  });
-  const [categories, setCategories] = useState<Category[]>(() => {
-    const local = localStorage.getItem("nicoletta_categories");
-    return local ? JSON.parse(local) : [];
-  });
-  const [testimonials, setTestimonials] = useState<Testimonial[]>(() => {
-    const local = localStorage.getItem("nicoletta_testimonials");
-    return local ? JSON.parse(local) : [];
-  });
-  const [announcements, setAnnouncements] = useState<Announcement[]>(() => {
-    const local = localStorage.getItem("nicoletta_announcements");
-    return local ? JSON.parse(local) : [];
-  });
-  const [quotes, setQuotes] = useState<QuoteRequest[]>(() => {
-    const local = localStorage.getItem("nicoletta_quotes");
-    return local ? JSON.parse(local) : [];
-  });
+  const [products, setProducts] = useState<Product[]>(() =>
+    safeParseLocal<Product[]>("nicoletta_products", [], Array.isArray)
+  );
+  const [categories, setCategories] = useState<Category[]>(() =>
+    safeParseLocal<Category[]>("nicoletta_categories", [], Array.isArray)
+  );
+  const [testimonials, setTestimonials] = useState<Testimonial[]>(() =>
+    safeParseLocal<Testimonial[]>("nicoletta_testimonials", [], Array.isArray)
+  );
+  const [announcements, setAnnouncements] = useState<Announcement[]>(() =>
+    safeParseLocal<Announcement[]>("nicoletta_announcements", [], Array.isArray)
+  );
+  const [quotes, setQuotes] = useState<QuoteRequest[]>(() =>
+    safeParseLocal<QuoteRequest[]>("nicoletta_quotes", [], Array.isArray)
+  );
   const [customization, setCustomization] = useState<CustomizationSettings>(() => {
-    const local = localStorage.getItem("nicoletta_customization");
-    if (local) {
-      try {
-        return JSON.parse(local);
-      } catch (e) {
-        console.error("Failed to parse local customization, using defaults", e);
-      }
-    }
-    return {
+    const defaultCust: CustomizationSettings = {
       logoText: "Nicoletta",
       logoSubtext: "Crafts & Decor",
       logoImageUrl: "",
@@ -179,6 +216,11 @@ export default function App() {
         }
       ]
     };
+    return safeParseLocal<CustomizationSettings>(
+      "nicoletta_customization",
+      defaultCust,
+      (val) => Boolean(val && typeof val === "object" && Array.isArray(val.sections) && val.sections.length > 0)
+    );
   });
 
   // Secure Session State
@@ -329,64 +371,96 @@ export default function App() {
 
       // Public tables loading
       const [resProds, resCats, resTests, resAnns, resCust] = await Promise.all([
-        fetch("/api/products"),
-        fetch("/api/categories"),
-        fetch("/api/testimonials"),
-        fetch("/api/announcements"),
-        fetch("/api/customization")
+        safeFetchJson("/api/products"),
+        safeFetchJson("/api/categories"),
+        safeFetchJson("/api/testimonials"),
+        safeFetchJson("/api/announcements"),
+        safeFetchJson("/api/customization")
       ]);
 
-      if (resProds.ok) setProducts(await resProds.json());
-      if (resCats.ok) setCategories(await resCats.json());
-      if (resTests.ok) setTestimonials(await resTests.json());
-      if (resAnns.ok) setAnnouncements(await resAnns.json());
-      if (resCust.ok) {
-        const serverCust = await resCust.json();
-        const localCustStr = localStorage.getItem("nicoletta_customization");
-        if (localCustStr) {
-          try {
-            const localCust = JSON.parse(localCustStr);
-            if (localCust && typeof localCust.logoImageUrl === "string" && localCust.logoImageUrl.length > 0 && !serverCust.logoImageUrl) {
-              serverCust.logoImageUrl = localCust.logoImageUrl;
-            }
-          } catch (e) {
-            console.error("Failed to merge local customization backup:", e);
-          }
+      if (resProds.ok && Array.isArray(resProds.data)) {
+        const localProds = safeParseLocal<Product[]>("nicoletta_products", [], Array.isArray);
+        if (resProds.data.length > 0 || localProds.length === 0) {
+          setProducts(resProds.data);
         }
-        setCustomization(serverCust);
+      }
+      if (resCats.ok && Array.isArray(resCats.data)) {
+        const localCats = safeParseLocal<Category[]>("nicoletta_categories", [], Array.isArray);
+        if (resCats.data.length > 0 || localCats.length === 0) {
+          setCategories(resCats.data);
+        }
+      }
+      if (resTests.ok && Array.isArray(resTests.data)) {
+        const localTests = safeParseLocal<Testimonial[]>("nicoletta_testimonials", [], Array.isArray);
+        if (resTests.data.length > 0 || localTests.length === 0) {
+          setTestimonials(resTests.data);
+        }
+      }
+      if (resAnns.ok && Array.isArray(resAnns.data)) {
+        const localAnns = safeParseLocal<Announcement[]>("nicoletta_announcements", [], Array.isArray);
+        if (resAnns.data.length > 0 || localAnns.length === 0) {
+          setAnnouncements(resAnns.data);
+        }
+      }
+      if (resCust.ok && resCust.data && Array.isArray(resCust.data.sections)) {
+        const serverCust = resCust.data;
+        const localCust = safeParseLocal<CustomizationSettings | null>(
+          "nicoletta_customization",
+          null,
+          (v) => Boolean(v && typeof v === "object" && Array.isArray(v.sections) && v.sections.length > 0)
+        );
+        const localUnsynced = localStorage.getItem("nicoletta_customization_unsynced") === "true";
+
+        if (localCust && localUnsynced) {
+          setCustomization(localCust);
+        } else {
+          if (localCust && typeof localCust.logoImageUrl === "string" && localCust.logoImageUrl.length > 0 && !serverCust.logoImageUrl) {
+            serverCust.logoImageUrl = localCust.logoImageUrl;
+          }
+          setCustomization(serverCust);
+        }
       }
 
       // Views metric counter ping
       try {
-        const resHit = await fetch("/api/analytics/view-hit", { method: "POST" });
-        if (resHit.ok) {
-          const hitData = await resHit.json();
-          setTotalViewsState(hitData.views);
-          localStorage.setItem("nicoletta_total_views", String(hitData.views));
+        const resHit = await safeFetchJson("/api/analytics/view-hit", { method: "POST" });
+        if (resHit.ok && resHit.data && typeof resHit.data.views === "number") {
+          setTotalViewsState(resHit.data.views);
+          safeSetLocalStorage("nicoletta_total_views", String(resHit.data.views));
         } else {
           const nextViews = (parseInt(localStorage.getItem("nicoletta_total_views") || "1", 10) || 0) + 1;
-          localStorage.setItem("nicoletta_total_views", String(nextViews));
+          safeSetLocalStorage("nicoletta_total_views", String(nextViews));
           setTotalViewsState(nextViews);
         }
       } catch {
         const nextViews = (parseInt(localStorage.getItem("nicoletta_total_views") || "1", 10) || 0) + 1;
-        localStorage.setItem("nicoletta_total_views", String(nextViews));
+        safeSetLocalStorage("nicoletta_total_views", String(nextViews));
         setTotalViewsState(nextViews);
       }
 
       // If authorized session exists, load protected administrative logs & quotes
       if (currentToken) {
         const [resQuotes, resAllTests] = await Promise.all([
-          fetch("/api/admin/quotes", {
+          safeFetchJson("/api/admin/quotes", {
             headers: { "Authorization": `Bearer ${currentToken}` }
           }),
-          fetch("/api/admin/testimonials", {
+          safeFetchJson("/api/admin/testimonials", {
             headers: { "Authorization": `Bearer ${currentToken}` }
           })
         ]);
 
-        if (resQuotes.ok) setQuotes(await resQuotes.json());
-        if (resAllTests.ok) setTestimonials(await resAllTests.json());
+        if (resQuotes.ok && Array.isArray(resQuotes.data)) {
+          const localQuotes = safeParseLocal<QuoteRequest[]>("nicoletta_quotes", [], Array.isArray);
+          if (resQuotes.data.length > 0 || localQuotes.length === 0) {
+            setQuotes(resQuotes.data);
+          }
+        }
+        if (resAllTests.ok && Array.isArray(resAllTests.data)) {
+          const localTests = safeParseLocal<Testimonial[]>("nicoletta_testimonials", [], Array.isArray);
+          if (resAllTests.data.length > 0 || localTests.length === 0) {
+            setTestimonials(resAllTests.data);
+          }
+        }
       }
     } catch (err) {
       console.error("Artisan cloud database synchronization failure:", err);
@@ -397,64 +471,85 @@ export default function App() {
 
   // One-time cleanup for old dummy sample records
   useEffect(() => {
-    const cleanedFlag = localStorage.getItem("nicoletta_sample_data_cleared_v1");
-    if (!cleanedFlag) {
-      localStorage.removeItem("nicoletta_products");
-      localStorage.removeItem("nicoletta_categories");
-      localStorage.removeItem("nicoletta_testimonials");
-      localStorage.removeItem("nicoletta_announcements");
-      localStorage.removeItem("nicoletta_quotes");
-      localStorage.setItem("nicoletta_sample_data_cleared_v1", "true");
+    try {
+      const cleanedFlag = localStorage.getItem("nicoletta_sample_data_cleared_v1");
+      if (!cleanedFlag) {
+        localStorage.removeItem("nicoletta_products");
+        localStorage.removeItem("nicoletta_categories");
+        localStorage.removeItem("nicoletta_testimonials");
+        localStorage.removeItem("nicoletta_announcements");
+        localStorage.removeItem("nicoletta_quotes");
+        safeSetLocalStorage("nicoletta_sample_data_cleared_v1", "true");
+      }
+    } catch {
+      // Ignore storage access errors
     }
   }, []);
 
   // Keep localStorage backup updated once initial load has fetched active states from the server
   useEffect(() => {
     if (initialLoadDone && Array.isArray(products)) {
-      localStorage.setItem("nicoletta_products", JSON.stringify(products));
+      safeSetLocalStorage("nicoletta_products", JSON.stringify(products));
     }
   }, [products, initialLoadDone]);
 
   useEffect(() => {
     if (initialLoadDone && Array.isArray(categories)) {
-      localStorage.setItem("nicoletta_categories", JSON.stringify(categories));
+      safeSetLocalStorage("nicoletta_categories", JSON.stringify(categories));
     }
   }, [categories, initialLoadDone]);
 
   useEffect(() => {
     if (initialLoadDone && Array.isArray(testimonials)) {
-      localStorage.setItem("nicoletta_testimonials", JSON.stringify(testimonials));
+      safeSetLocalStorage("nicoletta_testimonials", JSON.stringify(testimonials));
     }
   }, [testimonials, initialLoadDone]);
 
   useEffect(() => {
     if (initialLoadDone && Array.isArray(announcements)) {
-      localStorage.setItem("nicoletta_announcements", JSON.stringify(announcements));
+      safeSetLocalStorage("nicoletta_announcements", JSON.stringify(announcements));
     }
   }, [announcements, initialLoadDone]);
 
   useEffect(() => {
     if (initialLoadDone && Array.isArray(quotes)) {
-      localStorage.setItem("nicoletta_quotes", JSON.stringify(quotes));
+      safeSetLocalStorage("nicoletta_quotes", JSON.stringify(quotes));
     }
   }, [quotes, initialLoadDone]);
 
   useEffect(() => {
-    if (initialLoadDone && customization && customization.sections && customization.sections.length > 0) {
-      localStorage.setItem("nicoletta_customization", JSON.stringify(customization));
+    if (initialLoadDone && customization && Array.isArray(customization.sections) && customization.sections.length > 0) {
+      safeSetLocalStorage("nicoletta_customization", JSON.stringify(customization));
     }
   }, [customization, initialLoadDone]);
 
   const restoreDatabaseToServer = async (activeToken: string) => {
     try {
-      const customizationStr = localStorage.getItem("nicoletta_customization");
+      const body: Record<string, any> = {};
+      const localCust = safeParseLocal<CustomizationSettings | null>(
+        "nicoletta_customization",
+        null,
+        (v) => Boolean(v && typeof v === "object" && Array.isArray(v.sections) && v.sections.length > 0)
+      );
+      if (localCust) body.customization = localCust;
 
-      const body: any = {};
-      if (customizationStr) body.customization = JSON.parse(customizationStr);
+      const localProds = safeParseLocal<Product[] | null>("nicoletta_products", null, Array.isArray);
+      if (localProds && localProds.length > 0) body.products = localProds;
+
+      const localCats = safeParseLocal<Category[] | null>("nicoletta_categories", null, Array.isArray);
+      if (localCats && localCats.length > 0) body.categories = localCats;
+
+      const localTests = safeParseLocal<Testimonial[] | null>("nicoletta_testimonials", null, Array.isArray);
+      if (localTests && localTests.length > 0) body.testimonials = localTests;
+
+      const localAnns = safeParseLocal<Announcement[] | null>("nicoletta_announcements", null, Array.isArray);
+      if (localAnns && localAnns.length > 0) body.announcements = localAnns;
+
+      const localQuotes = safeParseLocal<QuoteRequest[] | null>("nicoletta_quotes", null, Array.isArray);
+      if (localQuotes && localQuotes.length > 0) body.quotes = localQuotes;
 
       if (Object.keys(body).length > 0) {
-        console.log("Restoring persistent local customization to server...");
-        const res = await fetch("/api/admin/restore-db", {
+        const res = await safeFetchJson("/api/admin/restore-db", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -463,9 +558,7 @@ export default function App() {
           body: JSON.stringify(body)
         });
         if (res.ok) {
-          console.log("Artisan cloud database successfully restored and synchronized.");
-        } else {
-          console.error("Failed to restore database to server:", await res.json());
+          localStorage.removeItem("nicoletta_customization_unsynced");
         }
       }
     } catch (err) {
@@ -482,16 +575,16 @@ export default function App() {
         if (storedToken === "static-admin-session-token") {
           setIsLoggedIn(true);
           setToken(storedToken);
+          await restoreDatabaseToServer(storedToken);
           await fetchAllData(storedToken);
           setInitialLoadDone(true);
           return;
         }
         try {
-          const res = await fetch("/api/auth/session", {
+          const res = await safeFetchJson("/api/auth/session", {
             headers: { "Authorization": `Bearer ${storedToken}` }
           });
-          const session = await res.json();
-          if (session.authenticated) {
+          if (res.ok && res.data && res.data.authenticated) {
             setIsLoggedIn(true);
             setToken(storedToken);
             await restoreDatabaseToServer(storedToken);
@@ -499,7 +592,7 @@ export default function App() {
             setInitialLoadDone(true);
             return;
           }
-        } catch (err) {
+        } catch {
           setIsLoggedIn(true);
           setToken(storedToken);
           await fetchAllData(storedToken);
@@ -610,23 +703,40 @@ export default function App() {
   };
 
   // Administrative RESTful Action Synchronizers
+  const updateCustomizationState = (newCust: CustomizationSettings) => {
+    if (!newCust || typeof newCust !== "object") return;
+    const validCust: CustomizationSettings = {
+      ...customization,
+      ...newCust,
+      sections: Array.isArray(newCust.sections) && newCust.sections.length > 0
+        ? newCust.sections
+        : (Array.isArray(customization?.sections) ? customization.sections : [])
+    };
+    setCustomization(validCust);
+    safeSetLocalStorage("nicoletta_customization", JSON.stringify(validCust));
+  };
+
   const updateProductsState = async (newProds: Product[]) => {
-    setProducts(newProds);
+    const safeProds = Array.isArray(newProds) ? newProds : [];
+    setProducts(safeProds);
+    safeSetLocalStorage("nicoletta_products", JSON.stringify(safeProds));
     try {
-      if (newProds.length < products.length) {
+      let synced = false;
+      if (safeProds.length < products.length) {
         // DELETE
-        const deleted = products.find(p => !newProds.some(np => np.id === p.id));
+        const deleted = products.find(p => !safeProds.some(np => np.id === p.id));
         if (deleted) {
-          await fetch(`/api/admin/products/${deleted.id}`, {
+          const res = await safeFetchJson(`/api/admin/products/${deleted.id}`, {
             method: "DELETE",
             headers: { "Authorization": `Bearer ${token}` }
           });
+          synced = res.ok;
         }
-      } else if (newProds.length > products.length) {
+      } else if (safeProds.length > products.length) {
         // CREATE
-        const created = newProds.find(np => !products.some(p => p.id === np.id));
+        const created = safeProds.find(np => !products.some(p => p.id === np.id));
         if (created) {
-          await fetch("/api/admin/products", {
+          const res = await safeFetchJson("/api/admin/products", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -634,15 +744,16 @@ export default function App() {
             },
             body: JSON.stringify(created)
           });
+          synced = res.ok;
         }
       } else {
         // UPDATE
-        const updated = newProds.find(np => {
+        const updated = safeProds.find(np => {
           const old = products.find(p => p.id === np.id);
           return old && JSON.stringify(old) !== JSON.stringify(np);
         });
         if (updated) {
-          await fetch(`/api/admin/products/${updated.id}`, {
+          const res = await safeFetchJson(`/api/admin/products/${updated.id}`, {
             method: "PUT",
             headers: {
               "Content-Type": "application/json",
@@ -650,29 +761,36 @@ export default function App() {
             },
             body: JSON.stringify(updated)
           });
+          synced = res.ok;
         }
       }
-      await fetchAllData();
+      if (synced) {
+        await fetchAllData();
+      }
     } catch (err) {
       console.error("Failed to sync products update:", err);
     }
   };
 
   const updateCategoriesState = async (newCats: Category[]) => {
-    setCategories(newCats);
+    const safeCats = Array.isArray(newCats) ? newCats : [];
+    setCategories(safeCats);
+    safeSetLocalStorage("nicoletta_categories", JSON.stringify(safeCats));
     try {
-      if (newCats.length < categories.length) {
-        const deleted = categories.find(c => !newCats.some(nc => nc.id === c.id));
+      let synced = false;
+      if (safeCats.length < categories.length) {
+        const deleted = categories.find(c => !safeCats.some(nc => nc.id === c.id));
         if (deleted) {
-          await fetch(`/api/admin/categories/${deleted.id}`, {
+          const res = await safeFetchJson(`/api/admin/categories/${deleted.id}`, {
             method: "DELETE",
             headers: { "Authorization": `Bearer ${token}` }
           });
+          synced = res.ok;
         }
-      } else if (newCats.length > categories.length) {
-        const created = newCats.find(nc => !categories.some(c => c.id === nc.id));
+      } else if (safeCats.length > categories.length) {
+        const created = safeCats.find(nc => !categories.some(c => c.id === nc.id));
         if (created) {
-          await fetch("/api/admin/categories", {
+          const res = await safeFetchJson("/api/admin/categories", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -680,14 +798,15 @@ export default function App() {
             },
             body: JSON.stringify(created)
           });
+          synced = res.ok;
         }
       } else {
-        const updated = newCats.find(nc => {
+        const updated = safeCats.find(nc => {
           const old = categories.find(c => c.id === nc.id);
           return old && JSON.stringify(old) !== JSON.stringify(nc);
         });
         if (updated) {
-          await fetch("/api/admin/categories", {
+          const res = await safeFetchJson("/api/admin/categories", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -695,29 +814,36 @@ export default function App() {
             },
             body: JSON.stringify(updated)
           });
+          synced = res.ok;
         }
       }
-      await fetchAllData();
+      if (synced) {
+        await fetchAllData();
+      }
     } catch (err) {
       console.error("Failed to sync categories update:", err);
     }
   };
 
   const updateTestimonialsState = async (newTests: Testimonial[]) => {
-    setTestimonials(newTests);
+    const safeTests = Array.isArray(newTests) ? newTests : [];
+    setTestimonials(safeTests);
+    safeSetLocalStorage("nicoletta_testimonials", JSON.stringify(safeTests));
     try {
-      if (newTests.length < testimonials.length) {
-        const deleted = testimonials.find(t => !newTests.some(nt => nt.id === t.id));
+      let synced = false;
+      if (safeTests.length < testimonials.length) {
+        const deleted = testimonials.find(t => !safeTests.some(nt => nt.id === t.id));
         if (deleted) {
-          await fetch(`/api/admin/testimonials/${deleted.id}`, {
+          const res = await safeFetchJson(`/api/admin/testimonials/${deleted.id}`, {
             method: "DELETE",
             headers: { "Authorization": `Bearer ${token}` }
           });
+          synced = res.ok;
         }
-      } else if (newTests.length > testimonials.length) {
-        const created = newTests.find(nt => !testimonials.some(t => t.id === nt.id));
+      } else if (safeTests.length > testimonials.length) {
+        const created = safeTests.find(nt => !testimonials.some(t => t.id === nt.id));
         if (created) {
-          const res = await fetch("/api/testimonials", {
+          const res = await safeFetchJson("/api/testimonials", {
             method: "POST",
             headers: {
               "Content-Type": "application/json"
@@ -729,9 +855,9 @@ export default function App() {
               company: created.company
             })
           });
-          if (res.ok && created.approved) {
-            const saved = await res.json();
-            await fetch(`/api/admin/testimonials/${saved.id}/approve`, {
+          synced = res.ok;
+          if (res.ok && res.data && created.approved) {
+            await safeFetchJson(`/api/admin/testimonials/${res.data.id}/approve`, {
               method: "PUT",
               headers: { "Authorization": `Bearer ${token}` }
             });
@@ -739,38 +865,45 @@ export default function App() {
         }
       } else {
         // Check if any review was marked approved
-        const approved = newTests.find(nt => {
+        const approved = safeTests.find(nt => {
           const old = testimonials.find(t => t.id === nt.id);
           return old && !old.approved && nt.approved;
         });
         if (approved) {
-          await fetch(`/api/admin/testimonials/${approved.id}/approve`, {
+          const res = await safeFetchJson(`/api/admin/testimonials/${approved.id}/approve`, {
             method: "PUT",
             headers: { "Authorization": `Bearer ${token}` }
           });
+          synced = res.ok;
         }
       }
-      await fetchAllData();
+      if (synced) {
+        await fetchAllData();
+      }
     } catch (err) {
       console.error("Failed to sync testimonials approval/removal:", err);
     }
   };
 
   const updateAnnouncementsState = async (newAnns: Announcement[]) => {
-    setAnnouncements(newAnns);
+    const safeAnns = Array.isArray(newAnns) ? newAnns : [];
+    setAnnouncements(safeAnns);
+    safeSetLocalStorage("nicoletta_announcements", JSON.stringify(safeAnns));
     try {
-      if (newAnns.length < announcements.length) {
-        const deleted = announcements.find(a => !newAnns.some(na => na.id === a.id));
+      let synced = false;
+      if (safeAnns.length < announcements.length) {
+        const deleted = announcements.find(a => !safeAnns.some(na => na.id === a.id));
         if (deleted) {
-          await fetch(`/api/admin/announcements/${deleted.id}`, {
+          const res = await safeFetchJson(`/api/admin/announcements/${deleted.id}`, {
             method: "DELETE",
             headers: { "Authorization": `Bearer ${token}` }
           });
+          synced = res.ok;
         }
-      } else if (newAnns.length > announcements.length) {
-        const created = newAnns.find(na => !announcements.some(a => a.id === na.id));
+      } else if (safeAnns.length > announcements.length) {
+        const created = safeAnns.find(na => !announcements.some(a => a.id === na.id));
         if (created) {
-          await fetch("/api/admin/announcements", {
+          const res = await safeFetchJson("/api/admin/announcements", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -778,30 +911,37 @@ export default function App() {
             },
             body: JSON.stringify(created)
           });
+          synced = res.ok;
         }
       } else {
         // Toggle active status
-        const toggled = newAnns.find(na => {
+        const toggled = safeAnns.find(na => {
           const old = announcements.find(a => a.id === na.id);
           return old && old.active !== na.active;
         });
         if (toggled) {
-          await fetch(`/api/admin/announcements/${toggled.id}/toggle`, {
+          const res = await safeFetchJson(`/api/admin/announcements/${toggled.id}/toggle`, {
             method: "PUT",
             headers: { "Authorization": `Bearer ${token}` }
           });
+          synced = res.ok;
         }
       }
-      await fetchAllData();
+      if (synced) {
+        await fetchAllData();
+      }
     } catch (err) {
       console.error("Failed to sync announcements ledger:", err);
     }
   };
 
   const updateQuotesState = async (newQuotes: QuoteRequest[]) => {
-    setQuotes(newQuotes);
+    const safeQuotes = Array.isArray(newQuotes) ? newQuotes : [];
+    setQuotes(safeQuotes);
+    safeSetLocalStorage("nicoletta_quotes", JSON.stringify(safeQuotes));
     try {
-      const changed = newQuotes.find(nq => {
+      let synced = false;
+      const changed = safeQuotes.find(nq => {
         const old = quotes.find(q => q.id === nq.id);
         return old && JSON.stringify(old) !== JSON.stringify(nq);
       });
@@ -809,7 +949,7 @@ export default function App() {
       if (changed) {
         const old = quotes.find(q => q.id === changed.id);
         if (old && old.status !== changed.status) {
-          await fetch(`/api/admin/quotes/${changed.id}/status`, {
+          const res = await safeFetchJson(`/api/admin/quotes/${changed.id}/status`, {
             method: "PUT",
             headers: {
               "Content-Type": "application/json",
@@ -817,8 +957,9 @@ export default function App() {
             },
             body: JSON.stringify({ status: changed.status })
           });
+          synced = res.ok;
         } else if (old && (old.adminNotes !== changed.adminNotes || old.quoteAmount !== changed.quoteAmount)) {
-          await fetch(`/api/admin/quotes/${changed.id}/details`, {
+          const res = await safeFetchJson(`/api/admin/quotes/${changed.id}/details`, {
             method: "PUT",
             headers: {
               "Content-Type": "application/json",
@@ -829,9 +970,12 @@ export default function App() {
               quoteAmount: changed.quoteAmount
             })
           });
+          synced = res.ok;
         }
       }
-      await fetchAllData();
+      if (synced) {
+        await fetchAllData();
+      }
     } catch (err) {
       console.error("Failed to sync quote modification:", err);
     }
@@ -1334,7 +1478,7 @@ export default function App() {
                 analytics={analyticsSummary}
                 token={token}
                 customization={customization}
-                onUpdateCustomization={setCustomization}
+                onUpdateCustomization={updateCustomizationState}
                 onUpdateProducts={updateProductsState}
                 onUpdateCategories={updateCategoriesState}
                 onUpdateTestimonials={updateTestimonialsState}
