@@ -4549,19 +4549,34 @@ export default function AdminDashboard({
 
                 {/* Logo Live Preview Panel */}
                 <div className="bg-white border border-stone-200 rounded-xl p-5 flex flex-col justify-center items-center text-center space-y-4 shadow-3xs">
-                  <span className="text-[9px] font-mono uppercase tracking-widest text-stone-400">Live Brandmark Preview</span>
+                  <span className="text-[9px] font-mono uppercase tracking-widest text-stone-400">Live Brandmark Preview (Header &amp; Footer)</span>
                   
-                  <div className="p-4 bg-stone-50 border border-dashed border-stone-200 rounded-xl w-full flex justify-center items-center py-8">
-                    {/* Render live high-fidelity mockup */}
-                    <NicolettaLogo
-                      size={logoSize}
-                      showText={logoShowText}
-                      colorTheme="light"
-                      logoText={logoText}
-                      logoSubtext={logoSubtext}
-                      logoImageUrl={logoImageUrl}
-                      hideBorder={logoHideBorder}
-                    />
+                  <div className="w-full space-y-3">
+                    <div className="p-4 bg-white border border-dashed border-stone-200 rounded-xl w-full flex flex-col items-center justify-center py-5 gap-2">
+                      <span className="text-[8px] font-mono uppercase tracking-widest text-stone-400">Header (Light Background)</span>
+                      <NicolettaLogo
+                        size={logoSize}
+                        showText={logoShowText}
+                        colorTheme="light"
+                        logoText={logoText}
+                        logoSubtext={logoSubtext}
+                        logoImageUrl={logoImageUrl}
+                        hideBorder={true}
+                      />
+                    </div>
+
+                    <div className="p-4 bg-brand-dark border border-stone-700 rounded-xl w-full flex flex-col items-center justify-center py-5 gap-2">
+                      <span className="text-[8px] font-mono uppercase tracking-widest text-white/60">Footer (Brown Background — White Logo)</span>
+                      <NicolettaLogo
+                        size={logoSize}
+                        showText={logoShowText}
+                        colorTheme="dark"
+                        logoText={logoText}
+                        logoSubtext={logoSubtext}
+                        logoImageUrl={logoImageUrl}
+                        hideBorder={true}
+                      />
+                    </div>
                   </div>
 
                   <div className="w-full flex justify-end gap-2 pt-2">
