@@ -1241,26 +1241,6 @@ export default function App() {
 
           {/* Admin Toggle & Hamburger Group */}
           <div className="flex items-center gap-3">
-            <button
-              id="header-customer-account-btn"
-              onClick={() => {
-                setIsAdminMode(false);
-                setActivePage("account");
-                setMobileMenuOpen(false);
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              className={`hidden sm:inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest px-4 py-2.5 rounded-full cursor-pointer transition-colors border shadow-2xs ${
-                !isAdminMode && activePage === "account"
-                  ? "bg-brand-primary text-white border-brand-primary"
-                  : customer
-                  ? "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
-                  : "bg-brand-highlight/60 hover:bg-brand-highlight text-brand-dark border-brand-border"
-              }`}
-            >
-              <User className="h-3.5 w-3.5" />
-              <span>{customer ? customer.fullName.split(" ")[0] : "Sign In / Join"}</span>
-            </button>
-
             {isAdminMode && (
               <div className="flex items-center gap-1.5">
                 <button
@@ -1369,20 +1349,6 @@ export default function App() {
               }`}
             >
               The Workshop
-            </button>
-            <button
-              onClick={() => {
-                setIsAdminMode(false);
-                setActivePage("account");
-                setMobileMenuOpen(false);
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              className={`w-full text-left py-2 px-3 rounded-[8px] text-[10px] font-bold uppercase tracking-wider flex items-center gap-2 ${
-                activePage === "account" && !isAdminMode ? "bg-brand-primary/10 text-brand-primary" : "text-brand-dark hover:bg-brand-highlight"
-              }`}
-            >
-              <User className="h-3.5 w-3.5" />
-              {customer ? `Account (${customer.fullName.split(" ")[0]})` : "Customer Sign Up / Log In"}
             </button>
           </div>
         )}
