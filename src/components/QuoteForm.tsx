@@ -375,10 +375,10 @@ export default function QuoteForm({ products, selectedProduct, onSubmitQuote, on
           </div>
           <div>
             <h3 className="font-serif font-bold text-brand-dark text-xl md:text-2xl">
-              Custom Craft Quote Request
+              Request a Custom Quote
             </h3>
             <p className="text-brand-muted text-xs md:text-sm leading-relaxed">
-              Submit your customization details or ideas. We'll reply with a pricing quote within 24 hours. Once your order is confirmed we will send a mockup design for your approval before crafting.
+              We'll get back to you with a personalized quote within 24 hours. Once your order is confirmed, we'll send you a design preview for approval before bringing your idea to life.
             </p>
           </div>
         </div>

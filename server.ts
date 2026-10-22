@@ -272,9 +272,9 @@ const DEFAULT_CUSTOMIZATION = {
     {
       id: "quote-header",
       page: "quote",
-      title: "Submit Your Custom Request",
-      subtitle: "Bespoke Engraving Design Blueprint",
-      description: "Submit your engraving specifics. Our creative workshop will draft a custom layout mockup and email it to you within 24 hours — free of charge.",
+      title: "Let's Create Something Special",
+      subtitle: "Made Just for You",
+      description: "Have a personalized gift or custom design in mind? Share your ideas and details with us, and we'll help bring your vision to life. Every special creation starts with an idea, and we'd love to hear yours!",
       visible: true,
       order: 1
     },

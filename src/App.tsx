@@ -2328,16 +2328,22 @@ export default function App() {
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
                 {(() => {
                   const sec = customization.sections?.find(s => s.id === "quote-header");
+                  const subtitle = !sec?.subtitle || sec.subtitle === "Design Studio" || sec.subtitle === "Bespoke Engraving Design Blueprint" ? "Made Just for You" : sec.subtitle;
+                  const title = !sec?.title || sec.title === "Bespoke Inquiry Layout" || sec.title === "Submit Your Custom Request" ? "Let's Create Something Special" : sec.title;
+                  const description = !sec?.description || sec.description.includes("Submit your engraving specifics") || sec.description.includes("free of charge")
+                    ? "Have a personalized gift or custom design in mind? Share your ideas and details with us, and we'll help bring your vision to life. Every special creation starts with an idea, and we'd love to hear yours!"
+                    : sec.description;
+
                   return (
                     <div className="text-center max-w-xl mx-auto mb-8 space-y-2">
                       <span className="text-[10px] text-brand-primary font-bold uppercase tracking-widest block">
-                        {sec?.subtitle || "Design Studio"}
+                        {subtitle}
                       </span>
                       <h3 className="font-serif font-bold text-brand-dark text-2xl md:text-3xl">
-                        {sec?.title || "Bespoke Inquiry Layout"}
+                        {title}
                       </h3>
-                      <p className="text-brand-muted text-xs font-light">
-                        {sec?.description || "Submit your engraving specifics. Our creative workshop will draft a custom layout mockup and email it to you within 24 hours — free of charge."}
+                      <p className="text-brand-muted text-xs font-light leading-relaxed">
+                        {description}
                       </p>
                     </div>
                   );
