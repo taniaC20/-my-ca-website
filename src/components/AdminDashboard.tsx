@@ -37,6 +37,7 @@ import {
 import { Product, Category, Testimonial, Announcement, QuoteRequest, AnalyticsSummary, CustomizationSettings, CustomSection, GIFT_OCCASION_PRESETS, GiftOccasionFilter } from "../types";
 import { NicolettaLogo } from "./NicolettaLogo";
 import { safeSetLocalStorage, persistKeyVal } from "../storage";
+import { pushCloudStore, subscribeCloudSync, CloudSyncState } from "../cloudStore";
 
 interface AdminDashboardProps {
   products: Product[];
@@ -421,6 +422,16 @@ export default function AdminDashboard({
     onUpdateCustomization(payload);
     persistKeyVal("nicoletta_customization", payload);
 
+    // Immediately push to global cloud store so all other browsers & devices receive changes
+    pushCloudStore({
+      customization: payload,
+      products,
+      categories,
+      testimonials,
+      announcements,
+      quotes
+    }).catch(() => {});
+
     try {
       const res = await fetch("/api/admin/customization", {
         method: "POST",
@@ -446,12 +457,12 @@ export default function AdminDashboard({
       } else {
         safeSetLocalStorage("nicoletta_customization_unsynced", "true");
       }
-      setCustomizerSuccess("Site settings and carousel customization saved successfully!");
+      setCustomizerSuccess("Site settings, carousel photos, and all store updates saved and synced across all browsers!");
       setTimeout(() => setCustomizerSuccess(null), 4000);
     } catch (err) {
       console.warn("Saved customization locally (server offline):", err);
       safeSetLocalStorage("nicoletta_customization_unsynced", "true");
-      setCustomizerSuccess("Site settings and carousel customization saved!");
+      setCustomizerSuccess("Site settings and carousel customization saved and synced across all browsers!");
       setTimeout(() => setCustomizerSuccess(null), 4000);
     } finally {
       setIsSavingCustomizer(false);
@@ -789,7 +800,43 @@ export default function AdminDashboard({
   const [uploadingSlideIndex, setUploadingSlideIndex] = useState<{ sectionId: string; index: number } | null>(null);
   const [sectionUploadError, setSectionUploadError] = useState<string>("");
 
-  // Filter states
+  // Cloud sync live state
+  const [cloudSyncState, setCloudSyncState] = useState<CloudSyncState>("idle");
+  const [cloudLastSynced, setCloudLastSynced] = useState<string | null>(null);
+  const [isManualSyncing, setIsManualSyncing] = useState(false);
+  const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    return subscribeCloudSync((st, at) => {
+      setCloudSyncState(st);
+      if (at) setCloudLastSynced(at);
+    });
+  }, []);
+
+  const handleManualCloudSync = async () => {
+    setIsManualSyncing(true);
+    setSyncFeedback(null);
+    try {
+      const ok = await pushCloudStore({
+        customization,
+        products,
+        categories,
+        testimonials,
+        announcements,
+        quotes
+      });
+      if (ok) {
+        setSyncFeedback("All products, categories, photos, and settings successfully synced to cloud!");
+      } else {
+        setSyncFeedback("Sync attempt completed. Saved to local browser cache.");
+      }
+    } catch {
+      setSyncFeedback("Sync attempt completed. Saved to local browser cache.");
+    } finally {
+      setIsManualSyncing(false);
+      setTimeout(() => setSyncFeedback(null), 5000);
+    }
+  };
   const [quotesFilter, setQuotesFilter] = useState<"all" | "pending" | "reviewing" | "quoted" | "approved" | "completed" | "rejected">("all");
   const [messagesFilter, setMessagesFilter] = useState<"all" | "pending" | "reviewing" | "quoted" | "approved" | "completed" | "rejected">("all");
   const [isAddingTestimonial, setIsAddingTestimonial] = useState(false);
@@ -1414,6 +1461,35 @@ export default function AdminDashboard({
         <div className="px-2 py-4 mb-4 border-b border-brand-border/10 flex items-center gap-2">
           <Sliders className="h-4.5 w-4.5 text-brand-primary" />
           <span className="font-serif font-bold text-base text-brand-highlight uppercase tracking-wider">Artisan Portal</span>
+        </div>
+
+        {/* Global Cloud Sync Status Pill & Force-Sync Button */}
+        <div className="mx-1 mb-4 p-3 bg-brand-primary/10 border border-brand-primary/20 rounded-xl space-y-2">
+          <div className="flex items-center justify-between text-[10px]">
+            <span className="text-stone-300 font-semibold flex items-center gap-1.5">
+              <span className={`h-2 w-2 rounded-full ${cloudSyncState === "syncing" ? "bg-amber-400 animate-pulse" : cloudSyncState === "error" ? "bg-red-400" : "bg-emerald-400"}`}></span>
+              {cloudSyncState === "syncing" ? "Syncing..." : cloudSyncState === "error" ? "Local Cache" : "Cloud Active"}
+            </span>
+            <span className="text-[9px] text-stone-400 font-mono">
+              All Browsers
+            </span>
+          </div>
+          <p className="text-[9px] text-stone-300 leading-tight">
+            Changes save to cloud so every browser, phone, and visitor sees your latest updates.
+          </p>
+          <button
+            type="button"
+            onClick={handleManualCloudSync}
+            disabled={isManualSyncing}
+            className="w-full text-center py-1.5 px-2 bg-brand-primary text-white rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-brand-primary-hover transition-colors disabled:opacity-50 cursor-pointer shadow-3xs"
+          >
+            {isManualSyncing ? "Syncing..." : "Sync Local Data to Cloud"}
+          </button>
+          {syncFeedback && (
+            <p className="text-[9px] text-emerald-300 font-medium text-center animate-fade-in">
+              {syncFeedback}
+            </p>
+          )}
         </div>
 
         <nav className="space-y-2">

@@ -46,6 +46,7 @@ import ProductDetails from "./components/ProductDetails";
 import CustomerAuthPortal from "./components/CustomerAuthPortal";
 import { CustomerProfile, getStoredCustomerSession } from "./supabaseClient";
 import { safeSetLocalStorage, safeParseLocal, persistKeyVal, idbGet } from "./storage";
+import { fetchCloudStore, pushCloudStore, scoreCustomizationRichness } from "./cloudStore";
 
 async function safeFetchJson(url: string, options?: RequestInit): Promise<{ ok: boolean; status: number; data: any }> {
   try {
@@ -333,12 +334,162 @@ export default function App() {
 
   const quoteFormRef = useRef<HTMLDivElement>(null);
 
-  // Authoritative server-side synchronizer function
+  // Reads the richest local browser state combining IndexedDB (high-capacity) + localStorage
+  const readBestLocalStore = async () => {
+    const [idbCust, idbProds, idbCats, idbTests, idbAnns, idbQuotes] = await Promise.all([
+      idbGet<CustomizationSettings>("nicoletta_customization").catch(() => null),
+      idbGet<Product[]>("nicoletta_products").catch(() => null),
+      idbGet<Category[]>("nicoletta_categories").catch(() => null),
+      idbGet<Testimonial[]>("nicoletta_testimonials").catch(() => null),
+      idbGet<Announcement[]>("nicoletta_announcements").catch(() => null),
+      idbGet<QuoteRequest[]>("nicoletta_quotes").catch(() => null)
+    ]);
+
+    const lsCust = safeParseLocal<CustomizationSettings | null>(
+      "nicoletta_customization",
+      null,
+      (v) => Boolean(v && typeof v === "object" && Array.isArray(v.sections) && v.sections.length > 0)
+    );
+    const lsProds = safeParseLocal<Product[]>("nicoletta_products", [], Array.isArray);
+    const lsCats = safeParseLocal<Category[]>("nicoletta_categories", [], Array.isArray);
+    const lsTests = safeParseLocal<Testimonial[]>("nicoletta_testimonials", [], Array.isArray);
+    const lsAnns = safeParseLocal<Announcement[]>("nicoletta_announcements", [], Array.isArray);
+    const lsQuotes = safeParseLocal<QuoteRequest[]>("nicoletta_quotes", [], Array.isArray);
+
+    const validIdbCust =
+      idbCust && typeof idbCust === "object" && Array.isArray(idbCust.sections) && idbCust.sections.length > 0
+        ? idbCust
+        : null;
+
+    const bestCust =
+      validIdbCust && scoreCustomizationRichness(validIdbCust) >= scoreCustomizationRichness(lsCust)
+        ? validIdbCust
+        : lsCust || validIdbCust;
+
+    const bestProds = Array.isArray(idbProds) && idbProds.length >= lsProds.length ? idbProds : lsProds;
+    const bestCats = Array.isArray(idbCats) && idbCats.length >= lsCats.length ? idbCats : lsCats;
+    const bestTests = Array.isArray(idbTests) && idbTests.length >= lsTests.length ? idbTests : lsTests;
+    const bestAnns = Array.isArray(idbAnns) && idbAnns.length >= lsAnns.length ? idbAnns : lsAnns;
+    const bestQuotes = Array.isArray(idbQuotes) && idbQuotes.length >= lsQuotes.length ? idbQuotes : lsQuotes;
+
+    return {
+      customization: bestCust,
+      products: bestProds,
+      categories: bestCats,
+      testimonials: bestTests,
+      announcements: bestAnns,
+      quotes: bestQuotes
+    };
+  };
+
+  // Authoritative server-side & cloud synchronizer function
   const fetchAllData = async (activeToken?: string | null) => {
     try {
       const currentToken = activeToken !== undefined ? activeToken : token;
+      const localStore = await readBestLocalStore();
 
-      // Public tables loading
+      // Apply local IndexedDB hydration immediately so the user sees their local work without flicker
+      if (localStore.customization) setCustomization(localStore.customization);
+      if (localStore.products.length > 0) setProducts(localStore.products);
+      if (localStore.categories.length > 0) setCategories(localStore.categories);
+      if (localStore.testimonials.length > 0) setTestimonials(localStore.testimonials);
+      if (localStore.announcements.length > 0) setAnnouncements(localStore.announcements);
+      if (localStore.quotes.length > 0) setQuotes(localStore.quotes);
+
+      // 1. Check shared Cloud Store (works across all browsers, phones, and devices on Vercel)
+      const cloudData = await fetchCloudStore();
+      const migrationDone = localStorage.getItem("nicoletta_cloud_initial_migration_done") === "true";
+      const localUnsynced = localStorage.getItem("nicoletta_customization_unsynced") === "true";
+      const isAdminBrowser = Boolean(
+        currentToken ||
+          localStorage.getItem("nicoletta_admin_token") ||
+          localStorage.getItem("nicoletta_admin_unlocked") === "true"
+      );
+      const hasLocalUserWork =
+        localStore.products.length > 0 ||
+        localStore.categories.length > 0 ||
+        localStore.testimonials.length > 0 ||
+        localStore.announcements.length > 0 ||
+        localStore.quotes.length > 0 ||
+        scoreCustomizationRichness(localStore.customization) > 0;
+
+      if (!cloudData) {
+        // Cloud store has no snapshot yet: if this browser has user work, publish it to the cloud automatically!
+        if (hasLocalUserWork || localUnsynced || isAdminBrowser) {
+          await pushCloudStore({
+            customization: localStore.customization || customization,
+            products: localStore.products,
+            categories: localStore.categories,
+            testimonials: localStore.testimonials,
+            announcements: localStore.announcements,
+            quotes: localStore.quotes
+          });
+        }
+      } else {
+        // Cloud store exists: check if this browser has un-migrated local admin work that is richer than cloud
+        const cloudProds = Array.isArray(cloudData.products) ? cloudData.products : [];
+        const cloudCats = Array.isArray(cloudData.categories) ? cloudData.categories : [];
+        const cloudTests = Array.isArray(cloudData.testimonials) ? cloudData.testimonials : [];
+        const cloudAnns = Array.isArray(cloudData.announcements) ? cloudData.announcements : [];
+        const cloudQuotes = Array.isArray(cloudData.quotes) ? cloudData.quotes : [];
+        const cloudCust =
+          cloudData.customization && Array.isArray(cloudData.customization.sections)
+            ? cloudData.customization
+            : null;
+
+        const localHasMoreData =
+          (!migrationDone || localUnsynced) &&
+          (isAdminBrowser || hasLocalUserWork) &&
+          (localStore.products.length > cloudProds.length ||
+            localStore.categories.length > cloudCats.length ||
+            localStore.testimonials.length > cloudTests.length ||
+            localStore.announcements.length > cloudAnns.length ||
+            scoreCustomizationRichness(localStore.customization) > scoreCustomizationRichness(cloudCust) ||
+            localUnsynced);
+
+        if (localHasMoreData) {
+          const mergedProds = localStore.products.length >= cloudProds.length ? localStore.products : cloudProds;
+          const mergedCats = localStore.categories.length >= cloudCats.length ? localStore.categories : cloudCats;
+          const mergedTests = localStore.testimonials.length >= cloudTests.length ? localStore.testimonials : cloudTests;
+          const mergedAnns = localStore.announcements.length >= cloudAnns.length ? localStore.announcements : cloudAnns;
+          const mergedQuotes = localStore.quotes.length >= cloudQuotes.length ? localStore.quotes : cloudQuotes;
+          const mergedCust =
+            (localUnsynced ||
+              scoreCustomizationRichness(localStore.customization) >= scoreCustomizationRichness(cloudCust)) &&
+            localStore.customization
+              ? localStore.customization
+              : cloudCust || localStore.customization || customization;
+
+          setProducts(mergedProds);
+          setCategories(mergedCats);
+          setTestimonials(mergedTests);
+          setAnnouncements(mergedAnns);
+          setQuotes(mergedQuotes);
+          if (mergedCust) setCustomization(mergedCust);
+
+          await pushCloudStore({
+            customization: mergedCust,
+            products: mergedProds,
+            categories: mergedCats,
+            testimonials: mergedTests,
+            announcements: mergedAnns,
+            quotes: mergedQuotes
+          });
+        } else {
+          // Use authoritative cloud state so all browsers and customer devices see the exact same site!
+          setProducts(cloudProds);
+          setCategories(cloudCats);
+          setTestimonials(cloudTests);
+          setAnnouncements(cloudAnns);
+          setQuotes(cloudQuotes);
+          if (cloudCust) {
+            setCustomization(cloudCust);
+          }
+          safeSetLocalStorage("nicoletta_cloud_initial_migration_done", "true");
+        }
+      }
+
+      // 2. Also check local Express /api endpoints when running local dev server
       const [resProds, resCats, resTests, resAnns, resCust] = await Promise.all([
         safeFetchJson("/api/products"),
         safeFetchJson("/api/categories"),
@@ -347,47 +498,20 @@ export default function App() {
         safeFetchJson("/api/customization")
       ]);
 
-      if (resProds.ok && Array.isArray(resProds.data)) {
-        const localProds = safeParseLocal<Product[]>("nicoletta_products", [], Array.isArray);
-        if (resProds.data.length > 0 || localProds.length === 0) {
-          setProducts(resProds.data);
-        }
+      if (resProds.ok && Array.isArray(resProds.data) && resProds.data.length > 0 && !cloudData) {
+        setProducts(resProds.data);
       }
-      if (resCats.ok && Array.isArray(resCats.data)) {
-        const localCats = safeParseLocal<Category[]>("nicoletta_categories", [], Array.isArray);
-        if (resCats.data.length > 0 || localCats.length === 0) {
-          setCategories(resCats.data);
-        }
+      if (resCats.ok && Array.isArray(resCats.data) && resCats.data.length > 0 && !cloudData) {
+        setCategories(resCats.data);
       }
-      if (resTests.ok && Array.isArray(resTests.data)) {
-        const localTests = safeParseLocal<Testimonial[]>("nicoletta_testimonials", [], Array.isArray);
-        if (resTests.data.length > 0 || localTests.length === 0) {
-          setTestimonials(resTests.data);
-        }
+      if (resTests.ok && Array.isArray(resTests.data) && resTests.data.length > 0 && !cloudData) {
+        setTestimonials(resTests.data);
       }
-      if (resAnns.ok && Array.isArray(resAnns.data)) {
-        const localAnns = safeParseLocal<Announcement[]>("nicoletta_announcements", [], Array.isArray);
-        if (resAnns.data.length > 0 || localAnns.length === 0) {
-          setAnnouncements(resAnns.data);
-        }
+      if (resAnns.ok && Array.isArray(resAnns.data) && resAnns.data.length > 0 && !cloudData) {
+        setAnnouncements(resAnns.data);
       }
-      if (resCust.ok && resCust.data && Array.isArray(resCust.data.sections)) {
-        const serverCust = resCust.data;
-        const localCust = safeParseLocal<CustomizationSettings | null>(
-          "nicoletta_customization",
-          null,
-          (v) => Boolean(v && typeof v === "object" && Array.isArray(v.sections) && v.sections.length > 0)
-        );
-        const localUnsynced = localStorage.getItem("nicoletta_customization_unsynced") === "true";
-
-        if (localCust && localUnsynced) {
-          setCustomization(localCust);
-        } else {
-          if (localCust && typeof localCust.logoImageUrl === "string" && localCust.logoImageUrl.length > 0 && !serverCust.logoImageUrl) {
-            serverCust.logoImageUrl = localCust.logoImageUrl;
-          }
-          setCustomization(serverCust);
-        }
+      if (resCust.ok && resCust.data && Array.isArray(resCust.data.sections) && !cloudData) {
+        setCustomization(resCust.data);
       }
 
       // Views metric counter ping
@@ -418,17 +542,11 @@ export default function App() {
           })
         ]);
 
-        if (resQuotes.ok && Array.isArray(resQuotes.data)) {
-          const localQuotes = safeParseLocal<QuoteRequest[]>("nicoletta_quotes", [], Array.isArray);
-          if (resQuotes.data.length > 0 || localQuotes.length === 0) {
-            setQuotes(resQuotes.data);
-          }
+        if (resQuotes.ok && Array.isArray(resQuotes.data) && resQuotes.data.length > 0 && !cloudData) {
+          setQuotes(resQuotes.data);
         }
-        if (resAllTests.ok && Array.isArray(resAllTests.data)) {
-          const localTests = safeParseLocal<Testimonial[]>("nicoletta_testimonials", [], Array.isArray);
-          if (resAllTests.data.length > 0 || localTests.length === 0) {
-            setTestimonials(resAllTests.data);
-          }
+        if (resAllTests.ok && Array.isArray(resAllTests.data) && resAllTests.data.length > 0 && !cloudData) {
+          setTestimonials(resAllTests.data);
         }
       }
     } catch (err) {
@@ -453,47 +571,6 @@ export default function App() {
     } catch {
       // Ignore storage access errors
     }
-  }, []);
-
-  // Hydrate from IndexedDB on initial mount if IndexedDB has stored studio data (exceeding 5MB localStorage limit)
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const [idbCust, idbProds, idbCats, idbTests, idbAnns, idbQuotes] = await Promise.all([
-          idbGet<CustomizationSettings>("nicoletta_customization"),
-          idbGet<Product[]>("nicoletta_products"),
-          idbGet<Category[]>("nicoletta_categories"),
-          idbGet<Testimonial[]>("nicoletta_testimonials"),
-          idbGet<Announcement[]>("nicoletta_announcements"),
-          idbGet<QuoteRequest[]>("nicoletta_quotes")
-        ]);
-        if (!active) return;
-        if (idbCust && typeof idbCust === "object" && Array.isArray(idbCust.sections) && idbCust.sections.length > 0) {
-          setCustomization(idbCust);
-        }
-        if (Array.isArray(idbProds) && idbProds.length > 0) {
-          setProducts(idbProds);
-        }
-        if (Array.isArray(idbCats) && idbCats.length > 0) {
-          setCategories(idbCats);
-        }
-        if (Array.isArray(idbTests) && idbTests.length > 0) {
-          setTestimonials(idbTests);
-        }
-        if (Array.isArray(idbAnns) && idbAnns.length > 0) {
-          setAnnouncements(idbAnns);
-        }
-        if (Array.isArray(idbQuotes) && idbQuotes.length > 0) {
-          setQuotes(idbQuotes);
-        }
-      } catch {
-        // Ignore IndexedDB read errors
-      }
-    })();
-    return () => {
-      active = false;
-    };
   }, []);
 
   // Keep localStorage + IndexedDB backup updated once initial load has fetched active states from the server
@@ -535,28 +612,14 @@ export default function App() {
 
   const restoreDatabaseToServer = async (activeToken: string) => {
     try {
+      const localStore = await readBestLocalStore();
       const body: Record<string, any> = {};
-      const localCust = safeParseLocal<CustomizationSettings | null>(
-        "nicoletta_customization",
-        null,
-        (v) => Boolean(v && typeof v === "object" && Array.isArray(v.sections) && v.sections.length > 0)
-      );
-      if (localCust) body.customization = localCust;
-
-      const localProds = safeParseLocal<Product[] | null>("nicoletta_products", null, Array.isArray);
-      if (localProds && localProds.length > 0) body.products = localProds;
-
-      const localCats = safeParseLocal<Category[] | null>("nicoletta_categories", null, Array.isArray);
-      if (localCats && localCats.length > 0) body.categories = localCats;
-
-      const localTests = safeParseLocal<Testimonial[] | null>("nicoletta_testimonials", null, Array.isArray);
-      if (localTests && localTests.length > 0) body.testimonials = localTests;
-
-      const localAnns = safeParseLocal<Announcement[] | null>("nicoletta_announcements", null, Array.isArray);
-      if (localAnns && localAnns.length > 0) body.announcements = localAnns;
-
-      const localQuotes = safeParseLocal<QuoteRequest[] | null>("nicoletta_quotes", null, Array.isArray);
-      if (localQuotes && localQuotes.length > 0) body.quotes = localQuotes;
+      if (localStore.customization) body.customization = localStore.customization;
+      if (localStore.products.length > 0) body.products = localStore.products;
+      if (localStore.categories.length > 0) body.categories = localStore.categories;
+      if (localStore.testimonials.length > 0) body.testimonials = localStore.testimonials;
+      if (localStore.announcements.length > 0) body.announcements = localStore.announcements;
+      if (localStore.quotes.length > 0) body.quotes = localStore.quotes;
 
       if (Object.keys(body).length > 0) {
         const res = await safeFetchJson("/api/admin/restore-db", {
@@ -690,6 +753,7 @@ export default function App() {
         localStorage.setItem("nicoletta_admin_token", fallbackToken);
         setIsLoggedIn(true);
         setAdminPassword("");
+        await fetchAllData(fallbackToken);
       } else {
         setAuthError("Login validation failed. Secret passphrase mismatch.");
       }
@@ -724,12 +788,14 @@ export default function App() {
     };
     setCustomization(validCust);
     persistKeyVal("nicoletta_customization", validCust);
+    pushCloudStore({ customization: validCust }).catch(() => {});
   };
 
   const updateProductsState = async (newProds: Product[]) => {
     const safeProds = Array.isArray(newProds) ? newProds : [];
     setProducts(safeProds);
     persistKeyVal("nicoletta_products", safeProds);
+    pushCloudStore({ products: safeProds }).catch(() => {});
     try {
       let synced = false;
       if (safeProds.length < products.length) {
@@ -796,6 +862,7 @@ export default function App() {
     const safeCats = Array.isArray(newCats) ? newCats : [];
     setCategories(safeCats);
     persistKeyVal("nicoletta_categories", safeCats);
+    pushCloudStore({ categories: safeCats }).catch(() => {});
     try {
       let synced = false;
       if (safeCats.length < categories.length) {
@@ -859,6 +926,7 @@ export default function App() {
     const safeTests = Array.isArray(newTests) ? newTests : [];
     setTestimonials(safeTests);
     persistKeyVal("nicoletta_testimonials", safeTests);
+    pushCloudStore({ testimonials: safeTests }).catch(() => {});
     try {
       let synced = false;
       if (safeTests.length < testimonials.length) {
@@ -929,6 +997,7 @@ export default function App() {
     const safeAnns = Array.isArray(newAnns) ? newAnns : [];
     setAnnouncements(safeAnns);
     persistKeyVal("nicoletta_announcements", safeAnns);
+    pushCloudStore({ announcements: safeAnns }).catch(() => {});
     try {
       let synced = false;
       if (safeAnns.length < announcements.length) {
@@ -989,6 +1058,7 @@ export default function App() {
     const safeQuotes = Array.isArray(newQuotes) ? newQuotes : [];
     setQuotes(safeQuotes);
     persistKeyVal("nicoletta_quotes", safeQuotes);
+    pushCloudStore({ quotes: safeQuotes }).catch(() => {});
     try {
       let synced = false;
       const changed = safeQuotes.find(nq => {
@@ -1113,13 +1183,22 @@ export default function App() {
       });
       if (response.ok) {
         const savedQuote = await response.json();
-        setQuotes((prev) => [savedQuote, ...prev.filter((q) => q.id !== savedQuote.id)]);
+        const nextQuotes = [savedQuote, ...quotes.filter((q) => q.id !== savedQuote.id)];
+        setQuotes(nextQuotes);
+        persistKeyVal("nicoletta_quotes", nextQuotes);
+        pushCloudStore({ quotes: nextQuotes }).catch(() => {});
         await fetchAllData();
       } else {
-        setQuotes((prev) => [fallbackQuote, ...prev]);
+        const nextQuotes = [fallbackQuote, ...quotes];
+        setQuotes(nextQuotes);
+        persistKeyVal("nicoletta_quotes", nextQuotes);
+        pushCloudStore({ quotes: nextQuotes }).catch(() => {});
       }
     } catch (err) {
-      setQuotes((prev) => [fallbackQuote, ...prev]);
+      const nextQuotes = [fallbackQuote, ...quotes];
+      setQuotes(nextQuotes);
+      persistKeyVal("nicoletta_quotes", nextQuotes);
+      pushCloudStore({ quotes: nextQuotes }).catch(() => {});
     }
   };
 
@@ -1140,11 +1219,17 @@ export default function App() {
         await fetchAllData();
         alert("Thank you! Your testimonial has been submitted successfully for moderator review.");
       } else {
-        setTestimonials((prev) => [fallbackTestimonial, ...prev]);
+        const nextTests = [fallbackTestimonial, ...testimonials];
+        setTestimonials(nextTests);
+        persistKeyVal("nicoletta_testimonials", nextTests);
+        pushCloudStore({ testimonials: nextTests }).catch(() => {});
         alert("Thank you! Your testimonial has been submitted successfully for moderator review.");
       }
     } catch (err) {
-      setTestimonials((prev) => [fallbackTestimonial, ...prev]);
+      const nextTests = [fallbackTestimonial, ...testimonials];
+      setTestimonials(nextTests);
+      persistKeyVal("nicoletta_testimonials", nextTests);
+      pushCloudStore({ testimonials: nextTests }).catch(() => {});
       alert("Thank you! Your testimonial has been submitted successfully for moderator review.");
     }
   };
@@ -2410,13 +2495,22 @@ export default function App() {
                           
                           if (response.ok) {
                             const saved = await response.json();
-                            setQuotes((prev) => [saved, ...prev.filter((q) => q.id !== saved.id)]);
+                            const nextQuotes = [saved, ...quotes.filter((q) => q.id !== saved.id)];
+                            setQuotes(nextQuotes);
+                            persistKeyVal("nicoletta_quotes", nextQuotes);
+                            pushCloudStore({ quotes: nextQuotes }).catch(() => {});
                             await fetchAllData();
                           } else {
-                            setQuotes((prev) => [fallbackContactQuote, ...prev]);
+                            const nextQuotes = [fallbackContactQuote, ...quotes];
+                            setQuotes(nextQuotes);
+                            persistKeyVal("nicoletta_quotes", nextQuotes);
+                            pushCloudStore({ quotes: nextQuotes }).catch(() => {});
                           }
                         } catch (err) {
-                          setQuotes((prev) => [fallbackContactQuote, ...prev]);
+                          const nextQuotes = [fallbackContactQuote, ...quotes];
+                          setQuotes(nextQuotes);
+                          persistKeyVal("nicoletta_quotes", nextQuotes);
+                          pushCloudStore({ quotes: nextQuotes }).catch(() => {});
                         }
                         setContactSubmitted(true);
                         setContactUploadedFiles([]);
