@@ -45,38 +45,7 @@ import { NicolettaLogo } from "./components/NicolettaLogo";
 import ProductDetails from "./components/ProductDetails";
 import CustomerAuthPortal from "./components/CustomerAuthPortal";
 import { CustomerProfile, getStoredCustomerSession } from "./supabaseClient";
-
-function safeSetLocalStorage(key: string, value: string): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    localStorage.setItem(key, value);
-    return true;
-  } catch (err) {
-    console.warn(`LocalStorage quota or write warning for key "${key}":`, err);
-    try {
-      // Remove non-essential cache keys and retry once
-      localStorage.removeItem("nicoletta_sample_data_cleared_v1");
-      localStorage.setItem(key, value);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-}
-
-function safeParseLocal<T>(key: string, fallback: T, validator?: (val: any) => boolean): T {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    const parsed = JSON.parse(raw);
-    if (validator && !validator(parsed)) return fallback;
-    return parsed as T;
-  } catch (err) {
-    console.warn(`Failed to parse localStorage key "${key}", using fallback:`, err);
-    return fallback;
-  }
-}
+import { safeSetLocalStorage, safeParseLocal, persistKeyVal, idbGet } from "./storage";
 
 async function safeFetchJson(url: string, options?: RequestInit): Promise<{ ok: boolean; status: number; data: any }> {
   try {
@@ -486,40 +455,81 @@ export default function App() {
     }
   }, []);
 
-  // Keep localStorage backup updated once initial load has fetched active states from the server
+  // Hydrate from IndexedDB on initial mount if IndexedDB has stored studio data (exceeding 5MB localStorage limit)
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const [idbCust, idbProds, idbCats, idbTests, idbAnns, idbQuotes] = await Promise.all([
+          idbGet<CustomizationSettings>("nicoletta_customization"),
+          idbGet<Product[]>("nicoletta_products"),
+          idbGet<Category[]>("nicoletta_categories"),
+          idbGet<Testimonial[]>("nicoletta_testimonials"),
+          idbGet<Announcement[]>("nicoletta_announcements"),
+          idbGet<QuoteRequest[]>("nicoletta_quotes")
+        ]);
+        if (!active) return;
+        if (idbCust && typeof idbCust === "object" && Array.isArray(idbCust.sections) && idbCust.sections.length > 0) {
+          setCustomization(idbCust);
+        }
+        if (Array.isArray(idbProds) && idbProds.length > 0) {
+          setProducts(idbProds);
+        }
+        if (Array.isArray(idbCats) && idbCats.length > 0) {
+          setCategories(idbCats);
+        }
+        if (Array.isArray(idbTests) && idbTests.length > 0) {
+          setTestimonials(idbTests);
+        }
+        if (Array.isArray(idbAnns) && idbAnns.length > 0) {
+          setAnnouncements(idbAnns);
+        }
+        if (Array.isArray(idbQuotes) && idbQuotes.length > 0) {
+          setQuotes(idbQuotes);
+        }
+      } catch {
+        // Ignore IndexedDB read errors
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Keep localStorage + IndexedDB backup updated once initial load has fetched active states from the server
   useEffect(() => {
     if (initialLoadDone && Array.isArray(products)) {
-      safeSetLocalStorage("nicoletta_products", JSON.stringify(products));
+      persistKeyVal("nicoletta_products", products);
     }
   }, [products, initialLoadDone]);
 
   useEffect(() => {
     if (initialLoadDone && Array.isArray(categories)) {
-      safeSetLocalStorage("nicoletta_categories", JSON.stringify(categories));
+      persistKeyVal("nicoletta_categories", categories);
     }
   }, [categories, initialLoadDone]);
 
   useEffect(() => {
     if (initialLoadDone && Array.isArray(testimonials)) {
-      safeSetLocalStorage("nicoletta_testimonials", JSON.stringify(testimonials));
+      persistKeyVal("nicoletta_testimonials", testimonials);
     }
   }, [testimonials, initialLoadDone]);
 
   useEffect(() => {
     if (initialLoadDone && Array.isArray(announcements)) {
-      safeSetLocalStorage("nicoletta_announcements", JSON.stringify(announcements));
+      persistKeyVal("nicoletta_announcements", announcements);
     }
   }, [announcements, initialLoadDone]);
 
   useEffect(() => {
     if (initialLoadDone && Array.isArray(quotes)) {
-      safeSetLocalStorage("nicoletta_quotes", JSON.stringify(quotes));
+      persistKeyVal("nicoletta_quotes", quotes);
     }
   }, [quotes, initialLoadDone]);
 
   useEffect(() => {
     if (initialLoadDone && customization && Array.isArray(customization.sections) && customization.sections.length > 0) {
-      safeSetLocalStorage("nicoletta_customization", JSON.stringify(customization));
+      persistKeyVal("nicoletta_customization", customization);
     }
   }, [customization, initialLoadDone]);
 
@@ -713,13 +723,13 @@ export default function App() {
         : (Array.isArray(customization?.sections) ? customization.sections : [])
     };
     setCustomization(validCust);
-    safeSetLocalStorage("nicoletta_customization", JSON.stringify(validCust));
+    persistKeyVal("nicoletta_customization", validCust);
   };
 
   const updateProductsState = async (newProds: Product[]) => {
     const safeProds = Array.isArray(newProds) ? newProds : [];
     setProducts(safeProds);
-    safeSetLocalStorage("nicoletta_products", JSON.stringify(safeProds));
+    persistKeyVal("nicoletta_products", safeProds);
     try {
       let synced = false;
       if (safeProds.length < products.length) {
@@ -775,7 +785,7 @@ export default function App() {
   const updateCategoriesState = async (newCats: Category[]) => {
     const safeCats = Array.isArray(newCats) ? newCats : [];
     setCategories(safeCats);
-    safeSetLocalStorage("nicoletta_categories", JSON.stringify(safeCats));
+    persistKeyVal("nicoletta_categories", safeCats);
     try {
       let synced = false;
       if (safeCats.length < categories.length) {
@@ -828,7 +838,7 @@ export default function App() {
   const updateTestimonialsState = async (newTests: Testimonial[]) => {
     const safeTests = Array.isArray(newTests) ? newTests : [];
     setTestimonials(safeTests);
-    safeSetLocalStorage("nicoletta_testimonials", JSON.stringify(safeTests));
+    persistKeyVal("nicoletta_testimonials", safeTests);
     try {
       let synced = false;
       if (safeTests.length < testimonials.length) {
@@ -888,7 +898,7 @@ export default function App() {
   const updateAnnouncementsState = async (newAnns: Announcement[]) => {
     const safeAnns = Array.isArray(newAnns) ? newAnns : [];
     setAnnouncements(safeAnns);
-    safeSetLocalStorage("nicoletta_announcements", JSON.stringify(safeAnns));
+    persistKeyVal("nicoletta_announcements", safeAnns);
     try {
       let synced = false;
       if (safeAnns.length < announcements.length) {
@@ -938,7 +948,7 @@ export default function App() {
   const updateQuotesState = async (newQuotes: QuoteRequest[]) => {
     const safeQuotes = Array.isArray(newQuotes) ? newQuotes : [];
     setQuotes(safeQuotes);
-    safeSetLocalStorage("nicoletta_quotes", JSON.stringify(safeQuotes));
+    persistKeyVal("nicoletta_quotes", safeQuotes);
     try {
       let synced = false;
       const changed = safeQuotes.find(nq => {

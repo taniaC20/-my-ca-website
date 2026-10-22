@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { Product, Category, Testimonial, Announcement, QuoteRequest, AnalyticsSummary, CustomizationSettings, CustomSection } from "../types";
 import { NicolettaLogo } from "./NicolettaLogo";
+import { safeSetLocalStorage, persistKeyVal } from "../storage";
 
 interface AdminDashboardProps {
   products: Product[];
@@ -55,7 +56,12 @@ interface AdminDashboardProps {
 
 type AdminTab = "analytics" | "products" | "categories" | "testimonials" | "quotes" | "messages" | "announcements" | "site-customizer" | "security";
 
-async function compressImageToDataUrl(file: File, maxDimension = 1200, quality = 0.82): Promise<string> {
+async function compressImageToDataUrl(
+  file: File,
+  maxDimension = 900,
+  quality = 0.76,
+  preserveAlpha = false
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error("Error reading file."));
@@ -100,13 +106,32 @@ async function compressImageToDataUrl(file: File, maxDimension = 1200, quality =
             resolve(rawDataUrl);
             return;
           }
+
+          if (!preserveAlpha) {
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, width, height);
+          }
           ctx.drawImage(img, 0, 0, width, height);
 
-          // Preserve transparency for PNG/WebP logos or smaller PNGs; otherwise use compact WebP/JPEG
-          const isTransparentFormat = file.type === "image/png" || file.type === "image/webp";
-          const outputMime = isTransparentFormat ? "image/webp" : "image/jpeg";
+          const outputMime = preserveAlpha ? "image/webp" : "image/jpeg";
           let compressed = canvas.toDataURL(outputMime, quality);
-          if (!compressed || compressed === "data:," || compressed.length > rawDataUrl.length) {
+          if (preserveAlpha && (!compressed || !compressed.startsWith("data:image/webp"))) {
+            compressed = canvas.toDataURL("image/png");
+          }
+
+          // Step down quality if still above ~85KB Base64 (~115,000 chars) so multiple carousel slides fit effortlessly
+          const maxBase64Length = preserveAlpha ? 180000 : 115000;
+          if (compressed && compressed.length > maxBase64Length) {
+            for (const q of [0.64, 0.52, 0.42]) {
+              const nextTry = canvas.toDataURL("image/jpeg", q);
+              if (nextTry && nextTry !== "data:," && nextTry.length < compressed.length) {
+                compressed = nextTry;
+              }
+              if (compressed.length <= maxBase64Length) break;
+            }
+          }
+
+          if (!compressed || compressed === "data:,") {
             compressed = rawDataUrl;
           }
           resolve(compressed);
@@ -123,11 +148,12 @@ async function compressImageToDataUrl(file: File, maxDimension = 1200, quality =
 
 async function uploadImageAsset(
   file: File,
-  maxDimension = 1200
+  maxDimension = 900,
+  preserveAlpha = false
 ): Promise<{ url: string; name: string; size: number }> {
-  const compressedData = await compressImageToDataUrl(file, maxDimension);
+  const compressedData = await compressImageToDataUrl(file, maxDimension, 0.76, preserveAlpha);
   const mimeMatch = compressedData.match(/^data:([^;]+);base64,/);
-  const effectiveType = mimeMatch ? mimeMatch[1] : file.type || "image/png";
+  const effectiveType = mimeMatch ? mimeMatch[1] : file.type || "image/jpeg";
   const approxSizeKB = Math.max(1, Math.round((compressedData.length * 0.75) / 1024));
 
   try {
@@ -143,7 +169,7 @@ async function uploadImageAsset(
     const contentType = res.headers.get("content-type") || "";
     if (res.ok && contentType.includes("application/json")) {
       const data = await res.json();
-      if (data && typeof data.url === "string" && data.url.length > 0) {
+      if (data && typeof data.url === "string" && data.url.length > 0 && !data.url.startsWith("/uploads/artisan_")) {
         return {
           url: data.url,
           name: data.name || file.name,
@@ -287,6 +313,9 @@ export default function AdminDashboard({
   };
 
   // Sync state if prop changes
+  const sectionsRef = React.useRef<CustomSection[]>(sections);
+  sectionsRef.current = sections;
+
   React.useEffect(() => {
     if (customization) {
       setLogoText(customization.logoText || "Nicoletta");
@@ -297,7 +326,8 @@ export default function AdminDashboard({
       setLogoHideBorder(customization.logoHideBorder !== false);
       setPhilosophyQuote(customization.philosophyQuote || "An engraving isn't just marks burnt into surface; it's the transfer of a family signature across generations.");
       setPhilosophyAuthor(customization.philosophyAuthor || "Nicoletta, Founder & Creative Director");
-      if (customization.sections) {
+      if (Array.isArray(customization.sections) && customization.sections.length > 0) {
+        sectionsRef.current = [...customization.sections];
         setSections([...customization.sections]);
       }
     }
@@ -335,7 +365,7 @@ export default function AdminDashboard({
     setLogoUploadError("");
 
     try {
-      const uploaded = await uploadImageAsset(file, 600);
+      const uploaded = await uploadImageAsset(file, 500, true);
       setLogoImageUrl(uploaded.url);
       setLogoUploading(false);
       await handleSaveCustomizer(undefined, undefined, uploaded.url);
@@ -354,7 +384,7 @@ export default function AdminDashboard({
     setIsSavingCustomizer(true);
     setCustomizerSuccess(null);
 
-    const rawSections = sectionsOverride || sections;
+    const rawSections = sectionsOverride || sectionsRef.current || sections;
     const targetSections = Array.isArray(rawSections)
       ? rawSections.filter((s): s is CustomSection => Boolean(s && typeof s === "object" && typeof s.id === "string"))
       : [];
@@ -371,13 +401,11 @@ export default function AdminDashboard({
       sections: targetSections
     };
 
-    // Always persist locally & update live app state immediately
+    // Always persist locally (both localStorage and IndexedDB) & update live app state immediately
+    sectionsRef.current = targetSections;
+    setSections(targetSections);
     onUpdateCustomization(payload);
-    try {
-      localStorage.setItem("nicoletta_customization", JSON.stringify(payload));
-    } catch (storageErr) {
-      console.warn("Local storage save warning:", storageErr);
-    }
+    persistKeyVal("nicoletta_customization", payload);
 
     try {
       const res = await fetch("/api/admin/customization", {
@@ -394,21 +422,22 @@ export default function AdminDashboard({
         const updated = await res.json();
         if (updated && typeof updated === "object" && Array.isArray(updated.sections) && updated.sections.length > 0) {
           onUpdateCustomization(updated);
-          localStorage.removeItem("nicoletta_customization_unsynced");
+          persistKeyVal("nicoletta_customization", updated);
+          try {
+            localStorage.removeItem("nicoletta_customization_unsynced");
+          } catch {
+            // Ignore
+          }
         }
       } else {
-        localStorage.setItem("nicoletta_customization_unsynced", "true");
+        safeSetLocalStorage("nicoletta_customization_unsynced", "true");
       }
-      setCustomizerSuccess("Site settings and logo customization saved successfully!");
+      setCustomizerSuccess("Site settings and carousel customization saved successfully!");
       setTimeout(() => setCustomizerSuccess(null), 4000);
     } catch (err) {
       console.warn("Saved customization locally (server offline):", err);
-      try {
-        localStorage.setItem("nicoletta_customization_unsynced", "true");
-      } catch {
-        // Ignore storage error
-      }
-      setCustomizerSuccess("Site settings and logo customization saved!");
+      safeSetLocalStorage("nicoletta_customization_unsynced", "true");
+      setCustomizerSuccess("Site settings and carousel customization saved!");
       setTimeout(() => setCustomizerSuccess(null), 4000);
     } finally {
       setIsSavingCustomizer(false);
@@ -494,8 +523,8 @@ export default function AdminDashboard({
   };
 
   const updateSectionText = (id: string, field: keyof CustomSection | Partial<CustomSection>, value?: any) => {
-    setSections((prev) =>
-      prev.map((sec) => {
+    setSections((prev) => {
+      const next = prev.map((sec) => {
         if (sec.id === id) {
           if (typeof field === "object" && field !== null) {
             return { ...sec, ...field };
@@ -504,8 +533,10 @@ export default function AdminDashboard({
           }
         }
         return sec;
-      })
-    );
+      });
+      sectionsRef.current = next;
+      return next;
+    });
   };
 
   const handleAddCustomSection = (e: React.FormEvent) => {
@@ -751,13 +782,15 @@ export default function AdminDashboard({
   };
 
   const handleSectionImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, sectionId: string, slideIndex?: number) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const fileList: File[] = e.target.files ? Array.from(e.target.files) : [];
+    if (fileList.length === 0) return;
     e.target.value = "";
 
-    if (file.size > 10 * 1024 * 1024) {
-      setSectionUploadError("Image file exceeds the 10MB limit.");
-      return;
+    for (const f of fileList) {
+      if (f.size > 15 * 1024 * 1024) {
+        setSectionUploadError(`"${f.name}" exceeds the 15MB limit.`);
+        return;
+      }
     }
 
     if (slideIndex !== undefined) {
@@ -768,28 +801,39 @@ export default function AdminDashboard({
     setSectionUploadError("");
 
     try {
-      const uploaded = await uploadImageAsset(file, 1400);
-      setSections((prevSections) => {
-        const updatedSections = prevSections.map((s) => {
-          if (s.id !== sectionId) return s;
-          if (sectionId === "home-hero") {
-            const currentUrls = s.imageUrls && s.imageUrls.length > 0
-              ? [...s.imageUrls]
-              : (s.imageUrl ? [s.imageUrl] : []);
-            if (slideIndex !== undefined) {
-              while (currentUrls.length <= slideIndex) {
+      const uploadedUrls: string[] = [];
+      for (const file of fileList) {
+        const uploaded = await uploadImageAsset(file, sectionId === "home-hero" ? 850 : 1000, false);
+        uploadedUrls.push(uploaded.url);
+      }
+
+      const prevSections = sectionsRef.current || sections;
+      const updatedSections = prevSections.map((s) => {
+        if (s.id !== sectionId) return s;
+        if (sectionId === "home-hero") {
+          const currentUrls = s.imageUrls && s.imageUrls.length > 0
+            ? [...s.imageUrls]
+            : (s.imageUrl ? [s.imageUrl] : []);
+          if (slideIndex !== undefined) {
+            uploadedUrls.forEach((u, offset) => {
+              const targetIdx = slideIndex + offset;
+              while (currentUrls.length <= targetIdx) {
                 currentUrls.push("");
               }
-              currentUrls[slideIndex] = uploaded.url;
-            } else {
-              currentUrls.push(uploaded.url);
-            }
-            return { ...s, imageUrl: currentUrls[0] || uploaded.url, imageUrls: currentUrls };
+              currentUrls[targetIdx] = u;
+            });
+          } else {
+            currentUrls.push(...uploadedUrls);
           }
-          return { ...s, imageUrl: uploaded.url };
-        });
-        return updatedSections;
+          const firstValid = currentUrls.find((u) => typeof u === "string" && u.trim().length > 0) || uploadedUrls[0] || "";
+          return { ...s, imageUrl: firstValid, imageUrls: currentUrls };
+        }
+        return { ...s, imageUrl: uploadedUrls[0] || s.imageUrl };
       });
+
+      sectionsRef.current = updatedSections;
+      setSections(updatedSections);
+      await handleSaveCustomizer(undefined, updatedSections);
     } catch {
       setSectionUploadError("Error reading file.");
     } finally {
@@ -3220,8 +3264,12 @@ export default function AdminDashboard({
                           <input
                             id="pForm-image-custom"
                             type="text"
-                            value={productForm.image}
-                            onChange={(e) => setProductForm({ ...productForm, image: e.target.value })}
+                            value={productForm.image.startsWith("data:") ? "[Uploaded Craft Photo]" : productForm.image}
+                            onChange={(e) => {
+                              if (e.target.value !== "[Uploaded Craft Photo]") {
+                                setProductForm({ ...productForm, image: e.target.value });
+                              }
+                            }}
                             placeholder="https://example.com/craft-photo.jpg"
                             className="bg-white border border-stone-300 rounded-sm py-2 px-3 text-xs focus:outline-none"
                           />
@@ -3242,7 +3290,9 @@ export default function AdminDashboard({
                               />
                               <div className="text-[10px] overflow-hidden">
                                 <p className="font-bold text-stone-800 truncate">Selected Visual Asset</p>
-                                <p className="text-stone-400 truncate font-mono text-[9px]">{productForm.image}</p>
+                                <p className="text-stone-400 truncate font-mono text-[9px]">
+                                  {productForm.image.startsWith("data:") ? "Uploaded Studio Image" : productForm.image}
+                                </p>
                               </div>
                             </>
                           ) : (
@@ -3753,8 +3803,12 @@ export default function AdminDashboard({
                     <input
                       id="catForm-image"
                       type="text"
-                      value={categoryForm.image}
-                      onChange={(e) => setCategoryForm({ ...categoryForm, image: e.target.value })}
+                      value={categoryForm.image.startsWith("data:") ? "[Uploaded Category Photo]" : categoryForm.image}
+                      onChange={(e) => {
+                        if (e.target.value !== "[Uploaded Category Photo]") {
+                          setCategoryForm({ ...categoryForm, image: e.target.value });
+                        }
+                      }}
                       placeholder="https://images.unsplash.com/photo-... or click Upload Photo"
                       className="bg-white border border-stone-300 rounded-sm py-2 px-3 text-sm focus:outline-none"
                     />
@@ -5093,15 +5147,18 @@ export default function AdminDashboard({
                                                         id={`slide-file-upload-${globalIdx}`}
                                                         type="file"
                                                         accept="image/*"
+                                                        multiple
                                                         onChange={(e) => handleSectionImageUpload(e, sec.id, globalIdx)}
                                                         className="hidden"
                                                       />
 
                                                       <div className="flex-1 min-w-0">
                                                         <input
-                                                          type="url"
-                                                          value={url}
+                                                          type="text"
+                                                          value={url.startsWith("data:") ? `[Uploaded Photo ${imgInSlideIdx + 1}]` : url}
+                                                          readOnly={url.startsWith("data:")}
                                                           onChange={(e) => {
+                                                            if (e.target.value.startsWith("[Uploaded Photo")) return;
                                                             const updatedUrls = [...currentUrls];
                                                             while (updatedUrls.length <= globalIdx) {
                                                               updatedUrls.push("");
@@ -5114,7 +5171,7 @@ export default function AdminDashboard({
                                                             updateSectionText(sec.id, updates);
                                                           }}
                                                           className="w-full text-[10px] px-2 py-1 rounded border border-stone-200 bg-white focus:outline-none focus:border-brand-primary"
-                                                          placeholder="Paste custom URL..."
+                                                          placeholder="Upload or paste URL..."
                                                         />
                                                       </div>
                                                     </div>
@@ -5215,8 +5272,10 @@ export default function AdminDashboard({
                                         referrerPolicy="no-referrer"
                                       />
                                       <div className="min-w-0 flex-1">
-                                        <p className="text-[10px] font-bold text-stone-700 truncate">Current Image Path</p>
-                                        <p className="text-[9px] text-stone-400 truncate font-mono">{sec.imageUrl}</p>
+                                        <p className="text-[10px] font-bold text-stone-700 truncate">Current Image Asset</p>
+                                        <p className="text-[9px] text-stone-400 truncate font-mono">
+                                          {sec.imageUrl.startsWith("data:") ? "[Uploaded Section Photo]" : sec.imageUrl}
+                                        </p>
                                       </div>
                                       <button 
                                         type="button"
@@ -5238,9 +5297,14 @@ export default function AdminDashboard({
                                   </div>
 
                                   <input
-                                    type="url"
-                                    value={sec.imageUrl || ""}
-                                    onChange={(e) => updateSectionText(sec.id, "imageUrl", e.target.value)}
+                                    type="text"
+                                    value={(sec.imageUrl || "").startsWith("data:") ? "[Uploaded Section Photo]" : (sec.imageUrl || "")}
+                                    readOnly={(sec.imageUrl || "").startsWith("data:")}
+                                    onChange={(e) => {
+                                      if (e.target.value !== "[Uploaded Section Photo]") {
+                                        updateSectionText(sec.id, "imageUrl", e.target.value);
+                                      }
+                                    }}
                                     className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary"
                                     placeholder="https://images.unsplash.com/..."
                                   />
