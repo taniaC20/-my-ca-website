@@ -214,6 +214,48 @@ export default function App() {
   const [selectedProductForQuote, setSelectedProductForQuote] = useState<Product | null>(null);
   const [selectedProductDetail, setSelectedProductDetail] = useState<Product | null>(null);
 
+  // Global Page Loading & Progress Bar States
+  const [pageLoadingProgress, setPageLoadingProgress] = useState<number>(0);
+  const [isPageLoading, setIsPageLoading] = useState<boolean>(true);
+  const [isSlowLoading, setIsSlowLoading] = useState<boolean>(false);
+  const loadingProgressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const slowLoadingTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const startLoadingBar = () => {
+    setIsPageLoading(true);
+    setIsSlowLoading(false);
+    setPageLoadingProgress(22);
+
+    if (loadingProgressTimerRef.current) clearInterval(loadingProgressTimerRef.current);
+    if (slowLoadingTimerRef.current) clearTimeout(slowLoadingTimerRef.current);
+
+    loadingProgressTimerRef.current = setInterval(() => {
+      setPageLoadingProgress((prev) => {
+        if (prev < 48) return prev + 14;
+        if (prev < 78) return prev + 7;
+        if (prev < 91) return prev + 2;
+        return prev;
+      });
+    }, 180);
+
+    // If a page transition takes more than 1.1s, mark as slow loading to show the helpful notification banner
+    slowLoadingTimerRef.current = setTimeout(() => {
+      setIsSlowLoading(true);
+    }, 1100);
+  };
+
+  const finishLoadingBar = () => {
+    if (loadingProgressTimerRef.current) clearInterval(loadingProgressTimerRef.current);
+    if (slowLoadingTimerRef.current) clearTimeout(slowLoadingTimerRef.current);
+    setPageLoadingProgress(100);
+
+    setTimeout(() => {
+      setIsPageLoading(false);
+      setIsSlowLoading(false);
+      setPageLoadingProgress(0);
+    }, 380);
+  };
+
   const [contactSubmitted, setContactSubmitted] = useState(false);
   const [contactData, setContactData] = useState({ name: "", email: "", subject: "", message: "" });
   const [contactUploadedFiles, setContactUploadedFiles] = useState<{ name: string; size: number; url: string }[]>([]);
@@ -385,6 +427,7 @@ export default function App() {
 
   // Authoritative server-side & cloud synchronizer function
   const fetchAllData = async (activeToken?: string | null) => {
+    startLoadingBar();
     try {
       const currentToken = activeToken !== undefined ? activeToken : token;
       const localStore = await readBestLocalStore();
@@ -552,6 +595,8 @@ export default function App() {
       }
     } catch (err) {
       console.error("Artisan cloud database synchronization failure:", err);
+    } finally {
+      finishLoadingBar();
     }
   };
 
@@ -1167,6 +1212,15 @@ export default function App() {
     }
   }, [selectedCategoryId, categories]);
 
+  // Trigger top loading bar progress on page, category, or product navigation
+  useEffect(() => {
+    startLoadingBar();
+    const timer = setTimeout(() => {
+      finishLoadingBar();
+    }, 420);
+    return () => clearTimeout(timer);
+  }, [activePage, selectedProductDetail?.id, selectedCategoryId]);
+
   // CLIENT FORM ACTIONS
   const handleClientSubmitQuote = async (payload: Omit<QuoteRequest, "id" | "createdAt" | "updatedAt" | "status">) => {
     const fallbackQuote: QuoteRequest = {
@@ -1298,7 +1352,42 @@ export default function App() {
   });
 
   return (
-    <div className="min-h-screen bg-brand-bg flex flex-col font-sans selection:bg-brand-primary selection:text-white">
+    <div className="min-h-screen bg-brand-bg flex flex-col font-sans selection:bg-brand-primary selection:text-white relative">
+      {/* Global Top Sleek Progress & Loading Bar */}
+      {isPageLoading && (
+        <div className="fixed top-0 left-0 right-0 z-[9999] pointer-events-none">
+          {/* Luminous Brand Progress Track */}
+          <div className="h-1 md:h-1.5 w-full bg-stone-900/10 backdrop-blur-xs overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-amber-700 via-amber-500 to-amber-300 shadow-[0_0_14px_rgba(217,119,6,0.95)] relative"
+              style={{
+                width: `${pageLoadingProgress}%`,
+                opacity: pageLoadingProgress >= 100 ? 0 : 1,
+                transition: pageLoadingProgress === 100 ? "width 200ms ease-out, opacity 400ms ease-in 150ms" : "width 280ms ease-out"
+              }}
+            >
+              {/* Dynamic Head Shimmer Light Beam */}
+              <div className="absolute right-0 top-0 bottom-0 w-28 bg-gradient-to-r from-transparent via-white/50 to-white animate-pulse" />
+            </div>
+          </div>
+
+          {/* Polite Glassmorphism Pill if Loading Takes More Than 1.1s */}
+          {isSlowLoading && (
+            <div className="flex justify-center pt-3 animate-fade-in px-4">
+              <div className="bg-stone-900/95 text-white border border-amber-500/30 shadow-xl px-4 py-2 rounded-full text-xs flex items-center gap-2.5 backdrop-blur-md">
+                <span className="h-3.5 w-3.5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin shrink-0" />
+                <span className="font-medium text-stone-200">
+                  Handcrafting page content... almost there!
+                </span>
+                <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-400/30 px-2 py-0.5 rounded-full font-mono uppercase tracking-wider">
+                  Loading
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Top Announcement Banner */}
       <AnnouncementBar announcements={announcements} />
 
