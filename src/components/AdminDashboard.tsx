@@ -820,6 +820,8 @@ export default function AdminDashboard({
   const [uploadingAdminPhoto, setUploadingAdminPhoto] = useState(false);
   const [adminPhotoError, setAdminPhotoError] = useState("");
   const [drawerStatus, setDrawerStatus] = useState<QuoteRequest["status"]>("quoted");
+  const [manualPrices, setManualPrices] = useState<Record<string, string>>({});
+  const [savedPriceId, setSavedPriceId] = useState<string | null>(null);
 
   // Custom Image Upload states
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -1576,6 +1578,49 @@ export default function AdminDashboard({
     }
   };
 
+  const handleQuickSavePrice = async (quoteId: string, price: number) => {
+    const currentQuote = quotes.find((q) => q.id === quoteId);
+    if (!currentQuote) return;
+    const finalStatus = currentQuote.status === "pending" || currentQuote.status === "reviewing" ? "quoted" : currentQuote.status;
+    const noteEntry = `[Admin: Set phone quote price to $${price} CAD on ${new Date().toLocaleDateString()}]`;
+    const updatedNotes = currentQuote.adminNotes ? `${currentQuote.adminNotes}\n${noteEntry}` : noteEntry;
+
+    const updated = quotes.map((q) =>
+      q.id === quoteId
+        ? {
+            ...q,
+            quoteAmount: price,
+            status: finalStatus,
+            adminNotes: updatedNotes,
+            updatedAt: new Date().toISOString()
+          }
+        : q
+    );
+    onUpdateQuotes(updated);
+    setSavedPriceId(quoteId);
+    setTimeout(() => setSavedPriceId((curr) => (curr === quoteId ? null : curr)), 2500);
+
+    if (token) {
+      try {
+        await fetch(`/api/admin/quotes/${quoteId}/details`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            quoteAmount: price,
+            status: finalStatus,
+            adminNotes: updatedNotes,
+            adminPhotos: currentQuote.adminPhotos
+          })
+        });
+      } catch (e) {
+        console.error("Failed to update quote price on backend:", e);
+      }
+    }
+  };
+
   const handleSaveQuoteDetails = async () => {
     if (!selectedQuoteId) return;
     const currentQuote = quotes.find((q) => q.id === selectedQuoteId);
@@ -1824,7 +1869,9 @@ export default function AdminDashboard({
               <div className="space-y-4 animate-fade-in">
                 {quoteRequestsList
                   .filter(q => quotesFilter === "all" || q.status === quotesFilter)
-                  .map((q) => (
+                  .map((q) => {
+                    const isPhoneWithoutEmail = (!q.customerEmail || !q.customerEmail.trim()) || (q.contactPreference === "phone" && (!q.customerEmail || !q.customerEmail.trim()));
+                    return (
                     <div
                       key={q.id}
                       id={`admin-quote-${q.id}`}
@@ -1835,7 +1882,9 @@ export default function AdminDashboard({
                         <div>
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-bold text-stone-900 text-sm">{q.customerName}</span>
-                            <span className="text-stone-400 font-mono text-[10px]">{q.customerEmail}</span>
+                            <span className="text-stone-400 font-mono text-[10px]">
+                              {q.customerEmail || (q.customerPhone ? `Phone: ${q.customerPhone}` : "Phone Contact")}
+                            </span>
                           </div>
                           <p className="text-xs text-stone-600">
                             Item: <strong>{q.productName}</strong> (Qty: {q.quantity})
@@ -1865,14 +1914,16 @@ export default function AdminDashboard({
                             {q.status}
                           </span>
 
-                          <button
-                            id={`email-compose-header-btn-${q.id}`}
-                            onClick={() => handleOpenEmailCompose(q)}
-                            className="bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-bold py-1 px-2.5 rounded-sm cursor-pointer transition-colors flex items-center gap-1 shadow-2xs"
-                            title="Compose Email Proposal"
-                          >
-                            <Mail className="h-3 w-3" /> Compose Email
-                          </button>
+                          {!isPhoneWithoutEmail && (
+                            <button
+                              id={`email-compose-header-btn-${q.id}`}
+                              onClick={() => handleOpenEmailCompose(q)}
+                              className="bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-bold py-1 px-2.5 rounded-sm cursor-pointer transition-colors flex items-center gap-1 shadow-2xs"
+                              title="Compose Email Proposal"
+                            >
+                              <Mail className="h-3 w-3" /> Compose Email
+                            </button>
+                          )}
 
                           <button
                             id={`review-quote-btn-${q.id}`}
@@ -1978,18 +2029,62 @@ export default function AdminDashboard({
                             {q.quoteAmount ? (
                               <p className="text-stone-700 font-bold flex items-center gap-1.5 text-sm">
                                 <BadgeDollarSign className="h-4.5 w-4.5 text-emerald-600" />
-                                Active Price Quote: <span className="text-emerald-700">${q.quoteAmount} USD</span>
+                                Active Price Quote: <span className="text-emerald-700">${q.quoteAmount}</span>
                               </p>
                             ) : (
                               <p className="text-stone-500 italic text-xs">No price quoted yet.</p>
                             )}
-                            <button
-                              id={`email-compose-btn-${q.id}`}
-                              onClick={() => handleOpenEmailCompose(q)}
-                              className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-1.5 px-3 rounded-md text-[10px] flex items-center gap-1.5 cursor-pointer transition-all uppercase tracking-wider shadow-xs"
-                            >
-                              <Mail className="h-3.5 w-3.5" /> Compose Email Proposal
-                            </button>
+
+                            {isPhoneWithoutEmail ? (
+                              <div className="bg-amber-50/80 p-2.5 rounded-md border border-amber-200/80 space-y-2">
+                                <div className="flex items-center justify-between gap-1 text-[11px] font-bold text-amber-900">
+                                  <span className="flex items-center gap-1">
+                                    <Phone className="h-3.5 w-3.5 text-amber-700" /> Phone Client — Manual Quote Price
+                                  </span>
+                                  {savedPriceId === q.id && (
+                                    <span className="text-[10px] font-bold text-emerald-700 flex items-center gap-1">
+                                      <Check className="h-3 w-3" /> Saved!
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="relative flex-1">
+                                    <span className="absolute left-2.5 top-1.5 text-stone-500 font-bold text-xs">$</span>
+                                    <input
+                                      type="number"
+                                      placeholder={q.quoteAmount ? String(q.quoteAmount) : "Enter quote price"}
+                                      value={manualPrices[q.id] ?? (q.quoteAmount ? String(q.quoteAmount) : "")}
+                                      onChange={(e) => setManualPrices(prev => ({ ...prev, [q.id]: e.target.value }))}
+                                      className="w-full bg-white border border-stone-300 rounded py-1 pl-6 pr-2 text-xs font-bold text-stone-900 focus:outline-none focus:ring-1 focus:ring-amber-800"
+                                    />
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const raw = manualPrices[q.id] ?? (q.quoteAmount ? String(q.quoteAmount) : "");
+                                      const val = parseFloat(raw);
+                                      if (!isNaN(val) && val >= 0) {
+                                        handleQuickSavePrice(q.id, val);
+                                      }
+                                    }}
+                                    className="bg-amber-800 hover:bg-amber-900 text-white text-xs font-bold py-1 px-3 rounded cursor-pointer transition-colors shrink-0 shadow-2xs"
+                                  >
+                                    Save Price
+                                  </button>
+                                </div>
+                                <p className="text-[10px] text-stone-500 italic">
+                                  Phone managed directly. Saving records quote price and sets status to Quoted.
+                                </p>
+                              </div>
+                            ) : (
+                              <button
+                                id={`email-compose-btn-${q.id}`}
+                                onClick={() => handleOpenEmailCompose(q)}
+                                className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-1.5 px-3 rounded-md text-[10px] flex items-center gap-1.5 cursor-pointer transition-all uppercase tracking-wider shadow-xs"
+                              >
+                                <Mail className="h-3.5 w-3.5" /> Compose Email Proposal
+                              </button>
+                            )}
                           </div>
 
                           {q.adminNotes && (
@@ -2205,14 +2300,20 @@ export default function AdminDashboard({
 
                           {/* Manager Action Footer */}
                           <div className="flex flex-wrap justify-between items-center gap-2 border-t border-amber-200/60 pt-3">
-                            <button
-                              type="button"
-                              id={`inline-email-compose-btn-${q.id}`}
-                              onClick={() => handleOpenEmailCompose({ ...q, quoteAmount: quotePrice || q.quoteAmount, adminNotes: quoteNotes, adminPhotos: quotePhotos, status: drawerStatus })}
-                              className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-1.5 px-3 rounded-md text-[11px] flex items-center gap-1.5 cursor-pointer transition-all uppercase tracking-wider shadow-xs"
-                            >
-                              <Mail className="h-3.5 w-3.5" /> Compose Email Proposal
-                            </button>
+                            {isPhoneWithoutEmail ? (
+                              <span className="text-xs text-amber-900 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded font-medium flex items-center gap-1.5">
+                                <Phone className="h-3.5 w-3.5 text-amber-700" /> Phone-only contact — manage quote price above &amp; via call
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                id={`inline-email-compose-btn-${q.id}`}
+                                onClick={() => handleOpenEmailCompose({ ...q, quoteAmount: quotePrice || q.quoteAmount, adminNotes: quoteNotes, adminPhotos: quotePhotos, status: drawerStatus })}
+                                className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-1.5 px-3 rounded-md text-[11px] flex items-center gap-1.5 cursor-pointer transition-all uppercase tracking-wider shadow-xs"
+                              >
+                                <Mail className="h-3.5 w-3.5" /> Compose Email Proposal
+                              </button>
+                            )}
 
                             <div className="flex gap-2">
                               <button
@@ -2235,7 +2336,8 @@ export default function AdminDashboard({
                         </div>
                       )}
                     </div>
-                  ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -2290,7 +2392,9 @@ export default function AdminDashboard({
               <div className="space-y-4 animate-fade-in">
                 {contactMessagesList
                   .filter(q => messagesFilter === "all" || q.status === messagesFilter)
-                  .map((q) => (
+                  .map((q) => {
+                    const isPhoneWithoutEmail = (!q.customerEmail || !q.customerEmail.trim()) || (q.contactPreference === "phone" && (!q.customerEmail || !q.customerEmail.trim()));
+                    return (
                     <div
                       key={q.id}
                       id={`admin-message-${q.id}`}
@@ -2301,7 +2405,9 @@ export default function AdminDashboard({
                         <div>
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-bold text-stone-900 text-sm">{q.customerName}</span>
-                            <span className="text-stone-400 font-mono text-[10px]">{q.customerEmail}</span>
+                            <span className="text-stone-400 font-mono text-[10px]">
+                              {q.customerEmail || (q.customerPhone ? `Phone: ${q.customerPhone}` : "Phone Contact")}
+                            </span>
                           </div>
                           <p className="text-xs text-stone-600">
                             Inquiry Type: <strong className="text-amber-900">{q.productName || "General Contact Message"}</strong>
@@ -2331,14 +2437,16 @@ export default function AdminDashboard({
                             {q.status}
                           </span>
 
-                          <button
-                            id={`email-compose-msg-header-btn-${q.id}`}
-                            onClick={() => handleOpenEmailCompose(q)}
-                            className="bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-bold py-1 px-2.5 rounded-sm cursor-pointer transition-colors flex items-center gap-1 shadow-2xs"
-                            title="Compose Email Reply"
-                          >
-                            <Mail className="h-3 w-3" /> Compose Email
-                          </button>
+                          {!isPhoneWithoutEmail && (
+                            <button
+                              id={`email-compose-msg-header-btn-${q.id}`}
+                              onClick={() => handleOpenEmailCompose(q)}
+                              className="bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-bold py-1 px-2.5 rounded-sm cursor-pointer transition-colors flex items-center gap-1 shadow-2xs"
+                              title="Compose Email Reply"
+                            >
+                              <Mail className="h-3 w-3" /> Compose Email
+                            </button>
+                          )}
 
                           <button
                             id={`review-message-btn-${q.id}`}
@@ -2427,18 +2535,62 @@ export default function AdminDashboard({
                             {q.quoteAmount ? (
                               <p className="text-stone-700 font-bold flex items-center gap-1.5 text-sm">
                                 <BadgeDollarSign className="h-4.5 w-4.5 text-emerald-600" />
-                                Assigned Price Quote: <span className="text-emerald-700">${q.quoteAmount} USD</span>
+                                Assigned Price Quote: <span className="text-emerald-700">${q.quoteAmount}</span>
                               </p>
                             ) : (
                               <p className="text-stone-500 italic text-xs">No price assigned yet.</p>
                             )}
-                            <button
-                              id={`email-compose-msg-btn-${q.id}`}
-                              onClick={() => handleOpenEmailCompose(q)}
-                              className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-1.5 px-3 rounded-md text-[10px] flex items-center gap-1.5 cursor-pointer transition-all uppercase tracking-wider shadow-xs"
-                            >
-                              <Mail className="h-3.5 w-3.5" /> Compose Email Proposal
-                            </button>
+
+                            {isPhoneWithoutEmail ? (
+                              <div className="bg-amber-50/80 p-2.5 rounded-md border border-amber-200/80 space-y-2">
+                                <div className="flex items-center justify-between gap-1 text-[11px] font-bold text-amber-900">
+                                  <span className="flex items-center gap-1">
+                                    <Phone className="h-3.5 w-3.5 text-amber-700" /> Phone Client — Manual Quote Price
+                                  </span>
+                                  {savedPriceId === q.id && (
+                                    <span className="text-[10px] font-bold text-emerald-700 flex items-center gap-1">
+                                      <Check className="h-3 w-3" /> Saved!
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="relative flex-1">
+                                    <span className="absolute left-2.5 top-1.5 text-stone-500 font-bold text-xs">$</span>
+                                    <input
+                                      type="number"
+                                      placeholder={q.quoteAmount ? String(q.quoteAmount) : "Enter quote price"}
+                                      value={manualPrices[q.id] ?? (q.quoteAmount ? String(q.quoteAmount) : "")}
+                                      onChange={(e) => setManualPrices(prev => ({ ...prev, [q.id]: e.target.value }))}
+                                      className="w-full bg-white border border-stone-300 rounded py-1 pl-6 pr-2 text-xs font-bold text-stone-900 focus:outline-none focus:ring-1 focus:ring-amber-800"
+                                    />
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const raw = manualPrices[q.id] ?? (q.quoteAmount ? String(q.quoteAmount) : "");
+                                      const val = parseFloat(raw);
+                                      if (!isNaN(val) && val >= 0) {
+                                        handleQuickSavePrice(q.id, val);
+                                      }
+                                    }}
+                                    className="bg-amber-800 hover:bg-amber-900 text-white text-xs font-bold py-1 px-3 rounded cursor-pointer transition-colors shrink-0 shadow-2xs"
+                                  >
+                                    Save Price
+                                  </button>
+                                </div>
+                                <p className="text-[10px] text-stone-500 italic">
+                                  Phone managed directly. Saving records quote price and sets status to Quoted.
+                                </p>
+                              </div>
+                            ) : (
+                              <button
+                                id={`email-compose-msg-btn-${q.id}`}
+                                onClick={() => handleOpenEmailCompose(q)}
+                                className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-1.5 px-3 rounded-md text-[10px] flex items-center gap-1.5 cursor-pointer transition-all uppercase tracking-wider shadow-xs"
+                              >
+                                <Mail className="h-3.5 w-3.5" /> Compose Email Proposal
+                              </button>
+                            )}
                           </div>
 
                           {q.adminNotes && (
@@ -2654,14 +2806,20 @@ export default function AdminDashboard({
 
                           {/* Manager Action Footer */}
                           <div className="flex flex-wrap justify-between items-center gap-2 border-t border-amber-200/60 pt-3">
-                            <button
-                              type="button"
-                              id={`inline-email-compose-msg-btn-${q.id}`}
-                              onClick={() => handleOpenEmailCompose({ ...q, quoteAmount: quotePrice || q.quoteAmount, adminNotes: quoteNotes, adminPhotos: quotePhotos, status: drawerStatus })}
-                              className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-1.5 px-3 rounded-md text-[11px] flex items-center gap-1.5 cursor-pointer transition-all uppercase tracking-wider shadow-xs"
-                            >
-                              <Mail className="h-3.5 w-3.5" /> Compose Email Proposal
-                            </button>
+                            {isPhoneWithoutEmail ? (
+                              <span className="text-xs text-amber-900 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded font-medium flex items-center gap-1.5">
+                                <Phone className="h-3.5 w-3.5 text-amber-700" /> Phone-only contact — manage quote price above &amp; via call
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                id={`inline-email-compose-msg-btn-${q.id}`}
+                                onClick={() => handleOpenEmailCompose({ ...q, quoteAmount: quotePrice || q.quoteAmount, adminNotes: quoteNotes, adminPhotos: quotePhotos, status: drawerStatus })}
+                                className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-1.5 px-3 rounded-md text-[11px] flex items-center gap-1.5 cursor-pointer transition-all uppercase tracking-wider shadow-xs"
+                              >
+                                <Mail className="h-3.5 w-3.5" /> Compose Email Proposal
+                              </button>
+                            )}
 
                             <div className="flex gap-2">
                               <button
@@ -2684,7 +2842,8 @@ export default function AdminDashboard({
                         </div>
                       )}
                     </div>
-                  ))}
+                  );
+                })}
               </div>
             )}
           </div>

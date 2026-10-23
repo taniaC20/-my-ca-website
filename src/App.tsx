@@ -3123,7 +3123,7 @@ export default function App() {
                           type="submit"
                           className="w-full bg-brand-primary hover:bg-brand-primary-hover text-white text-[10px] uppercase tracking-widest font-bold py-3.5 px-4 rounded-full transition-colors cursor-pointer"
                         >
-                          Send Message to Tannia
+                          Send Message
                         </button>
                       </form>
                     )}
