@@ -1455,67 +1455,28 @@ export default function App() {
 
           {/* Quick Nav Anchors */}
           <nav className="hidden md:flex items-center gap-8 text-xs font-bold uppercase tracking-widest text-brand-muted">
-            <button
-              onClick={() => {
-                setIsAdminMode(false);
-                setActivePage("home");
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              className={`hover:text-brand-primary transition-colors cursor-pointer py-2 ${
-                !isAdminMode && activePage === "home" ? "text-brand-primary border-b-2 border-brand-primary font-extrabold" : ""
-              }`}
-            >
-              Home
-            </button>
-            <button
-              onClick={() => {
-                setIsAdminMode(false);
-                setActivePage("catalog");
-                setSelectedCategoryId("all");
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              className={`hover:text-brand-primary transition-colors cursor-pointer py-2 ${
-                !isAdminMode && activePage === "catalog" ? "text-brand-primary border-b-2 border-brand-primary font-extrabold" : ""
-              }`}
-            >
-              Catalog
-            </button>
-            <button
-              onClick={() => {
-                setIsAdminMode(false);
-                setActivePage("quote-request");
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              className={`hover:text-brand-primary transition-colors cursor-pointer py-2 ${
-                !isAdminMode && activePage === "quote-request" ? "text-brand-primary border-b-2 border-brand-primary font-extrabold" : ""
-              }`}
-            >
-              Request Quote
-            </button>
-            <button
-              onClick={() => {
-                setIsAdminMode(false);
-                setActivePage("testimonials");
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              className={`hover:text-brand-primary transition-colors cursor-pointer py-2 ${
-                !isAdminMode && activePage === "testimonials" ? "text-brand-primary border-b-2 border-brand-primary font-extrabold" : ""
-              }`}
-            >
-              Reviews
-            </button>
-            <button
-              onClick={() => {
-                setIsAdminMode(false);
-                setActivePage("contact");
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              className={`hover:text-brand-primary transition-colors cursor-pointer py-2 ${
-                !isAdminMode && activePage === "contact" ? "text-brand-primary border-b-2 border-brand-primary font-extrabold" : ""
-              }`}
-            >
-              Contact us
-            </button>
+            {[
+              { id: "home" as const, label: "Home" },
+              { id: "catalog" as const, label: "Catalog" },
+              { id: "quote-request" as const, label: "Request Quote" },
+              { id: "testimonials" as const, label: "Reviews" },
+              { id: "contact" as const, label: "Contact Us" }
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setIsAdminMode(false);
+                  setActivePage(item.id);
+                  if (item.id === "catalog") setSelectedCategoryId("all");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                className={`hover:text-brand-primary transition-colors cursor-pointer py-2 ${
+                  !isAdminMode && activePage === item.id ? "text-brand-primary border-b-2 border-brand-primary font-extrabold" : ""
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
           </nav>
 
           {/* Admin Toggle & Hamburger Group */}
@@ -1563,72 +1524,29 @@ export default function App() {
         {/* Mobile Navigation Dropdown */}
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-brand-border bg-white px-4 py-3 space-y-2 animate-fade-in">
-            <button
-              onClick={() => {
-                setIsAdminMode(false);
-                setActivePage("home");
-                setMobileMenuOpen(false);
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              className={`w-full text-left py-2 px-3 rounded-[8px] text-[10px] font-bold uppercase tracking-wider block ${
-                activePage === "home" && !isAdminMode ? "bg-brand-primary/10 text-brand-primary" : "text-brand-dark hover:bg-brand-highlight"
-              }`}
-            >
-              Home
-            </button>
-            <button
-              onClick={() => {
-                setIsAdminMode(false);
-                setActivePage("catalog");
-                setSelectedCategoryId("all");
-                setMobileMenuOpen(false);
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              className={`w-full text-left py-2 px-3 rounded-[8px] text-[10px] font-bold uppercase tracking-wider block ${
-                activePage === "catalog" && !isAdminMode ? "bg-brand-primary/10 text-brand-primary" : "text-brand-dark hover:bg-brand-highlight"
-              }`}
-            >
-              Artisan Catalog
-            </button>
-            <button
-              onClick={() => {
-                setIsAdminMode(false);
-                setActivePage("quote-request");
-                setMobileMenuOpen(false);
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              className={`w-full text-left py-2 px-3 rounded-[8px] text-[10px] font-bold uppercase tracking-wider block ${
-                activePage === "quote-request" && !isAdminMode ? "bg-brand-primary/10 text-brand-primary" : "text-brand-dark hover:bg-brand-highlight"
-              }`}
-            >
-              Request Quote
-            </button>
-            <button
-              onClick={() => {
-                setIsAdminMode(false);
-                setActivePage("testimonials");
-                setMobileMenuOpen(false);
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              className={`w-full text-left py-2 px-3 rounded-[8px] text-[10px] font-bold uppercase tracking-wider block ${
-                activePage === "testimonials" && !isAdminMode ? "bg-brand-primary/10 text-brand-primary" : "text-brand-dark hover:bg-brand-highlight"
-              }`}
-            >
-              Patron Reviews
-            </button>
-            <button
-              onClick={() => {
-                setIsAdminMode(false);
-                setActivePage("contact");
-                setMobileMenuOpen(false);
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              className={`w-full text-left py-2 px-3 rounded-[8px] text-[10px] font-bold uppercase tracking-wider block ${
-                activePage === "contact" && !isAdminMode ? "bg-brand-primary/10 text-brand-primary" : "text-brand-dark hover:bg-brand-highlight"
-              }`}
-            >
-              The Workshop
-            </button>
+            {[
+              { id: "home" as const, label: "Home" },
+              { id: "catalog" as const, label: "Catalog" },
+              { id: "quote-request" as const, label: "Request Quote" },
+              { id: "testimonials" as const, label: "Reviews" },
+              { id: "contact" as const, label: "Contact Us" }
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setIsAdminMode(false);
+                  setActivePage(item.id);
+                  if (item.id === "catalog") setSelectedCategoryId("all");
+                  setMobileMenuOpen(false);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                className={`w-full text-left py-2 px-3 rounded-[8px] text-[10px] font-bold uppercase tracking-wider block transition-colors ${
+                  activePage === item.id && !isAdminMode ? "bg-brand-primary/10 text-brand-primary font-extrabold" : "text-brand-dark hover:bg-brand-highlight"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
           </div>
         )}
       </header>
@@ -2022,9 +1940,9 @@ export default function App() {
                         {sec.id === "home-testimonials" && (
                           <section id="testimonials-home" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 bg-brand-highlight/20 py-16 rounded-[32px] border border-brand-border/30">
                             <div className="text-center space-y-2">
-                              <span className="text-[10px] text-brand-primary font-bold uppercase tracking-widest block">{sec.subtitle || "Patron Affection"}</span>
-                              <h3 className="font-serif font-bold text-brand-dark text-2xl md:text-3xl">{sec.title || "Stories from the Mantle"}</h3>
-                              <p className="text-brand-muted text-xs md:text-sm max-w-xl mx-auto font-light">{sec.description || "Read direct feedback from clients who have gifted our engraving pieces."}</p>
+                              <span className="text-[10px] text-brand-primary font-bold uppercase tracking-widest block">{!sec.subtitle || sec.subtitle === "Patron Affection" || sec.subtitle === "Patron Testimonials" ? "Customer Reviews" : sec.subtitle}</span>
+                              <h3 className="font-serif font-bold text-brand-dark text-2xl md:text-3xl">{!sec.title || sec.title === "Stories from the Mantle" || sec.title === "Bespoke Stories" || sec.title === "Kind Words from Our Customers" ? "Words from Our Customers" : sec.title}</h3>
+                              <p className="text-brand-muted text-xs md:text-sm max-w-xl mx-auto font-light">{sec.description || "Read direct feedback from clients who have gifted our personalized pieces."}</p>
                             </div>
 
                             {testimonials.filter(t => t.approved).length === 0 ? (
