@@ -24,8 +24,9 @@ function cleanSpecialInstructions(raw?: string): string {
 /**
  * Escapes HTML characters to prevent malformed rendering or script injection in HTML email clients.
  */
-function escapeHtml(str: string): string {
-  return str
+function escapeHtml(str: string | undefined | null): string {
+  if (!str) return "";
+  return String(str)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
@@ -119,9 +120,11 @@ export async function sendQuoteNotificationToAdmin(
 
   const customerLines = [
     `CUSTOMER DETAILS:`,
-    `- Name:  ${quote.customerName}`,
-    `- Email: ${quote.customerEmail}`
+    `- Name:  ${quote.customerName || "Customer"}`
   ];
+  if (quote.customerEmail && quote.customerEmail.trim()) {
+    customerLines.push(`- Email: ${quote.customerEmail.trim()}`);
+  }
   if (hasPhone) {
     customerLines.push(`- Phone: ${phoneVal}`);
     if (showContactPref) {
@@ -172,11 +175,19 @@ export async function sendQuoteNotificationToAdmin(
     textSections.push(`ATTACHED REFERENCE FILES (${files.length}):\n${fileList}`);
   }
 
-  textSections.push(
-    `--------------------------------------------------\n` +
-    `Reply directly to: ${quote.customerEmail}\n` +
-    `Nicoletta Crafts & Decor Web Portal (https://www.nicolettacraftsdecor.ca)`
-  );
+  if (quote.contactPreference !== "phone" && quote.customerEmail && quote.customerEmail.trim()) {
+    textSections.push(
+      `--------------------------------------------------\n` +
+      `Reply directly to: ${quote.customerEmail.trim()}\n` +
+      `Nicoletta Crafts & Decor Web Portal (https://www.nicolettacraftsdecor.ca)`
+    );
+  } else {
+    textSections.push(
+      `--------------------------------------------------\n` +
+      `Customer requested contact by Phone: ${phoneVal || "Provided"}\n` +
+      `Nicoletta Crafts & Decor Web Portal (https://www.nicolettacraftsdecor.ca)`
+    );
+  }
 
   const messageText = textSections.join("\n\n");
 
@@ -238,12 +249,13 @@ export async function sendQuoteNotificationToAdmin(
                   ${escapeHtml(quote.customerName)}
                 </div>
                 <div style="font-size: 14px; color: #423830; line-height: 1.6;">
+                  ${quote.customerEmail && quote.customerEmail.trim() ? `
                   <div>
                     <strong>Email:</strong> <a href="mailto:${escapeHtml(quote.customerEmail)}" style="color: #936037; font-weight: 600; text-decoration: underline;">${escapeHtml(quote.customerEmail)}</a>
-                  </div>
+                  </div>` : ""}
                   ${hasPhone ? `
                   <div style="margin-top: 4px;">
-                    <strong>Phone:</strong> <a href="tel:${escapeHtml(phoneVal)}" style="color: #936037; font-weight: 600; text-decoration: underline;">${escapeHtml(phoneVal)}</a>
+                    <strong>Phone:</strong> <span style="color: #1e1915; font-weight: 700;">${escapeHtml(phoneVal)}</span>
                   </div>` : ""}
                   ${showContactPref ? `
                   <div style="margin-top: 6px;">
@@ -317,8 +329,8 @@ export async function sendQuoteNotificationToAdmin(
                 </ul>
               </div>` : ""}
 
-              <!-- Direct Action: Reply via Email -->
-              ${quote.customerEmail ? `
+              <!-- Direct Action: Reply via Email (Omitted when Phone is selected) -->
+              ${quote.contactPreference !== "phone" && quote.customerEmail && quote.customerEmail.trim() ? `
               <div style="margin-top: 24px; padding: 18px 20px; background-color: #faf8f5; border: 1px solid #e8e0d5; border-radius: 12px; text-align: left;">
                 <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #7c6f62; margin-bottom: 6px;">
                   Reply to Customer
@@ -337,15 +349,7 @@ export async function sendQuoteNotificationToAdmin(
                 <div style="font-size: 11px; color: #8c7f73; line-height: 1.4;">
                   Tip: Hitting the regular &ldquo;Reply&rdquo; button in your email client will also reply directly to ${escapeHtml(quote.customerEmail)}.
                 </div>
-              </div>` : `
-              <div style="margin-top: 24px; padding: 16px 20px; background-color: #faf8f5; border: 1px solid #e8e0d5; border-radius: 12px; text-align: left;">
-                <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #7c6f62; margin-bottom: 6px;">
-                  Customer Contact Method
-                </div>
-                <div style="font-size: 13px; color: #1e1915;">
-                  Customer requested phone contact: <strong>${escapeHtml(phoneVal)}</strong> (No email address was provided).
-                </div>
-              </div>`}
+              </div>` : ""}
 
             </td>
           </tr>
@@ -380,7 +384,9 @@ export async function sendQuoteNotificationToAdmin(
         text: messageText,
         html: messageHtml,
         appPassword: settings?.gmailAppPassword,
-        replyTo: quote.customerEmail ? `"${quote.customerName.replace(/["\r\n]/g, "")}" <${quote.customerEmail.trim()}>` : undefined
+        replyTo: quote.customerEmail && quote.customerEmail.trim()
+          ? `"${(quote.customerName || "Customer").replace(/["\r\n]/g, "")}" <${quote.customerEmail.trim()}>`
+          : undefined
       })
     });
     if (res.ok) {

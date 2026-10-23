@@ -771,6 +771,7 @@ app.post("/api/quotes", (req, res) => {
     customerName,
     customerEmail,
     customerPhone,
+    contactPreference,
     engravingText,
     fontPreference,
     specialInstructions,
@@ -789,8 +790,16 @@ app.post("/api/quotes", (req, res) => {
   if (!cleanName || cleanName.length < 2 || cleanName.length > 80) {
     return res.status(400).json({ error: "Customer name is required (2-80 characters)." });
   }
-  if (!cleanEmail || !isValidEmail(cleanEmail) || cleanEmail.length > 100) {
-    return res.status(400).json({ error: "A valid email address is required." });
+
+  const hasValidEmail = Boolean(cleanEmail && isValidEmail(cleanEmail) && cleanEmail.length <= 100);
+  const hasValidPhone = Boolean(cleanPhone && cleanPhone.length >= 7);
+
+  if (!hasValidEmail && !hasValidPhone) {
+    return res.status(400).json({ error: "Either a valid email address or phone number is required." });
+  }
+
+  if (cleanEmail && (!isValidEmail(cleanEmail) || cleanEmail.length > 100)) {
+    return res.status(400).json({ error: "Please provide a valid email address." });
   }
 
   const parsedQty = parseInt(quantity, 10);
@@ -808,8 +817,9 @@ app.post("/api/quotes", (req, res) => {
     productId: productId ? sanitizeString(productId) : undefined,
     productName: cleanProductName,
     customerName: cleanName,
-    customerEmail: cleanEmail,
+    customerEmail: cleanEmail || undefined,
     customerPhone: cleanPhone || undefined,
+    contactPreference: contactPreference === "phone" ? "phone" : "email",
     engravingText: cleanEngravingText || undefined,
     fontPreference: fontPreference ? sanitizeString(fontPreference) : "Serif Classic",
     specialInstructions: cleanInstructions || undefined,
