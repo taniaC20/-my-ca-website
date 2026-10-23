@@ -620,9 +620,8 @@ ${contact.phone ? `- Phone Number: ${contact.phone}\n` : ""}- Message Content:
 WHAT HAPPENS NEXT:
 Tannia personally reviews every message received at our St. John's studio. We will review your inquiry and reach back out to you via ${contact.contactPreference === "phone" ? "phone call/text" : "email"} within one business day.
 
-VERIFICATION & TYPO NOTICE:
-Since you received this confirmation email, your email address is verified in our system.
-If you notice any typos in your phone number or email address, please reply directly to this email or send us a quick updated message via https://www.nicolettacraftsdecor.ca so we can connect with you without delay!
+INFORMATION CORRECTION:
+If your information needs a correction, please reply directly to this email or send us a quick updated message via https://www.nicolettacraftsdecor.ca so we can connect with you without delay!
 
 Warm regards,
 Tannia & the Studio Team
@@ -707,13 +706,13 @@ https://www.nicolettacraftsdecor.ca
                 </div>
               </div>
 
-              <!-- Verification Notice -->
+              <!-- Information Correction Notice -->
               <div style="background-color: #fcf9f2; border: 1px solid #ebdcb9; border-left: 4px solid #c59b27; border-radius: 10px; padding: 14px 18px; margin-bottom: 22px;">
                 <div style="font-size: 12px; font-weight: 700; color: #875c1b; margin-bottom: 4px;">
-                  Did you spot a typo in your email or phone number?
+                  Need to make a correction?
                 </div>
                 <div style="font-size: 13px; color: #5a4730; line-height: 1.5;">
-                  If any of your contact details above need a correction, simply <strong>reply directly to this email</strong> with the updated information, or submit a quick update on our site so we can reach you smoothly!
+                  If your information needs a correction, please <strong>reply directly to this email</strong> or visit our website to send an update!
                 </div>
               </div>
 
@@ -837,7 +836,7 @@ export async function sendQuoteConfirmationToClient(
   }
 
   textSections.push(
-    `WHAT HAPPENS NEXT:\nTannia personally reviews every quote request and will prepare your bespoke proposal within one business day.\n\nTYPO & CORRECTION NOTICE:\nIf you notice a typo in your contact details, simply reply directly to this email or send us a quick message at https://www.nicolettacraftsdecor.ca.\n\nWarm regards,\nTannia & the Studio Team\nNicoletta Crafts & Decor\nSt. John's, NL, Canada\nsales@nicolettacraftsdecor.ca\nhttps://www.nicolettacraftsdecor.ca`
+    `WHAT HAPPENS NEXT:\nTannia personally reviews every quote request and will prepare your proposal within one business day.\n\nINFORMATION CORRECTION:\nIf your information needs a correction, please reply directly to this email or visit our website at https://www.nicolettacraftsdecor.ca.\n\nWarm regards,\nTannia & the Studio Team\nNicoletta Crafts & Decor\nSt. John's, NL, Canada\nsales@nicolettacraftsdecor.ca\nhttps://www.nicolettacraftsdecor.ca`
   );
 
   const textBody = textSections.join("\n\n");
@@ -864,7 +863,7 @@ export async function sendQuoteConfirmationToClient(
                       Nicoletta Crafts &amp; Decor
                     </div>
                     <div style="margin-top: 4px; font-size: 11px; color: #a99e93; letter-spacing: 0.5px;">
-                      BESPOKE ARTISAN WORKSHOP &bull; ST. JOHN'S, NL
+                      ST. JOHN'S, NL
                     </div>
                   </td>
                   <td align="right" valign="top">
@@ -911,8 +910,8 @@ export async function sendQuoteConfirmationToClient(
                 <div style="font-size: 13px; color: #352c25; line-height: 1.5; white-space: pre-wrap;">${escapeHtml(cleanInstructions)}</div>
               </div>` : ""}
               <div style="background-color: #fcf9f2; border: 1px solid #ebdcb9; border-left: 4px solid #c59b27; border-radius: 10px; padding: 14px 18px; margin-bottom: 22px;">
-                <div style="font-size: 12px; font-weight: 700; color: #875c1b; margin-bottom: 4px;">Did you notice a typo in your contact information?</div>
-                <div style="font-size: 13px; color: #5a4730; line-height: 1.5;">If your email or phone number needs a correction, please <strong>reply directly to this email</strong> or visit our website to send an update!</div>
+                <div style="font-size: 12px; font-weight: 700; color: #875c1b; margin-bottom: 4px;">Need to make a correction?</div>
+                <div style="font-size: 13px; color: #5a4730; line-height: 1.5;">If your information needs a correction, please <strong>reply directly to this email</strong> or visit our website to send an update!</div>
               </div>
               <div style="font-size: 13px; color: #5a4e44; line-height: 1.6;">
                 Warm regards,<br><strong>Tannia &amp; the Studio Team</strong><br><em>Nicoletta Crafts &amp; Decor &bull; St. John's, NL</em>
