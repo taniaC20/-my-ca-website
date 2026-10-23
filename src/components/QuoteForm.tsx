@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { MessageSquare, Calendar, PenTool, Hash, Send, Sparkles, Upload, Trash2, Paperclip, CheckCircle, Mail, Phone } from "lucide-react";
 import { Product, QuoteRequest } from "../types";
+import { validateEmailAddress, validatePhoneNumber, formatPhoneInput } from "../emailService";
 import { getStoredCustomerSession } from "../supabaseClient";
 
 interface QuoteFormProps {
@@ -32,6 +33,13 @@ export default function QuoteForm({ products, selectedProduct, onSubmitQuote, on
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [submitted, setSubmitted] = useState(false);
+  const [submittedQuoteInfo, setSubmittedQuoteInfo] = useState<{
+    customerName: string;
+    customerEmail?: string;
+    customerPhone?: string;
+    contactPreference: "email" | "phone";
+    productName: string;
+  } | null>(null);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   const handleDrag = (e: React.DragEvent) => {
@@ -213,17 +221,24 @@ export default function QuoteForm({ products, selectedProduct, onSubmitQuote, on
     if (formData.contactPreference === "email") {
       if (!formData.customerEmail.trim()) {
         newErrors.customerEmail = "Email address is required when Email is selected as preferred contact.";
-      } else if (!/\S+@\S+\.\S+/.test(formData.customerEmail)) {
-        newErrors.customerEmail = "Please enter a valid email address.";
+      } else {
+        const check = validateEmailAddress(formData.customerEmail);
+        if (!check.valid) newErrors.customerEmail = check.error;
+      }
+      if (formData.customerPhone.trim()) {
+        const phoneCheck = validatePhoneNumber(formData.customerPhone, false);
+        if (!phoneCheck.valid) newErrors.customerPhone = phoneCheck.error;
       }
     } else if (formData.contactPreference === "phone") {
       if (!formData.customerPhone.trim()) {
         newErrors.customerPhone = "Phone number is required when Phone is selected as preferred contact.";
-      } else if (formData.customerPhone.trim().replace(/\D/g, "").length < 7) {
-        newErrors.customerPhone = "Please enter a valid phone number (at least 7 digits).";
+      } else {
+        const phoneCheck = validatePhoneNumber(formData.customerPhone, true);
+        if (!phoneCheck.valid) newErrors.customerPhone = phoneCheck.error;
       }
-      if (formData.customerEmail.trim() && !/\S+@\S+\.\S+/.test(formData.customerEmail)) {
-        newErrors.customerEmail = "Please enter a valid email address.";
+      if (formData.customerEmail.trim()) {
+        const check = validateEmailAddress(formData.customerEmail);
+        if (!check.valid) newErrors.customerEmail = check.error;
       }
     }
 
@@ -248,11 +263,22 @@ export default function QuoteForm({ products, selectedProduct, onSubmitQuote, on
     const cleanPhone = (formData.customerPhone || "").trim();
     const cleanDeadline = (formData.deadline || "").trim();
 
+    const prodName = currentProduct ? currentProduct.name : "General Custom Craft Project";
+    const cleanCustomerEmail = formData.customerEmail.trim();
+
+    setSubmittedQuoteInfo({
+      customerName: formData.customerName.trim(),
+      customerEmail: cleanCustomerEmail || undefined,
+      customerPhone: cleanPhone || undefined,
+      contactPreference: formData.contactPreference,
+      productName: prodName
+    });
+
     const payload = {
       productId: formData.productId || undefined,
-      productName: currentProduct ? currentProduct.name : "General Custom Craft Project",
+      productName: prodName,
       customerName: formData.customerName.trim(),
-      customerEmail: formData.customerEmail.trim(),
+      customerEmail: cleanCustomerEmail || undefined,
       customerPhone: cleanPhone || undefined,
       contactPreference: formData.contactPreference,
       engravingText: cleanEngraving || undefined,
@@ -537,7 +563,17 @@ export default function QuoteForm({ products, selectedProduct, onSubmitQuote, on
                 name="customerPhone"
                 type="text"
                 value={formData.customerPhone}
-                onChange={handleInputChange}
+                onChange={(e) => {
+                  const formatted = formatPhoneInput(e.target.value);
+                  setFormData((prev) => ({ ...prev, customerPhone: formatted }));
+                  if (errors.customerPhone) {
+                    setErrors((prev) => {
+                      const copy = { ...prev };
+                      delete copy.customerPhone;
+                      return copy;
+                    });
+                  }
+                }}
                 placeholder="(709) 555-0199"
                 className={`bg-brand-highlight/30 border rounded-[8px] py-2 px-3 text-brand-text text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary ${errors.customerPhone ? "border-red-500" : "border-brand-border"}`}
               />
@@ -802,15 +838,52 @@ export default function QuoteForm({ products, selectedProduct, onSubmitQuote, on
           {submitted && (
             <div
               id="quote-success-banner"
-              className="mt-4 p-4 bg-emerald-50 border border-emerald-200 text-emerald-950 rounded-[16px] text-xs space-y-1.5 animate-fade-in shadow-xs"
+              className="mt-6 p-6 bg-emerald-50/90 border border-emerald-200 text-emerald-950 rounded-[20px] text-xs space-y-4 animate-fade-in shadow-xs text-left"
             >
-              <div className="flex items-center gap-2 font-bold text-emerald-800 text-sm">
-                <CheckCircle className="h-4.5 w-4.5 text-emerald-600 shrink-0" />
-                <span>Request Received Successfully!</span>
+              <div className="flex items-center gap-2.5 font-bold text-emerald-900 text-base">
+                <CheckCircle className="h-5 w-5 text-emerald-600 shrink-0" />
+                <span>Quote Request Received Successfully!</span>
               </div>
               <p className="font-normal text-emerald-800 text-xs leading-relaxed">
-                Thank you for submitting your custom quote request! We have received your details and our team will get back to you soon with your quote and design mockup.
+                Thank you for your custom quote request{submittedQuoteInfo?.customerName ? `, ${submittedQuoteInfo.customerName}` : ""}! Nicoletta personally reviews each project specification and will prepare your bespoke proposal within <strong>one business day</strong>.
               </p>
+
+              {/* Confirmation Notice Box */}
+              <div className="bg-white border border-amber-200/90 rounded-[14px] p-4 text-stone-800 text-xs leading-relaxed space-y-2.5 shadow-2xs">
+                <div className="flex items-center gap-2 text-amber-900 font-bold text-xs uppercase tracking-wider">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                  Confirmation Notice
+                </div>
+                {submittedQuoteInfo?.customerEmail ? (
+                  <p className="text-stone-700 text-xs leading-relaxed">
+                    An automated confirmation notice has been sent to your email (<strong>{submittedQuoteInfo.customerEmail}</strong>)
+                    {submittedQuoteInfo.customerPhone ? <span> and noted your phone (<strong>{submittedQuoteInfo.customerPhone}</strong>) for {submittedQuoteInfo.contactPreference === "phone" ? "phone call/text" : "our records"}</span> : ""}.
+                  </p>
+                ) : (
+                  <p className="text-stone-700 text-xs leading-relaxed">
+                    Since you chose <strong>Phone</strong> as your contact method, Nicoletta will call or text you directly at <strong>{submittedQuoteInfo?.customerPhone}</strong>.
+                  </p>
+                )}
+
+                <div className="bg-amber-50/90 border border-amber-200/70 rounded-[10px] p-2.5 text-stone-800 text-[11px] leading-relaxed space-y-1">
+                  <p className="font-semibold text-amber-950">
+                    ⚠️ Didn&apos;t receive a confirmation or notice a typo?
+                  </p>
+                  <p className="text-stone-700">
+                    Please check your spam folder, or double-check that your email address and phone number were entered correctly. If there was a typo, please click below to submit another quote with the corrected information so we can reach you without delay!
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setSubmitted(false)}
+                  className="text-xs font-bold text-brand-primary hover:text-brand-dark transition-colors underline underline-offset-4 cursor-pointer"
+                >
+                  Submit another quote or send a correction &rarr;
+                </button>
+              </div>
             </div>
           )}
         </form>

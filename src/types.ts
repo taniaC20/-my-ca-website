@@ -76,7 +76,7 @@ export interface QuoteRequest {
   productId?: string;
   productName?: string;
   customerName: string;
-  customerEmail: string;
+  customerEmail?: string;
   customerPhone?: string;
   contactPreference?: "email" | "phone";
   engravingText?: string;

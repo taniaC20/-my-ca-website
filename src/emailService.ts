@@ -393,6 +393,10 @@ export async function sendQuoteNotificationToAdmin(
       if (showContactPref) {
         payload.Preferred_Contact = prefLabel;
       }
+      if (quote.customerEmail && quote.customerEmail.trim()) {
+        payload.Customer_Email = quote.customerEmail.trim();
+        payload._autoresponse = `Thank you for contacting Nicoletta Crafts & Decor, ${quote.customerName}! We have received your inquiry for: "${cleanTopic}" (Ref: #${refCode}). Nicoletta personally reviews every inquiry and will respond within one business day.\n\nIf you notice any typos in your submitted information, reply directly to this email or send us a message at https://www.nicolettacraftsdecor.ca.`;
+      }
 
       if (isContact) {
         payload.Inquiry_Topic = cleanTopic;
@@ -562,6 +566,18 @@ export function validateEmailAddress(email: string): { valid: boolean; error?: s
 /**
  * Phone number validation and standard Canadian/US and International formatting.
  */
+/**
+ * Formats standard Canadian / US phone numbers as (XXX) XXX-XXXX on input
+ */
+export function formatPhoneInput(raw: string): string {
+  if (!raw) return "";
+  if (raw.startsWith("+")) return raw;
+  const digits = raw.replace(/\D/g, "").slice(0, 10);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
 export function validatePhoneNumber(phone: string, isRequired: boolean = false): {
   valid: boolean;
   error?: string;
@@ -765,6 +781,12 @@ https://www.nicolettacraftsdecor.ca
 </html>
   `.trim();
 
+  if (!contact.email || !contact.email.trim()) {
+    return { success: true, message: "Client requested contact by phone only (no email provided)" };
+  }
+
+  let sent = false;
+
   try {
     const res = await fetch("/api/send-email", {
       method: "POST",
@@ -780,11 +802,257 @@ https://www.nicolettacraftsdecor.ca
       })
     });
     if (res.ok) {
-      return { success: true, message: `Confirmation dispatched to client: ${contact.email}` };
+      const data = await res.json().catch(() => ({}));
+      if (data.success) {
+        sent = true;
+      }
     }
   } catch (err) {
     console.warn("Client confirmation email dispatch error:", err);
   }
 
-  return { success: false, message: "Could not send client confirmation email" };
+  // Fallback: FormSubmit direct delivery to client
+  if (!sent) {
+    try {
+      await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(contact.email)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          _subject: emailSubject,
+          _replyto: DEFAULT_ADMIN_EMAIL,
+          _template: "table",
+          Studio: "Nicoletta Crafts & Decor",
+          Inquiry_Reference: `#${refCode}`,
+          Customer_Name: contact.name,
+          Inquiry_Subject: inquirySubject,
+          Preferred_Contact: contact.contactPreference === "phone" ? "Phone (Call or Text)" : "Email",
+          Phone_Number: contact.phone || undefined,
+          Message: contact.message,
+          Status: "Safely received - Nicoletta will review your message within 1 business day",
+          Correction_Notice: "If any details have a typo, reply to this email or send us a message at https://www.nicolettacraftsdecor.ca"
+        })
+      });
+      sent = true;
+    } catch (fallbackErr) {
+      console.warn("FormSubmit contact confirmation fallback error:", fallbackErr);
+    }
+  }
+
+  return { success: sent, message: sent ? `Confirmation dispatched to client: ${contact.email}` : "Could not send client confirmation email" };
+}
+
+
+/**
+ * Sends an automated confirmation email to the client when they submit a custom quote request.
+ * Dispatches via Gmail SMTP API when configured, with zero-config FormSubmit fallback.
+ */
+export async function sendQuoteConfirmationToClient(
+  quote: QuoteRequest,
+  settings?: EmailSettings
+): Promise<{ success: boolean; message: string }> {
+  const clientEmail = (quote.customerEmail || "").trim();
+  if (!clientEmail) {
+    return { success: true, message: "Client requested contact by phone only (no email provided)" };
+  }
+
+  const senderEmail = settings?.gmailUser || DEFAULT_ADMIN_EMAIL;
+  const rawId = quote.id || `q-${Date.now()}`;
+  const refCode = rawId.replace(/^q-/, "").slice(-6).toUpperCase();
+  const projectName = (quote.productName || "Custom Craft Project").trim();
+  const emailSubject = `Confirmation: We received your quote request - Nicoletta Crafts & Decor [#${refCode}]`;
+
+  const now = new Date();
+  const formattedDate = now.toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" });
+  const formattedTime = now.toLocaleTimeString("en-CA", { hour: "numeric", minute: "2-digit" });
+  const timeStampDisplay = `${formattedDate} at ${formattedTime}`;
+
+  const phoneVal = (quote.customerPhone || "").trim();
+  const hasPhone = Boolean(phoneVal);
+  const prefLabel = quote.contactPreference === "phone" ? "Phone (Call/Text)" : "Email";
+
+  const cleanEngraving = (quote.engravingText || "").trim();
+  const cleanFont = cleanEngraving && quote.fontPreference && quote.fontPreference.trim()
+    ? quote.fontPreference.trim()
+    : "";
+  const cleanInstructions = cleanSpecialInstructions(quote.specialInstructions);
+  const cleanDeadline = (quote.deadline || "").trim();
+  const hasAlternative = Boolean(quote.alternativeRequest);
+  const alternativeDetails = (quote.alternativeDetails || "").trim();
+  const files = Array.isArray(quote.uploadedFiles) && quote.uploadedFiles.length > 0 ? quote.uploadedFiles : [];
+
+  const textSections: string[] = [
+    `Dear ${quote.customerName},\n\nThank you for requesting a custom quote from Nicoletta Crafts & Decor! We have safely received your project details on ${timeStampDisplay}.`,
+    `QUOTE SPECIFICATIONS:\n- Reference ID: #${refCode}\n- Item / Project: ${projectName}\n- Quantity: ${quote.quantity || 1}\n- Preferred Contact: ${prefLabel}${hasPhone ? `\n- Phone Number: ${phoneVal}` : ""}${cleanDeadline ? `\n- Target Deadline: ${cleanDeadline}` : ""}`
+  ];
+
+  if (cleanEngraving) {
+    textSections.push(`CUSTOM PERSONALIZATION / ENGRAVING:\n- Text: "${cleanEngraving}"${cleanFont ? `\n- Typography: ${cleanFont}` : ""}`);
+  }
+
+  if (cleanInstructions) {
+    textSections.push(`SPECIAL INSTRUCTIONS / DESIGN NOTES:\n${cleanInstructions}`);
+  }
+
+  if (hasAlternative) {
+    textSections.push(`ALTERNATIVE CRAFT REQUEST:\n${alternativeDetails || "Yes, open to artisan suggestions."}`);
+  }
+
+  if (files.length > 0) {
+    textSections.push(`ATTACHED REFERENCE FILES (${files.length}):\n${files.map((f, i) => `  ${i + 1}. ${f.name}`).join("\n")}`);
+  }
+
+  textSections.push(
+    `WHAT HAPPENS NEXT:\nNicoletta personally reviews every quote request and will prepare your bespoke proposal within one business day.\n\nTYPO & CORRECTION NOTICE:\nIf you notice a typo in your contact details, simply reply directly to this email or send us a quick message at https://www.nicolettacraftsdecor.ca.\n\nWarm regards,\nNicoletta & the Studio Team\nNicoletta Crafts & Decor\nSt. John's, NL, Canada\nsales@nicolettacraftsdecor.ca\nhttps://www.nicolettacraftsdecor.ca`
+  );
+
+  const textBody = textSections.join("\n\n");
+
+  const htmlBody = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(emailSubject)}</title>
+</head>
+<body style="margin: 0; padding: 24px 12px; background-color: #f6f3ee; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #2c2520; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: 1px solid #ebe5dc;">
+          <tr>
+            <td style="background-color: #1e1915; padding: 28px 32px 24px; text-align: left;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td>
+                    <div style="font-family: 'Playfair Display', Georgia, serif; font-size: 20px; font-weight: 700; color: #e2b45e; letter-spacing: 0.5px;">
+                      Nicoletta Crafts &amp; Decor
+                    </div>
+                    <div style="margin-top: 4px; font-size: 11px; color: #a99e93; letter-spacing: 0.5px;">
+                      BESPOKE ARTISAN WORKSHOP &bull; ST. JOHN'S, NL
+                    </div>
+                  </td>
+                  <td align="right" valign="top">
+                    <span style="display: inline-block; padding: 5px 12px; background-color: rgba(226, 180, 94, 0.15); border: 1px solid rgba(226, 180, 94, 0.35); border-radius: 999px; color: #e2b45e; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;">
+                      Quote Received
+                    </span>
+                  </td>
+                </tr>
+              </table>
+              <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.1); font-size: 12px; color: #c4baa9;">
+                Reference: <strong style="color: #ffffff;">#${refCode}</strong> &bull; Received on <strong>${timeStampDisplay}</strong>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 28px 32px 22px;">
+              <h2 style="font-family: 'Playfair Display', Georgia, serif; font-size: 21px; color: #1e1915; margin: 0 0 12px 0;">
+                Thank you for your quote request, ${escapeHtml(quote.customerName)}!
+              </h2>
+              <p style="font-size: 14px; line-height: 1.6; color: #423830; margin: 0 0 20px 0;">
+                We have received your custom project specifications. Nicoletta personally reviews every inquiry and will prepare your proposal within <strong>one business day</strong>.
+              </p>
+              <div style="background-color: #faf8f5; border: 1px solid #ece6dc; border-radius: 12px; padding: 18px 20px; margin-bottom: 20px;">
+                <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #8c7f73; margin-bottom: 10px;">
+                  Project Summary
+                </div>
+                <div style="font-size: 14px; color: #352c25; line-height: 1.6;">
+                  <div style="margin-bottom: 6px;"><strong>Item:</strong> ${escapeHtml(projectName)}</div>
+                  <div style="margin-bottom: 6px;"><strong>Quantity:</strong> ${quote.quantity || 1}</div>
+                  <div style="margin-bottom: 6px;"><strong>Preferred Contact:</strong> ${escapeHtml(prefLabel)}</div>
+                  ${hasPhone ? `<div style="margin-bottom: 6px;"><strong>Phone Provided:</strong> ${escapeHtml(phoneVal)}</div>` : ""}
+                  ${cleanDeadline ? `<div style="margin-bottom: 6px;"><strong>Target Deadline:</strong> ${escapeHtml(cleanDeadline)}</div>` : ""}
+                </div>
+              </div>
+              ${cleanEngraving ? `
+              <div style="background-color: #fcf9f2; border: 1px solid #ebdcc5; border-left: 4px solid #c59b27; border-radius: 10px; padding: 14px 18px; margin-bottom: 20px;">
+                <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #8c6239; margin-bottom: 4px;">Personalization Text</div>
+                <div style="font-family: 'Playfair Display', Georgia, serif; font-size: 16px; font-weight: 600; color: #2d241d; font-style: italic;">&ldquo;${escapeHtml(cleanEngraving)}&rdquo;</div>
+                ${cleanFont ? `<div style="font-size: 12px; color: #6e645d; margin-top: 4px;">Typography Style: <strong>${escapeHtml(cleanFont)}</strong></div>` : ""}
+              </div>` : ""}
+              ${cleanInstructions ? `
+              <div style="background-color: #faf9f7; border: 1px solid #e7e2d9; border-radius: 10px; padding: 14px 18px; margin-bottom: 20px;">
+                <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #8c7f73; margin-bottom: 6px;">Your Notes / Instructions</div>
+                <div style="font-size: 13px; color: #352c25; line-height: 1.5; white-space: pre-wrap;">${escapeHtml(cleanInstructions)}</div>
+              </div>` : ""}
+              <div style="background-color: #fcf9f2; border: 1px solid #ebdcb9; border-left: 4px solid #c59b27; border-radius: 10px; padding: 14px 18px; margin-bottom: 22px;">
+                <div style="font-size: 12px; font-weight: 700; color: #875c1b; margin-bottom: 4px;">Did you notice a typo in your contact information?</div>
+                <div style="font-size: 13px; color: #5a4730; line-height: 1.5;">If your email or phone number needs a correction, please <strong>reply directly to this email</strong> or visit our website to send an update!</div>
+              </div>
+              <div style="font-size: 13px; color: #5a4e44; line-height: 1.6;">
+                Warm regards,<br><strong>Nicoletta &amp; the Studio Team</strong><br><em>Nicoletta Crafts &amp; Decor &bull; St. John's, NL</em>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #faf8f5; border-top: 1px solid #ebe5dc; padding: 18px 32px; font-size: 11px; color: #8c7f73; text-align: center; line-height: 1.5;">
+              Nicoletta Crafts &amp; Decor &bull; St. John&rsquo;s, NL, Canada &bull; <a href="https://www.nicolettacraftsdecor.ca" style="color: #936037; text-decoration: none;">www.nicolettacraftsdecor.ca</a><br>
+              Inquiries: <a href="mailto:sales@nicolettacraftsdecor.ca" style="color: #936037; text-decoration: none;">sales@nicolettacraftsdecor.ca</a>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`.trim();
+
+  let sent = false;
+
+  // 1. Try local/serverless nodemailer API
+  try {
+    const res = await fetch("/api/send-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        to: clientEmail,
+        from: senderEmail,
+        subject: emailSubject,
+        text: textBody,
+        html: htmlBody,
+        appPassword: settings?.gmailAppPassword,
+        replyTo: DEFAULT_ADMIN_EMAIL
+      })
+    });
+    if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (data.success) {
+        sent = true;
+      }
+    }
+  } catch (err) {
+    console.warn("API quote confirmation dispatch error:", err);
+  }
+
+  // 2. Fallback: FormSubmit direct delivery to client
+  if (!sent) {
+    try {
+      await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(clientEmail)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          _subject: emailSubject,
+          _replyto: DEFAULT_ADMIN_EMAIL,
+          _template: "table",
+          Studio: "Nicoletta Crafts & Decor",
+          Inquiry_Reference: `#${refCode}`,
+          Customer_Name: quote.customerName,
+          Selected_Craft: projectName,
+          Quantity: quote.quantity || 1,
+          Preferred_Contact: prefLabel,
+          Phone_Number: phoneVal || undefined,
+          Deadline: cleanDeadline || undefined,
+          Personalization_Text: cleanEngraving || undefined,
+          Special_Notes: cleanInstructions || undefined,
+          Status: "Safely received - Nicoletta will prepare your proposal within 1 business day",
+          Correction_Notice: "If any details have a typo, reply to this email or send us a message at https://www.nicolettacraftsdecor.ca"
+        })
+      });
+      sent = true;
+    } catch (fallbackErr) {
+      console.warn("FormSubmit quote confirmation fallback error:", fallbackErr);
+    }
+  }
+
+  return { success: sent, message: sent ? "Confirmation dispatched to client" : "Failed to dispatch client confirmation" };
 }

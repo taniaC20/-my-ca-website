@@ -22,6 +22,7 @@ import {
   Phone
 } from "lucide-react";
 import { Product, QuoteRequest } from "../types";
+import { validateEmailAddress, validatePhoneNumber, formatPhoneInput } from "../emailService";
 
 interface ProductDetailsProps {
   product: Product;
@@ -61,6 +62,13 @@ export default function ProductDetails({
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [submittedQuoteInfo, setSubmittedQuoteInfo] = useState<{
+    customerName: string;
+    customerEmail?: string;
+    customerPhone?: string;
+    contactPreference: "email" | "phone";
+    productName: string;
+  } | null>(null);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   const hasPromo = product.promoPrice !== undefined && product.promoPrice < product.price;
@@ -288,17 +296,24 @@ export default function ProductDetails({
     if (formData.contactPreference === "email") {
       if (!formData.customerEmail.trim()) {
         newErrors.customerEmail = "Email address is required when Email is selected as preferred contact.";
-      } else if (!/\S+@\S+\.\S+/.test(formData.customerEmail)) {
-        newErrors.customerEmail = "Please enter a valid email address.";
+      } else {
+        const check = validateEmailAddress(formData.customerEmail);
+        if (!check.valid) newErrors.customerEmail = check.error;
+      }
+      if (formData.customerPhone.trim()) {
+        const phoneCheck = validatePhoneNumber(formData.customerPhone, false);
+        if (!phoneCheck.valid) newErrors.customerPhone = phoneCheck.error;
       }
     } else if (formData.contactPreference === "phone") {
       if (!formData.customerPhone.trim()) {
         newErrors.customerPhone = "Phone number is required when Phone is selected as preferred contact.";
-      } else if (formData.customerPhone.trim().replace(/\D/g, "").length < 7) {
-        newErrors.customerPhone = "Please enter a valid phone number (at least 7 digits).";
+      } else {
+        const phoneCheck = validatePhoneNumber(formData.customerPhone, true);
+        if (!phoneCheck.valid) newErrors.customerPhone = phoneCheck.error;
       }
-      if (formData.customerEmail.trim() && !/\S+@\S+\.\S+/.test(formData.customerEmail)) {
-        newErrors.customerEmail = "Please enter a valid email address.";
+      if (formData.customerEmail.trim()) {
+        const check = validateEmailAddress(formData.customerEmail);
+        if (!check.valid) newErrors.customerEmail = check.error;
       }
     }
 
@@ -319,12 +334,21 @@ export default function ProductDetails({
     const cleanPhone = (formData.customerPhone || "").trim();
     const cleanDeadline = (formData.deadline || "").trim();
 
+    const cleanCustomerEmail = formData.customerEmail.trim();
+    setSubmittedQuoteInfo({
+      customerName: formData.customerName.trim(),
+      customerEmail: cleanCustomerEmail || undefined,
+      customerPhone: cleanPhone || undefined,
+      contactPreference: formData.contactPreference,
+      productName: product.name
+    });
+
     if (onSubmitQuote) {
       onSubmitQuote({
         productId: product.id,
         productName: product.name,
         customerName: formData.customerName.trim(),
-        customerEmail: formData.customerEmail.trim(),
+        customerEmail: cleanCustomerEmail || undefined,
         customerPhone: cleanPhone || undefined,
         contactPreference: formData.contactPreference,
         engravingText: cleanEngraving || undefined,
@@ -736,7 +760,17 @@ export default function ProductDetails({
                       name="customerPhone"
                       type="text"
                       value={formData.customerPhone}
-                      onChange={handleInputChange}
+                      onChange={(e) => {
+                        const formatted = formatPhoneInput(e.target.value);
+                        setFormData((prev) => ({ ...prev, customerPhone: formatted }));
+                        if (errors.customerPhone) {
+                          setErrors((prev) => {
+                            const copy = { ...prev };
+                            delete copy.customerPhone;
+                            return copy;
+                          });
+                        }
+                      }}
                       placeholder="(709) 555-0199"
                       className={`bg-white border rounded-[8px] py-2 px-3 text-brand-text text-xs focus:outline-none focus:ring-1 focus:ring-brand-primary ${errors.customerPhone ? "border-red-500" : "border-brand-border"}`}
                     />
@@ -1003,15 +1037,43 @@ export default function ProductDetails({
                 {submitted && (
                   <div
                     id="inline-quote-success"
-                    className="mt-4 p-4 bg-emerald-50 border border-emerald-200 text-emerald-950 rounded-[16px] text-xs space-y-1.5 animate-fade-in shadow-xs"
+                    className="mt-6 p-5 bg-emerald-50/90 border border-emerald-200 text-emerald-950 rounded-[18px] text-xs space-y-3.5 animate-fade-in shadow-xs text-left"
                   >
-                    <div className="flex items-center gap-2 font-bold text-emerald-800 text-sm">
+                    <div className="flex items-center gap-2 font-bold text-emerald-900 text-sm">
                       <CheckCircle className="h-4.5 w-4.5 text-emerald-600 shrink-0" />
-                      <span>Request Received Successfully!</span>
+                      <span>Quote Request Received Successfully!</span>
                     </div>
                     <p className="font-normal text-emerald-800 text-xs leading-relaxed">
-                      Thank you for submitting your custom quote request! We have received your details and our team will get back to you soon with your quote and design mockup.
+                      Thank you for your request{submittedQuoteInfo?.customerName ? `, ${submittedQuoteInfo.customerName}` : ""}! Nicoletta personally reviews each project and will get back to you within <strong>one business day</strong>.
                     </p>
+
+                    <div className="bg-white border border-amber-200/90 rounded-[12px] p-3.5 text-stone-800 text-xs leading-relaxed space-y-2 shadow-2xs">
+                      <div className="flex items-center gap-2 text-amber-900 font-bold text-[11px] uppercase tracking-wider">
+                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                        Confirmation Notice
+                      </div>
+                      {submittedQuoteInfo?.customerEmail ? (
+                        <p className="text-stone-700 text-xs leading-relaxed">
+                          An automated confirmation has been sent to your email (<strong>{submittedQuoteInfo.customerEmail}</strong>)
+                          {submittedQuoteInfo.customerPhone ? <span> and noted your phone (<strong>{submittedQuoteInfo.customerPhone}</strong>) for {submittedQuoteInfo.contactPreference === "phone" ? "phone call/text" : "our records"}</span> : ""}.
+                        </p>
+                      ) : (
+                        <p className="text-stone-700 text-xs leading-relaxed">
+                          Since you chose <strong>Phone</strong> as your contact method, Nicoletta will call or text you directly at <strong>{submittedQuoteInfo?.customerPhone}</strong>.
+                        </p>
+                      )}
+                      <div className="bg-amber-50/90 border border-amber-200/70 rounded-[8px] p-2 text-stone-800 text-[10px] leading-relaxed">
+                        <strong>⚠️ Didn&apos;t receive a confirmation or notice a typo?</strong> Check your spam folder or click below to submit a correction!
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setSubmitted(false)}
+                      className="text-xs font-bold text-brand-primary hover:text-brand-dark transition-colors underline underline-offset-4 cursor-pointer"
+                    >
+                      Submit another quote or send a correction &rarr;
+                    </button>
                   </div>
                 )}
               </form>

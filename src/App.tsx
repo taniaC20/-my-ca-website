@@ -50,18 +50,12 @@ import { safeSetLocalStorage, safeParseLocal, persistKeyVal, idbGet } from "./st
 import { fetchCloudStore, pushCloudStore, scoreCustomizationRichness } from "./cloudStore";
 import {
   sendQuoteNotificationToAdmin,
+  sendQuoteConfirmationToClient,
   sendContactConfirmationToClient,
   validateEmailAddress,
-  validatePhoneNumber
+  validatePhoneNumber,
+  formatPhoneInput
 } from "./emailService";
-
-function formatPhoneInput(raw: string): string {
-  if (raw.startsWith("+")) return raw;
-  const digits = raw.replace(/\D/g, "").slice(0, 10);
-  if (digits.length <= 3) return digits;
-  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
-  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-}
 
 async function safeFetchJson(url: string, options?: RequestInit): Promise<{ ok: boolean; status: number; data: any }> {
   try {
@@ -1315,6 +1309,7 @@ export default function App() {
         persistKeyVal("nicoletta_quotes", nextQuotes);
         pushCloudStore({ quotes: nextQuotes }).catch(() => {});
         sendQuoteNotificationToAdmin(savedQuote, customization.emailSettings).catch(() => {});
+        sendQuoteConfirmationToClient(savedQuote, customization.emailSettings).catch(() => {});
         await fetchAllData();
       } else {
         const nextQuotes = [fallbackQuote, ...quotes];
@@ -1322,6 +1317,7 @@ export default function App() {
         persistKeyVal("nicoletta_quotes", nextQuotes);
         pushCloudStore({ quotes: nextQuotes }).catch(() => {});
         sendQuoteNotificationToAdmin(fallbackQuote, customization.emailSettings).catch(() => {});
+        sendQuoteConfirmationToClient(fallbackQuote, customization.emailSettings).catch(() => {});
       }
     } catch (err) {
       const nextQuotes = [fallbackQuote, ...quotes];
@@ -2595,10 +2591,16 @@ export default function App() {
                             Email &amp; Text Confirmation Notice
                           </div>
 
-                          <p className="text-stone-700 text-xs leading-relaxed">
-                            An automated confirmation email has been dispatched to your address (<strong>{submittedContactInfo?.email}</strong>)
-                            {submittedContactInfo?.phone ? <span> and noted your phone number (<strong>{submittedContactInfo.phone}</strong>) for {submittedContactInfo.contactPreference === "phone" ? "phone call/text" : "our records"}</span> : ""}.
-                          </p>
+                          {submittedContactInfo?.email ? (
+                            <p className="text-stone-700 text-xs leading-relaxed">
+                              An automated confirmation notice has been sent to your email (<strong>{submittedContactInfo.email}</strong>)
+                              {submittedContactInfo.phone ? <span> and noted your phone number (<strong>{submittedContactInfo.phone}</strong>) for {submittedContactInfo.contactPreference === "phone" ? "phone call/text" : "our records"}</span> : ""}.
+                            </p>
+                          ) : (
+                            <p className="text-stone-700 text-xs leading-relaxed">
+                              Since you selected <strong>Phone</strong> as your contact method, Nicoletta will call or text you directly at <strong>{submittedContactInfo?.phone}</strong>.
+                            </p>
+                          )}
 
                           <div className="bg-amber-50/90 border border-amber-200/70 rounded-[12px] p-3 text-stone-800 text-xs leading-relaxed space-y-1.5">
                             <p className="font-semibold text-amber-950 flex items-center gap-1.5">
@@ -2633,27 +2635,58 @@ export default function App() {
                           errors.name = "Your name is required.";
                         }
 
-                        // Validate Email Address
-                        const emailRes = validateEmailAddress(contactData.email);
-                        if (!emailRes.valid) {
-                          errors.email = emailRes.error;
-                          if (emailRes.suggestion) {
-                            setContactEmailSuggestion(emailRes.suggestion);
-                          }
-                        } else {
-                          setContactEmailSuggestion("");
-                        }
-
                         // Validate Contact Preference (REQUIRED)
                         if (!contactData.contactPreference) {
                           errors.contactPreference = "Please select how you would like to be contacted (Email or Phone).";
                         }
 
-                        // Validate Phone Number
-                        const isPhoneRequired = contactData.contactPreference === "phone";
-                        const phoneRes = validatePhoneNumber(contactData.phone, isPhoneRequired);
-                        if (!phoneRes.valid) {
-                          errors.phone = phoneRes.error;
+                        let validatedPhone = "";
+
+                        // If Email is preferred: Email is REQUIRED, Phone is OPTIONAL
+                        if (contactData.contactPreference === "email") {
+                          if (!contactData.email.trim()) {
+                            errors.email = "Email address is required when Email is selected as preferred contact.";
+                          } else {
+                            const emailRes = validateEmailAddress(contactData.email);
+                            if (!emailRes.valid) {
+                              errors.email = emailRes.error;
+                              if (emailRes.suggestion) setContactEmailSuggestion(emailRes.suggestion);
+                            } else {
+                              setContactEmailSuggestion("");
+                            }
+                          }
+
+                          if (contactData.phone.trim()) {
+                            const phoneRes = validatePhoneNumber(contactData.phone, false);
+                            if (!phoneRes.valid) errors.phone = phoneRes.error;
+                            else validatedPhone = phoneRes.formatted || contactData.phone.trim();
+                          }
+                        }
+
+                        // If Phone is preferred: Phone is REQUIRED, Email is OPTIONAL
+                        if (contactData.contactPreference === "phone") {
+                          if (!contactData.phone.trim()) {
+                            errors.phone = "Phone number is required when Phone is selected as preferred contact.";
+                          } else {
+                            const phoneRes = validatePhoneNumber(contactData.phone, true);
+                            if (!phoneRes.valid) {
+                              errors.phone = phoneRes.error;
+                            } else {
+                              validatedPhone = phoneRes.formatted || contactData.phone.trim();
+                            }
+                          }
+
+                          if (contactData.email.trim()) {
+                            const emailRes = validateEmailAddress(contactData.email);
+                            if (!emailRes.valid) {
+                              errors.email = emailRes.error;
+                              if (emailRes.suggestion) setContactEmailSuggestion(emailRes.suggestion);
+                            } else {
+                              setContactEmailSuggestion("");
+                            }
+                          } else {
+                            setContactEmailSuggestion("");
+                          }
                         }
 
                         // Validate Message
@@ -2668,7 +2701,7 @@ export default function App() {
 
                         setContactErrors({});
 
-                        const formattedPhone = phoneRes.formatted || contactData.phone.trim();
+                        const formattedPhone = validatedPhone || contactData.phone.trim();
                         const cleanCustomerName = contactData.name.trim();
                         const cleanCustomerEmail = contactData.email.trim();
                         const cleanSubject = contactData.subject.trim() || "General Inquiry";
@@ -2679,7 +2712,7 @@ export default function App() {
                           type: "contact" as const,
                           productName: `Contact Message: ${cleanSubject}`,
                           customerName: cleanCustomerName,
-                          customerEmail: cleanCustomerEmail,
+                          customerEmail: cleanCustomerEmail || undefined,
                           customerPhone: formattedPhone || undefined,
                           contactPreference: chosenPref,
                           specialInstructions: cleanMessage,
@@ -2777,8 +2810,13 @@ export default function App() {
                           </div>
                           
                           <div className="flex flex-col gap-1.5">
-                            <label htmlFor="contactEmail" className="text-[10px] font-bold text-brand-muted uppercase tracking-wider">
-                              Email Address <span className="text-red-500">*</span>
+                            <label htmlFor="contactEmail" className="text-[10px] font-bold text-brand-muted uppercase tracking-wider flex items-center justify-between">
+                              <span>
+                                Email Address {contactData.contactPreference === "email" ? <span className="text-red-500">*</span> : <span className="text-stone-400 font-normal lowercase">(optional)</span>}
+                              </span>
+                              {contactData.contactPreference === "email" && (
+                                <span className="text-[10px] text-amber-700 font-semibold normal-case">Required for email contact</span>
+                              )}
                             </label>
                             <input
                               id="contactEmail"
