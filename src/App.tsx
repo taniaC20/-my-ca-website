@@ -661,32 +661,20 @@ export default function App() {
     verifySession();
   }, []);
 
-  // Global shortcut (Ctrl+Shift+A or Cmd+Shift+A) to discreetly access Artisan Portal
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "a") {
-        e.preventDefault();
-        setIsUnlocked(true);
-        localStorage.setItem("nicoletta_admin_unlocked", "true");
-        setIsAdminMode((prev) => !prev);
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
-  // Detect secret admin URLs/hashes to unlock portal access
+  // Dedicated secret route: only accessible if URL address is nicolettacraftsdecor.ca/admin?=true
   useEffect(() => {
     const checkAdminRoute = () => {
+      const pathname = window.location.pathname.toLowerCase();
+      const search = window.location.search.toLowerCase();
       const params = new URLSearchParams(window.location.search);
-      const hash = window.location.hash;
-      
-      // Accept standard vance/artisan secret combinations
-      const hasSecretParam = params.has("portal") || params.has("artisan") || params.has("vance") || params.has("admin-secret") || params.has("admin");
-      const hasSecretHash = hash === "#artisan-portal" || hash === "#admin" || hash === "#vance-artisan" || hash === "#portal";
-      
-      if (hasSecretParam || hasSecretHash) {
+      const hash = window.location.hash.toLowerCase();
+
+      // Explicit target: /admin?=true (also handles /admin?admin=true or /admin?=true hash variants)
+      const isPathAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
+      const hasAdminQuery = search === "?=true" || search.includes("=true") || params.get("") === "true" || params.get("admin") === "true";
+      const hasHashAdmin = hash === "#admin?=true" || hash === "#/admin?=true";
+
+      if ((isPathAdmin && hasAdminQuery) || hasHashAdmin) {
         localStorage.setItem("nicoletta_admin_unlocked", "true");
         setIsUnlocked(true);
         setIsAdminMode(true);
@@ -695,8 +683,12 @@ export default function App() {
     };
 
     checkAdminRoute();
+    window.addEventListener("popstate", checkAdminRoute);
     window.addEventListener("hashchange", checkAdminRoute);
-    return () => window.removeEventListener("hashchange", checkAdminRoute);
+    return () => {
+      window.removeEventListener("popstate", checkAdminRoute);
+      window.removeEventListener("hashchange", checkAdminRoute);
+    };
   }, []);
 
   // Secure Admin Authentication Action handlers
@@ -3011,16 +3003,7 @@ export default function App() {
               hideBorder={true}
             />
 
-            <p 
-              className="text-[10px] text-brand-muted/70 font-medium cursor-default select-none"
-              title="Double-click to access Artisan Portal"
-              onDoubleClick={() => {
-                setIsUnlocked(true);
-                localStorage.setItem("nicoletta_admin_unlocked", "true");
-                setIsAdminMode(true);
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-            >
+            <p className="text-[10px] text-brand-muted/70 font-medium">
               &copy; 2026 Nicoletta Crafts &amp; Decor. All rights reserved.
             </p>
           </div>
