@@ -643,11 +643,11 @@ export default function ProductDetails({
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-brand-primary animate-pulse" />
                   <h3 className="font-serif font-bold text-lg text-brand-dark">
-                    {isPipeCleaner || (!hasVisualizer && !hasEngravingText) ? "Get a Quote" : "Personalize This Creation"}
+                    {isPipeCleaner ? "Get a Quote" : "Personalize this Item"}
                   </h3>
                 </div>
                 <p className="text-brand-muted text-[11px] leading-relaxed font-light">
-                  {isPipeCleaner || (!hasVisualizer && !hasEngravingText)
+                  {isPipeCleaner
                     ? "Please fill out your contact information, and we'll get back to you soon to confirm availability and guide you through the ordering process, including payment options and pickup or delivery details."
                     : "Fill in your custom details below. The crafter will review your order and contact you soon."}
                 </p>
