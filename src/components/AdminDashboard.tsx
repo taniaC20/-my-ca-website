@@ -36,7 +36,13 @@ import {
   Download,
   Phone,
   MapPin,
-  Save
+  Save,
+  Move,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  Crop,
+  Maximize2
 } from "lucide-react";
 import { Product, Category, Testimonial, Announcement, QuoteRequest, AnalyticsSummary, CustomizationSettings, CustomSection, GIFT_OCCASION_PRESETS, GiftOccasionFilter } from "../types";
 import { NicolettaLogo } from "./NicolettaLogo";
@@ -237,6 +243,124 @@ export default function AdminDashboard({
         });
     }
   }, [activeTab, token, quotes]);
+
+  // Immediate administrative quotes & messages fast loader
+  React.useEffect(() => {
+    const authToken = token || (typeof window !== "undefined" ? localStorage.getItem("nicoletta_admin_token") : null);
+    if (authToken && (activeTab === "quotes" || activeTab === "messages" || activeTab === "analytics" || quotes.length === 0)) {
+      fetch(`/api/admin/quotes?t=${Date.now()}`, {
+        headers: { "Authorization": `Bearer ${authToken}` }
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (Array.isArray(data) && data.length > 0) {
+            onUpdateQuotes(data);
+            try {
+              localStorage.setItem("nicoletta_quotes", JSON.stringify(data));
+            } catch {}
+          }
+        })
+        .catch(() => {});
+    }
+  }, [activeTab, token]);
+
+  // Product Photo Position & Resize Adjuster States
+  const [photoAdjusterOpen, setPhotoAdjusterOpen] = useState(false);
+  const [adjusterImageSrc, setAdjusterImageSrc] = useState<string>("");
+  const [adjusterTarget, setAdjusterTarget] = useState<"primary" | number>("primary");
+  const [adjusterZoom, setAdjusterZoom] = useState<number>(1);
+  const [adjusterPan, setAdjusterPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const adjusterImgRef = React.useRef<HTMLImageElement | null>(null);
+  const adjusterFrameRef = React.useRef<HTMLDivElement | null>(null);
+
+  const openImageAdjuster = (src: string, target: "primary" | number = "primary") => {
+    if (!src) return;
+    setAdjusterImageSrc(src);
+    setAdjusterTarget(target);
+    setAdjusterZoom(1);
+    setAdjusterPan({ x: 0, y: 0 });
+    setPhotoAdjusterOpen(true);
+  };
+
+  const handlePanStart = (clientX: number, clientY: number) => {
+    setIsPanning(true);
+    setPanStart({
+      x: clientX - adjusterPan.x,
+      y: clientY - adjusterPan.y
+    });
+  };
+
+  const handlePanMove = (clientX: number, clientY: number) => {
+    if (!isPanning) return;
+    setAdjusterPan({
+      x: clientX - panStart.x,
+      y: clientY - panStart.y
+    });
+  };
+
+  const handlePanEnd = () => {
+    setIsPanning(false);
+  };
+
+  const handleSaveFramedPhoto = () => {
+    const frame = adjusterFrameRef.current;
+    const img = adjusterImgRef.current;
+    if (!frame || !img) {
+      setPhotoAdjusterOpen(false);
+      return;
+    }
+
+    const frameRect = frame.getBoundingClientRect();
+    const frameW = frameRect.width || 440;
+    const frameH = frameRect.height || 330;
+    const outputW = 1200;
+    const outputH = 900;
+    const scale = outputW / frameW;
+
+    const imgW = img.offsetWidth || img.naturalWidth || frameW;
+    const imgH = img.offsetHeight || img.naturalHeight || frameH;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = outputW;
+    canvas.height = outputH;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      setPhotoAdjusterOpen(false);
+      return;
+    }
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, outputW, outputH);
+
+    const drawW = imgW * adjusterZoom * scale;
+    const drawH = imgH * adjusterZoom * scale;
+    const drawX = (outputW / 2 + adjusterPan.x * scale) - drawW / 2;
+    const drawY = (outputH / 2 + adjusterPan.y * scale) - drawH / 2;
+
+    try {
+      ctx.drawImage(img, drawX, drawY, drawW, drawH);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+
+      if (adjusterTarget === "primary") {
+        setProductForm((prev) => ({ ...prev, image: dataUrl }));
+      } else if (typeof adjusterTarget === "number") {
+        setProductForm((prev) => {
+          const next = [...(prev.additionalImages || [])];
+          next[adjusterTarget] = dataUrl;
+          return { ...prev, additionalImages: next };
+        });
+      }
+    } catch (err) {
+      console.warn("Direct canvas export blocked by CORS, keeping original:", err);
+      alert("External image URL cannot be cropped directly due to browser security. Please upload the photo file from your device to drag and crop.");
+    }
+
+    setPhotoAdjusterOpen(false);
+  };
 
   // Contact Section Fallback & Helper to ensure Connect & Footer is always editable across all devices
   const DEFAULT_CONTACT_HEADER_SECTION: CustomSection = {
@@ -1092,6 +1216,7 @@ export default function AdminDashboard({
     try {
       const uploaded = await uploadImageAsset(file, 1200);
       setProductForm((prev) => ({ ...prev, image: uploaded.url }));
+      openImageAdjuster(uploaded.url, "primary");
     } catch {
       setUploadError("Error reading file.");
     } finally {
@@ -3997,7 +4122,7 @@ export default function AdminDashboard({
                                   (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1544982503-9f984c14501a?auto=format&fit=crop&q=80&w=200";
                                 }}
                               />
-                              <div className="text-[10px] overflow-hidden">
+                              <div className="text-[10px] overflow-hidden flex-1">
                                 <p className="font-bold text-stone-800 truncate">Selected Visual Asset</p>
                                 <p className="text-stone-400 truncate font-mono text-[9px]">
                                   {productForm.image.startsWith("data:") ? "Uploaded Studio Image" : productForm.image}
@@ -4010,6 +4135,17 @@ export default function AdminDashboard({
                             </div>
                           )}
                         </div>
+
+                        {productForm.image && (
+                          <button
+                            type="button"
+                            onClick={() => openImageAdjuster(productForm.image, "primary")}
+                            className="bg-amber-100/90 hover:bg-amber-200 text-amber-950 border border-amber-300 font-bold text-xs py-1.5 px-3 rounded-md flex items-center justify-center gap-1.5 cursor-pointer transition-colors shadow-3xs w-full"
+                          >
+                            <Move className="h-3.5 w-3.5 text-amber-800" />
+                            <span>Drag &amp; Adjust Photo Size / Position</span>
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -4072,6 +4208,17 @@ export default function AdminDashboard({
                               <span className="absolute bottom-0.5 left-0.5 bg-black/60 text-white text-[8px] font-bold px-1 rounded">
                                 #{idx + 2}
                               </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openImageAdjuster(imgUrl, idx);
+                                }}
+                                className="absolute bottom-0.5 right-0.5 bg-black/70 hover:bg-amber-800 text-white rounded p-0.5 cursor-pointer transition-colors"
+                                title="Adjust & resize gallery image"
+                              >
+                                <Move className="h-2.5 w-2.5" />
+                              </button>
                               <button
                                 type="button"
                                 onClick={() =>
@@ -7465,6 +7612,178 @@ export default function AdminDashboard({
                 <li>Updating the password takes effect immediately and updates the offline persistent file database dynamically.</li>
                 <li>Make sure to note down your password safely if you change it.</li>
               </ul>
+            </div>
+          </div>
+        )}
+
+        {/* Photo Adjuster & Framing Modal */}
+        {photoAdjusterOpen && (
+          <div className="fixed inset-0 bg-stone-950/75 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fade-in">
+            <div className="bg-white rounded-2xl max-w-lg w-full p-5 space-y-4 shadow-2xl border border-stone-200">
+              <div className="flex justify-between items-start border-b border-stone-100 pb-3">
+                <div>
+                  <h4 className="font-serif font-bold text-stone-950 text-base md:text-lg flex items-center gap-2">
+                    <Crop className="h-4.5 w-4.5 text-amber-800" />
+                    <span>Adjust &amp; Accommodate Photo</span>
+                  </h4>
+                  <p className="text-stone-500 text-xs">
+                    Drag the photo inside the 4:3 frame to reposition it. Use the slider below to adjust size.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPhotoAdjusterOpen(false)}
+                  className="text-stone-400 hover:text-stone-600 p-1 rounded-full hover:bg-stone-100 transition-colors cursor-pointer"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* 4:3 Framing Viewport */}
+              <div className="flex flex-col items-center">
+                <div
+                  ref={adjusterFrameRef}
+                  className="w-full max-w-[440px] aspect-4/3 relative overflow-hidden rounded-xl bg-stone-900 border-2 border-amber-800/40 shadow-inner select-none cursor-grab active:cursor-grabbing"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handlePanStart(e.clientX, e.clientY);
+                  }}
+                  onMouseMove={(e) => handlePanMove(e.clientX, e.clientY)}
+                  onMouseUp={handlePanEnd}
+                  onMouseLeave={handlePanEnd}
+                  onTouchStart={(e) => {
+                    if (e.touches[0]) handlePanStart(e.touches[0].clientX, e.touches[0].clientY);
+                  }}
+                  onTouchMove={(e) => {
+                    if (e.touches[0]) handlePanMove(e.touches[0].clientX, e.touches[0].clientY);
+                  }}
+                  onTouchEnd={handlePanEnd}
+                  onWheel={(e) => {
+                    e.preventDefault();
+                    const delta = e.deltaY < 0 ? 0.08 : -0.08;
+                    setAdjusterZoom((prev) => Math.min(3.5, Math.max(0.4, parseFloat((prev + delta).toFixed(2)))));
+                  }}
+                >
+                  {/* Image with live position & zoom */}
+                  <img
+                    ref={adjusterImgRef}
+                    src={adjusterImageSrc}
+                    alt="Adjusting frame"
+                    crossOrigin="anonymous"
+                    draggable={false}
+                    className="absolute max-h-full max-w-full object-contain pointer-events-none select-none transition-transform duration-75 origin-center"
+                    style={{
+                      left: "50%",
+                      top: "50%",
+                      transform: `translate(calc(-50% + ${adjusterPan.x}px), calc(-50% + ${adjusterPan.y}px)) scale(${adjusterZoom})`
+                    }}
+                  />
+
+                  {/* 3x3 Composition Guide Overlay */}
+                  <div className="absolute inset-0 pointer-events-none grid grid-cols-3 grid-rows-3 border border-white/10">
+                    <div className="border-r border-b border-white/10"></div>
+                    <div className="border-r border-b border-white/10"></div>
+                    <div className="border-b border-white/10"></div>
+                    <div className="border-r border-b border-white/10"></div>
+                    <div className="border-r border-b border-white/10"></div>
+                    <div className="border-b border-white/10"></div>
+                    <div className="border-r border-white/10"></div>
+                    <div className="border-r border-white/10"></div>
+                    <div></div>
+                  </div>
+
+                  <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-xs text-white text-[10px] font-mono px-2 py-0.5 rounded-full pointer-events-none">
+                    Standard 4:3 Frame
+                  </div>
+                  <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-xs text-amber-300 text-[10px] font-mono px-2 py-0.5 rounded-full pointer-events-none">
+                    Drag to move photo
+                  </div>
+                </div>
+              </div>
+
+              {/* Controls */}
+              <div className="space-y-2.5">
+                <div className="bg-stone-50 border border-stone-200 rounded-lg p-2.5 space-y-1.5">
+                  <div className="flex justify-between items-center text-xs font-bold text-stone-700">
+                    <span className="flex items-center gap-1.5">
+                      <Maximize2 className="h-3.5 w-3.5 text-amber-800" /> Photo Size &amp; Zoom
+                    </span>
+                    <span className="font-mono text-amber-900 bg-amber-100 px-2 py-0.5 rounded text-[11px]">
+                      {Math.round(adjusterZoom * 100)}%
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setAdjusterZoom((prev) => Math.max(0.4, parseFloat((prev - 0.1).toFixed(2))))}
+                      className="p-1 rounded bg-white hover:bg-stone-200 border border-stone-300 text-stone-700 cursor-pointer transition-colors"
+                      title="Zoom out"
+                    >
+                      <ZoomOut className="h-3.5 w-3.5" />
+                    </button>
+                    <input
+                      type="range"
+                      min="0.4"
+                      max="3.0"
+                      step="0.05"
+                      value={adjusterZoom}
+                      onChange={(e) => setAdjusterZoom(parseFloat(e.target.value))}
+                      className="w-full accent-amber-800 cursor-pointer"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setAdjusterZoom((prev) => Math.min(3.0, parseFloat((prev + 0.1).toFixed(2))))}
+                      className="p-1 rounded bg-white hover:bg-stone-200 border border-stone-300 text-stone-700 cursor-pointer transition-colors"
+                      title="Zoom in"
+                    >
+                      <ZoomIn className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAdjusterPan({ x: 0, y: 0 });
+                        setAdjusterZoom(1);
+                      }}
+                      className="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 border border-stone-300 rounded text-stone-700 text-[11px] font-bold cursor-pointer transition-colors flex items-center gap-1"
+                    >
+                      <RotateCcw className="h-3 w-3" /> Reset
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAdjusterZoom(1.35)}
+                      className="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 border border-stone-300 rounded text-stone-700 text-[11px] font-bold cursor-pointer transition-colors"
+                    >
+                      Fill Frame
+                    </button>
+                  </div>
+                  <span className="text-[10px] text-stone-500 italic">
+                    Click &amp; drag photo to re-center
+                  </span>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex justify-end items-center gap-2.5 pt-2 border-t border-stone-100">
+                <button
+                  type="button"
+                  onClick={() => setPhotoAdjusterOpen(false)}
+                  className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold text-xs rounded-lg cursor-pointer transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveFramedPhoto}
+                  className="px-4 py-2 bg-amber-800 hover:bg-amber-900 text-white font-bold text-xs rounded-lg cursor-pointer transition-colors flex items-center gap-1.5 shadow-xs"
+                >
+                  <Check className="h-4 w-4" /> Apply &amp; Save Photo
+                </button>
+              </div>
             </div>
           </div>
         )}

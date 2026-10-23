@@ -868,7 +868,7 @@ export default function ProductDetails({
                 {/* Special instructions */}
                 <div className="flex flex-col gap-1.5 border-t border-brand-border/40 pt-4 mt-2">
                   <label htmlFor="specialInstructions" className="text-[10px] font-bold text-brand-muted uppercase tracking-wider">
-                    {isSublimation ? "Additional Customization Preferences" : isPipeCleaner ? "Bouquet Wrapping & Packaging Preferences" : "Special Design Instructions or Sizing Ideas"}
+                    {isSublimation ? "Additional Customization Preferences" : isPipeCleaner ? "Bouquet Wrapping & Packaging Preferences" : "Special Design Instructions"}
                   </label>
                   <textarea
                     id="specialInstructions"
@@ -893,7 +893,7 @@ export default function ProductDetails({
                         className="rounded border-amber-300 text-amber-800 focus:ring-amber-500 h-4.5 w-4.5 cursor-pointer mt-0.5 shrink-0"
                       />
                       <div className="space-y-0.5">
-                        <span className="font-serif font-bold text-brand-dark text-sm block">Request a Similar or Alternative Craft?</span>
+                        <span className="font-serif font-bold text-brand-dark text-sm block">Request a Similar or Alternative Item?</span>
                         <span className="text-xs text-brand-muted leading-relaxed block font-light">
                           {product.alternativeRequestText.trim()}
                         </span>
@@ -921,10 +921,10 @@ export default function ProductDetails({
                 {/* Secure, optional file drag upload */}
                 <div className="flex flex-col gap-1.5 border-t border-brand-border/40 pt-4 mt-2">
                   <label className="text-[10px] font-bold text-brand-muted uppercase tracking-wider flex items-center gap-1">
-                    <Upload className="h-3.5 w-3.5 text-brand-primary" /> {isSublimation ? "Upload Custom Image or Photo to Print" : "Inspiration Sketches or Logos (Optional)"}
+                    <Upload className="h-3.5 w-3.5 text-brand-primary" /> Photos, Designs, or Inspiration (Optional)
                   </label>
-                  <p className="text-[10px] text-brand-muted font-light">
-                    {isSublimation ? "Drag & drop the high-quality photo or design you want printed on your item, or click to choose." : "Have an inspiration sketch, custom monogram, or reference image? Drag it below, or click to upload."}
+                  <p className="text-[11px] text-brand-muted font-light leading-relaxed">
+                    Have a photo you'd like printed or engraved, a custom design, logo, or inspiration image? Drag and drop your files below or click to upload.
                   </p>
 
                   {isSublimation && (

@@ -556,7 +556,8 @@ export default function App() {
           setCategories(cloudCats);
           setTestimonials(cloudTests);
           setAnnouncements(cloudAnns);
-          setQuotes(cloudQuotes);
+          const preservedQuotes = Array.from(new Map([...localStore.quotes, ...cloudQuotes].map((q) => [q.id, q])).values());
+          setQuotes(preservedQuotes);
           if (cloudCust) {
             setCustomization(ensureContactSection(cloudCust));
           }
@@ -606,22 +607,35 @@ export default function App() {
         setTotalViewsState(nextViews);
       }
 
-      // If authorized session exists, load protected administrative logs & quotes
-      if (currentToken) {
-        const [resQuotes, resAllTests] = await Promise.all([
-          safeFetchJson("/api/admin/quotes", {
-            headers: { "Authorization": `Bearer ${currentToken}` }
-          }),
-          safeFetchJson("/api/admin/testimonials", {
-            headers: { "Authorization": `Bearer ${currentToken}` }
-          })
-        ]);
+      // If authorized session exists, load protected administrative logs & quotes immediately
+      const adminToken = currentToken || (typeof window !== "undefined" ? localStorage.getItem("nicoletta_admin_token") : null);
+      if (adminToken) {
+        try {
+          const [resQuotes, resAllTests] = await Promise.all([
+            safeFetchJson("/api/admin/quotes", {
+              headers: { "Authorization": `Bearer ${adminToken}` }
+            }),
+            safeFetchJson("/api/admin/testimonials", {
+              headers: { "Authorization": `Bearer ${adminToken}` }
+            })
+          ]);
 
-        if (resQuotes.ok && Array.isArray(resQuotes.data) && resQuotes.data.length > 0 && !cloudData) {
-          setQuotes(resQuotes.data);
-        }
-        if (resAllTests.ok && Array.isArray(resAllTests.data) && resAllTests.data.length > 0 && !cloudData) {
-          setTestimonials(resAllTests.data);
+          if (resQuotes.ok && Array.isArray(resQuotes.data)) {
+            setQuotes(prev => {
+              const map = new Map<string, QuoteRequest>();
+              (resQuotes.data as QuoteRequest[]).forEach(q => map.set(q.id, q));
+              prev.forEach(q => { if (!map.has(q.id)) map.set(q.id, q); });
+              const merged = Array.from(map.values());
+              persistKeyVal("nicoletta_quotes", merged);
+              return merged;
+            });
+          }
+          if (resAllTests.ok && Array.isArray(resAllTests.data) && resAllTests.data.length > 0) {
+            setTestimonials(resAllTests.data);
+            persistKeyVal("nicoletta_testimonials", resAllTests.data);
+          }
+        } catch (adminErr) {
+          console.error("Admin data refresh warning:", adminErr);
         }
       }
     } catch (err) {
