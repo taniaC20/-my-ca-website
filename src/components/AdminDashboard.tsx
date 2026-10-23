@@ -35,7 +35,8 @@ import {
   GripVertical,
   Download,
   Phone,
-  MapPin
+  MapPin,
+  Save
 } from "lucide-react";
 import { Product, Category, Testimonial, Announcement, QuoteRequest, AnalyticsSummary, CustomizationSettings, CustomSection, GIFT_OCCASION_PRESETS, GiftOccasionFilter } from "../types";
 import { NicolettaLogo } from "./NicolettaLogo";
@@ -237,6 +238,43 @@ export default function AdminDashboard({
     }
   }, [activeTab, token, quotes]);
 
+  // Contact Section Fallback & Helper to ensure Connect & Footer is always editable across all devices
+  const DEFAULT_CONTACT_HEADER_SECTION: CustomSection = {
+    id: "contact-header",
+    page: "contact",
+    title: "Connect with Nicoletta",
+    subtitle: "We'd Love to Hear from You",
+    description: "Have a question, a custom request, or a special gift in mind? We'd love to help you create something meaningful. Send us a message and let's make your idea a reality!",
+    extraText1: "Nicoletta Crafts Workshop",
+    extraText2: "305 Water St, St. John's, NL, Canada",
+    extraText3: "(709) 555-0182",
+    extraText: "sales@nicolettacraftsdecor.ca",
+    visible: true,
+    order: 9
+  };
+
+  const ensureContactHeaderSection = (secs: CustomSection[] | undefined | null): CustomSection[] => {
+    const safe = Array.isArray(secs)
+      ? secs.filter((s): s is CustomSection => Boolean(s && typeof s === "object" && typeof s.id === "string"))
+      : [];
+    const idx = safe.findIndex((s) => s.id === "contact-header");
+    if (idx === -1) {
+      return [...safe, { ...DEFAULT_CONTACT_HEADER_SECTION }];
+    }
+    const existing = safe[idx];
+    const merged: CustomSection = {
+      ...DEFAULT_CONTACT_HEADER_SECTION,
+      ...existing,
+      extraText1: existing.extraText1 !== undefined ? existing.extraText1 : DEFAULT_CONTACT_HEADER_SECTION.extraText1,
+      extraText2: existing.extraText2 !== undefined ? existing.extraText2 : DEFAULT_CONTACT_HEADER_SECTION.extraText2,
+      extraText3: existing.extraText3 !== undefined ? existing.extraText3 : DEFAULT_CONTACT_HEADER_SECTION.extraText3,
+      extraText: existing.extraText !== undefined ? existing.extraText : DEFAULT_CONTACT_HEADER_SECTION.extraText,
+    };
+    const copy = [...safe];
+    copy[idx] = merged;
+    return copy;
+  };
+
   // Site Customizer States
   const [logoText, setLogoText] = useState(customization?.logoText || "Nicoletta");
   const [logoSubtext, setLogoSubtext] = useState(customization?.logoSubtext || "Crafts & Decor");
@@ -254,9 +292,7 @@ export default function AdminDashboard({
   const [showOccasionEmojiPicker, setShowOccasionEmojiPicker] = useState(false);
   const [activeSectionTab, setActiveSectionTab] = useState<"home" | "workshop">("home");
   const [sections, setSections] = useState<CustomSection[]>(() => {
-    return customization?.sections && customization?.sections.length > 0
-      ? [...customization.sections]
-      : [];
+    return ensureContactHeaderSection(customization?.sections);
   });
 
   // Change Password States
@@ -342,8 +378,9 @@ export default function AdminDashboard({
         setGiftOccasionFilters([...customization.giftOccasionFilters]);
       }
       if (Array.isArray(customization.sections) && customization.sections.length > 0) {
-        sectionsRef.current = [...customization.sections];
-        setSections([...customization.sections]);
+        const nextSecs = ensureContactHeaderSection(customization.sections);
+        sectionsRef.current = nextSecs;
+        setSections(nextSecs);
       }
     }
   }, [customization]);
@@ -401,9 +438,7 @@ export default function AdminDashboard({
     setCustomizerSuccess(null);
 
     const rawSections = sectionsOverride || sectionsRef.current || sections;
-    const targetSections = Array.isArray(rawSections)
-      ? rawSections.filter((s): s is CustomSection => Boolean(s && typeof s === "object" && typeof s.id === "string"))
-      : [];
+    const targetSections = ensureContactHeaderSection(rawSections);
     const targetLogoUrl = logoUrlOverride !== undefined ? logoUrlOverride : logoImageUrl;
     const targetOccasionFilters = occasionFiltersOverride !== undefined ? occasionFiltersOverride : giftOccasionFilters;
     const payload: CustomizationSettings = {
@@ -653,7 +688,8 @@ export default function AdminDashboard({
 
   const updateSectionText = (id: string, field: keyof CustomSection | Partial<CustomSection>, value?: any) => {
     setSections((prev) => {
-      const next = prev.map((sec) => {
+      const ensured = ensureContactHeaderSection(prev);
+      const next = ensured.map((sec) => {
         if (sec.id === id) {
           if (typeof field === "object" && field !== null) {
             return { ...sec, ...field };
@@ -5801,7 +5837,7 @@ export default function AdminDashboard({
                   { id: "home", label: "Home Page" },
                   { id: "workshop", label: "Connect & Footer" }
                 ].map((t) => {
-                  const safeSecs = Array.isArray(sections) ? sections.filter((s) => Boolean(s && typeof s.id === "string")) : [];
+                  const safeSecs = ensureContactHeaderSection(sections);
                   const count = safeSecs.filter((sec) => {
                     if (t.id === "home") {
                       return sec.page === "home" || sec.id.startsWith("home-") || sec.id.startsWith("custom_");
@@ -5842,7 +5878,7 @@ export default function AdminDashboard({
               {/* Sections Reordering List */}
               <div className="space-y-4 pt-1">
                 {(() => {
-                  const safeSecs = Array.isArray(sections) ? sections.filter((s) => Boolean(s && typeof s.id === "string")) : [];
+                  const safeSecs = ensureContactHeaderSection(sections);
                   const sortedAll = [...safeSecs].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
                   const isOfActiveTab = (sec: CustomSection) => {
                     if (!sec || typeof sec.id !== "string") return false;
@@ -5855,7 +5891,10 @@ export default function AdminDashboard({
                     return false;
                   };
 
-                  const filtered = sortedAll.filter(isOfActiveTab);
+                  let filtered = sortedAll.filter(isOfActiveTab);
+                  if (activeSectionTab === "workshop" && filtered.length === 0) {
+                    filtered = [{ ...DEFAULT_CONTACT_HEADER_SECTION }];
+                  }
 
                   if (filtered.length === 0) {
                     return (
@@ -5919,7 +5958,7 @@ export default function AdminDashboard({
                             <div>
                               <div className="flex items-center gap-2">
                                 <h5 className="font-serif font-bold text-stone-900 text-sm">
-                                  {sec.name || sec.title}
+                                  {sec.id === "contact-header" ? "Connect Page & Storefront Footer Details" : (sec.name || sec.title)}
                                 </h5>
                                 <span className="text-[9px] bg-stone-100 text-stone-500 font-mono px-2 py-0.5 rounded-sm">
                                   ID: {sec.id}
@@ -5936,7 +5975,7 @@ export default function AdminDashboard({
                                 )}
                               </div>
                               <p className="text-stone-400 text-[10px]">
-                                {activeSectionTab === "home" ? "Drag or use arrows to reorder, hide, or rewrite this homepage section." : "Drag to reorder or modify display titles and copy on the public page."}
+                                {activeSectionTab === "home" ? "Drag or use arrows to reorder, hide, or rewrite this homepage section." : "Modify your workshop address, voice phone, email, and titles displayed on the Contact page and website footer."}
                               </p>
                             </div>
                           </div>
@@ -6142,6 +6181,21 @@ export default function AdminDashboard({
                                         </p>
                                       </div>
                                     </div>
+                                  </div>
+
+                                  <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3">
+                                    <span className="text-[10px] text-stone-500 italic">
+                                      Click save below to apply these contact and workshop details immediately to the website.
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => handleSaveCustomizer(e)}
+                                      disabled={isSavingCustomizer}
+                                      className="w-full sm:w-auto bg-brand-primary hover:bg-brand-primary-hover text-white text-xs font-bold py-2.5 px-6 rounded-xl cursor-pointer shadow-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                                    >
+                                      <Save className="h-3.5 w-3.5" />
+                                      {isSavingCustomizer ? "Saving Details..." : "Save Connect & Footer Details"}
+                                    </button>
                                   </div>
                                 </div>
                               ) : (

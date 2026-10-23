@@ -63,6 +63,39 @@ async function safeFetchJson(url: string, options?: RequestInit): Promise<{ ok: 
   }
 }
 
+export const DEFAULT_CONTACT_SECTION: CustomSection = {
+  id: "contact-header",
+  page: "contact",
+  title: "Connect with Nicoletta",
+  subtitle: "We'd Love to Hear from You",
+  description: "Have a question, a custom request, or a special gift in mind? We'd love to help you create something meaningful. Send us a message and let's make your idea a reality!",
+  extraText1: "Nicoletta Crafts Workshop",
+  extraText2: "305 Water St, St. John's, NL, Canada",
+  extraText3: "(709) 555-0182",
+  extraText: "sales@nicolettacraftsdecor.ca",
+  visible: true,
+  order: 9
+};
+
+export const ensureContactSection = (cust: CustomizationSettings): CustomizationSettings => {
+  if (!cust || typeof cust !== "object") return cust;
+  const sections = Array.isArray(cust.sections) ? [...cust.sections] : [];
+  const idx = sections.findIndex(s => s && s.id === "contact-header");
+  if (idx === -1) {
+    sections.push({ ...DEFAULT_CONTACT_SECTION });
+  } else {
+    sections[idx] = {
+      ...DEFAULT_CONTACT_SECTION,
+      ...sections[idx],
+      extraText1: sections[idx].extraText1 !== undefined ? sections[idx].extraText1 : DEFAULT_CONTACT_SECTION.extraText1,
+      extraText2: sections[idx].extraText2 !== undefined ? sections[idx].extraText2 : DEFAULT_CONTACT_SECTION.extraText2,
+      extraText3: sections[idx].extraText3 !== undefined ? sections[idx].extraText3 : DEFAULT_CONTACT_SECTION.extraText3,
+      extraText: sections[idx].extraText !== undefined ? sections[idx].extraText : DEFAULT_CONTACT_SECTION.extraText,
+    };
+  }
+  return { ...cust, sections };
+};
+
 export default function App() {
   // Ensure legacy sample dummy data is purged from local browser cache on initial boot
   if (typeof window !== "undefined" && !localStorage.getItem("nicoletta_sample_data_cleared_v2")) {
@@ -184,14 +217,16 @@ export default function App() {
           visible: true,
           order: 8,
           buttonText1: "Submit Quote Request"
-        }
+        },
+        DEFAULT_CONTACT_SECTION
       ]
     };
-    return safeParseLocal<CustomizationSettings>(
+    const parsed = safeParseLocal<CustomizationSettings>(
       "nicoletta_customization",
       defaultCust,
       (val) => Boolean(val && typeof val === "object" && Array.isArray(val.sections) && val.sections.length > 0)
     );
+    return ensureContactSection(parsed);
   });
 
   // Secure Session State
@@ -433,7 +468,7 @@ export default function App() {
       const localStore = await readBestLocalStore();
 
       // Apply local IndexedDB hydration immediately so the user sees their local work without flicker
-      if (localStore.customization) setCustomization(localStore.customization);
+      if (localStore.customization) setCustomization(ensureContactSection(localStore.customization));
       if (localStore.products.length > 0) setProducts(localStore.products);
       if (localStore.categories.length > 0) setCategories(localStore.categories);
       if (localStore.testimonials.length > 0) setTestimonials(localStore.testimonials);
@@ -509,10 +544,10 @@ export default function App() {
           setTestimonials(mergedTests);
           setAnnouncements(mergedAnns);
           setQuotes(mergedQuotes);
-          if (mergedCust) setCustomization(mergedCust);
+          if (mergedCust) setCustomization(ensureContactSection(mergedCust));
 
           await pushCloudStore({
-            customization: mergedCust,
+            customization: mergedCust ? ensureContactSection(mergedCust) : mergedCust,
             products: mergedProds,
             categories: mergedCats,
             testimonials: mergedTests,
@@ -527,7 +562,7 @@ export default function App() {
           setAnnouncements(cloudAnns);
           setQuotes(cloudQuotes);
           if (cloudCust) {
-            setCustomization(cloudCust);
+            setCustomization(ensureContactSection(cloudCust));
           }
           safeSetLocalStorage("nicoletta_cloud_initial_migration_done", "true");
         }
@@ -555,7 +590,7 @@ export default function App() {
         setAnnouncements(resAnns.data);
       }
       if (resCust.ok && resCust.data && Array.isArray(resCust.data.sections) && !cloudData) {
-        setCustomization(resCust.data);
+        setCustomization(ensureContactSection(resCust.data));
       }
 
       // Views metric counter ping
@@ -825,13 +860,14 @@ export default function App() {
   // Administrative RESTful Action Synchronizers
   const updateCustomizationState = (newCust: CustomizationSettings) => {
     if (!newCust || typeof newCust !== "object") return;
-    const validCust: CustomizationSettings = {
+    const rawSections = Array.isArray(newCust.sections) && newCust.sections.length > 0
+      ? newCust.sections
+      : (Array.isArray(customization?.sections) ? customization.sections : []);
+    const validCust: CustomizationSettings = ensureContactSection({
       ...customization,
       ...newCust,
-      sections: Array.isArray(newCust.sections) && newCust.sections.length > 0
-        ? newCust.sections
-        : (Array.isArray(customization?.sections) ? customization.sections : [])
-    };
+      sections: rawSections
+    });
     setCustomization(validCust);
     persistKeyVal("nicoletta_customization", validCust);
     pushCloudStore({ customization: validCust }).catch(() => {});
