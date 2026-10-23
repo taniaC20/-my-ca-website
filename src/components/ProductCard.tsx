@@ -114,7 +114,7 @@ export default function ProductCard({ product, categoryName, onRequestQuote }: P
           <div className="flex items-center gap-1 text-[10px] font-sans">
             {product.inStock ? (
               <span className="text-brand-primary flex items-center gap-1 font-semibold">
-                <CheckCircle className="h-3 w-3" /> Ready
+                <CheckCircle className="h-3 w-3" /> In Stock
               </span>
             ) : (
               <span className="text-brand-muted flex items-center gap-1 font-semibold">
