@@ -1870,7 +1870,11 @@ export default function AdminDashboard({
                 {quoteRequestsList
                   .filter(q => quotesFilter === "all" || q.status === quotesFilter)
                   .map((q) => {
-                    const isPhoneWithoutEmail = (!q.customerEmail || !q.customerEmail.trim()) || (q.contactPreference === "phone" && (!q.customerEmail || !q.customerEmail.trim()));
+                    const hasEmail = Boolean(q.customerEmail && q.customerEmail.trim());
+                    const hasPhone = Boolean(q.customerPhone && q.customerPhone.trim());
+                    const isPhonePreferred = q.contactPreference === "phone";
+                    const isPhoneOnly = !hasEmail;
+                    const isPhonePrimary = isPhoneOnly || isPhonePreferred;
                     return (
                     <div
                       key={q.id}
@@ -1914,7 +1918,7 @@ export default function AdminDashboard({
                             {q.status}
                           </span>
 
-                          {!isPhoneWithoutEmail && (
+                          {hasEmail && (
                             <button
                               id={`email-compose-header-btn-${q.id}`}
                               onClick={() => handleOpenEmailCompose(q)}
@@ -1927,7 +1931,13 @@ export default function AdminDashboard({
 
                           <button
                             id={`review-quote-btn-${q.id}`}
-                            onClick={() => startReviewQuote(q)}
+                            onClick={() => {
+                              if (selectedQuoteId === q.id) {
+                                setSelectedQuoteId(null);
+                              } else {
+                                startReviewQuote(q);
+                              }
+                            }}
                             className={`text-[11px] font-bold py-1 px-3 rounded-sm cursor-pointer transition-colors ${
                               selectedQuoteId === q.id
                                 ? "bg-amber-800 text-white ring-1 ring-amber-900"
@@ -2035,15 +2045,23 @@ export default function AdminDashboard({
                               <p className="text-stone-500 italic text-xs">No price quoted yet.</p>
                             )}
 
-                            {isPhoneWithoutEmail ? (
+                            {isPhonePrimary ? (
                               <div className="bg-amber-50/80 p-2.5 rounded-md border border-amber-200/80 space-y-2">
                                 <div className="flex items-center justify-between gap-1 text-[11px] font-bold text-amber-900">
                                   <span className="flex items-center gap-1">
                                     <Phone className="h-3.5 w-3.5 text-amber-700" /> Phone Client — Manual Quote Price
                                   </span>
-                                  {savedPriceId === q.id && (
+                                  {savedPriceId === q.id ? (
                                     <span className="text-[10px] font-bold text-emerald-700 flex items-center gap-1">
                                       <Check className="h-3 w-3" /> Saved!
+                                    </span>
+                                  ) : hasEmail ? (
+                                    <span className="text-[9px] font-medium bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
+                                      Phone Preferred
+                                    </span>
+                                  ) : (
+                                    <span className="text-[9px] font-medium bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
+                                      Phone Only
                                     </span>
                                   )}
                                 </div>
@@ -2075,6 +2093,18 @@ export default function AdminDashboard({
                                 <p className="text-[10px] text-stone-500 italic">
                                   Phone managed directly. Saving records quote price and sets status to Quoted.
                                 </p>
+                                {hasEmail && (
+                                  <div className="pt-1.5 border-t border-amber-200/60 flex items-center justify-between">
+                                    <span className="text-[10px] text-stone-600">Also want to email client?</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenEmailCompose(q)}
+                                      className="text-emerald-800 hover:text-emerald-950 font-bold text-[10px] flex items-center gap-1 cursor-pointer transition-colors underline"
+                                    >
+                                      <Mail className="h-3 w-3" /> Compose Email Proposal
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             ) : (
                               <button
@@ -2300,11 +2330,7 @@ export default function AdminDashboard({
 
                           {/* Manager Action Footer */}
                           <div className="flex flex-wrap justify-between items-center gap-2 border-t border-amber-200/60 pt-3">
-                            {isPhoneWithoutEmail ? (
-                              <span className="text-xs text-amber-900 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded font-medium flex items-center gap-1.5">
-                                <Phone className="h-3.5 w-3.5 text-amber-700" /> Phone-only contact — manage quote price above &amp; via call
-                              </span>
-                            ) : (
+                            {hasEmail ? (
                               <button
                                 type="button"
                                 id={`inline-email-compose-btn-${q.id}`}
@@ -2313,6 +2339,10 @@ export default function AdminDashboard({
                               >
                                 <Mail className="h-3.5 w-3.5" /> Compose Email Proposal
                               </button>
+                            ) : (
+                              <span className="text-xs text-amber-900 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded font-medium flex items-center gap-1.5">
+                                <Phone className="h-3.5 w-3.5 text-amber-700" /> Phone-only contact — manage quote price above &amp; via call
+                              </span>
                             )}
 
                             <div className="flex gap-2">
@@ -2393,7 +2423,11 @@ export default function AdminDashboard({
                 {contactMessagesList
                   .filter(q => messagesFilter === "all" || q.status === messagesFilter)
                   .map((q) => {
-                    const isPhoneWithoutEmail = (!q.customerEmail || !q.customerEmail.trim()) || (q.contactPreference === "phone" && (!q.customerEmail || !q.customerEmail.trim()));
+                    const hasEmail = Boolean(q.customerEmail && q.customerEmail.trim());
+                    const hasPhone = Boolean(q.customerPhone && q.customerPhone.trim());
+                    const isPhonePreferred = q.contactPreference === "phone";
+                    const isPhoneOnly = !hasEmail;
+                    const isPhonePrimary = isPhoneOnly || isPhonePreferred;
                     return (
                     <div
                       key={q.id}
@@ -2437,7 +2471,7 @@ export default function AdminDashboard({
                             {q.status}
                           </span>
 
-                          {!isPhoneWithoutEmail && (
+                          {hasEmail && (
                             <button
                               id={`email-compose-msg-header-btn-${q.id}`}
                               onClick={() => handleOpenEmailCompose(q)}
@@ -2450,7 +2484,13 @@ export default function AdminDashboard({
 
                           <button
                             id={`review-message-btn-${q.id}`}
-                            onClick={() => startReviewQuote(q)}
+                            onClick={() => {
+                              if (selectedQuoteId === q.id) {
+                                setSelectedQuoteId(null);
+                              } else {
+                                startReviewQuote(q);
+                              }
+                            }}
                             className={`text-[11px] font-bold py-1 px-3 rounded-sm cursor-pointer transition-colors ${
                               selectedQuoteId === q.id
                                 ? "bg-amber-800 text-white ring-1 ring-amber-900"
@@ -2541,15 +2581,23 @@ export default function AdminDashboard({
                               <p className="text-stone-500 italic text-xs">No price assigned yet.</p>
                             )}
 
-                            {isPhoneWithoutEmail ? (
+                            {isPhonePrimary ? (
                               <div className="bg-amber-50/80 p-2.5 rounded-md border border-amber-200/80 space-y-2">
                                 <div className="flex items-center justify-between gap-1 text-[11px] font-bold text-amber-900">
                                   <span className="flex items-center gap-1">
                                     <Phone className="h-3.5 w-3.5 text-amber-700" /> Phone Client — Manual Quote Price
                                   </span>
-                                  {savedPriceId === q.id && (
+                                  {savedPriceId === q.id ? (
                                     <span className="text-[10px] font-bold text-emerald-700 flex items-center gap-1">
                                       <Check className="h-3 w-3" /> Saved!
+                                    </span>
+                                  ) : hasEmail ? (
+                                    <span className="text-[9px] font-medium bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
+                                      Phone Preferred
+                                    </span>
+                                  ) : (
+                                    <span className="text-[9px] font-medium bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
+                                      Phone Only
                                     </span>
                                   )}
                                 </div>
@@ -2581,6 +2629,18 @@ export default function AdminDashboard({
                                 <p className="text-[10px] text-stone-500 italic">
                                   Phone managed directly. Saving records quote price and sets status to Quoted.
                                 </p>
+                                {hasEmail && (
+                                  <div className="pt-1.5 border-t border-amber-200/60 flex items-center justify-between">
+                                    <span className="text-[10px] text-stone-600">Also want to email client?</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenEmailCompose(q)}
+                                      className="text-emerald-800 hover:text-emerald-950 font-bold text-[10px] flex items-center gap-1 cursor-pointer transition-colors underline"
+                                    >
+                                      <Mail className="h-3 w-3" /> Compose Email Proposal
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             ) : (
                               <button
@@ -2806,11 +2866,7 @@ export default function AdminDashboard({
 
                           {/* Manager Action Footer */}
                           <div className="flex flex-wrap justify-between items-center gap-2 border-t border-amber-200/60 pt-3">
-                            {isPhoneWithoutEmail ? (
-                              <span className="text-xs text-amber-900 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded font-medium flex items-center gap-1.5">
-                                <Phone className="h-3.5 w-3.5 text-amber-700" /> Phone-only contact — manage quote price above &amp; via call
-                              </span>
-                            ) : (
+                            {hasEmail ? (
                               <button
                                 type="button"
                                 id={`inline-email-compose-msg-btn-${q.id}`}
@@ -2819,6 +2875,10 @@ export default function AdminDashboard({
                               >
                                 <Mail className="h-3.5 w-3.5" /> Compose Email Proposal
                               </button>
+                            ) : (
+                              <span className="text-xs text-amber-900 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded font-medium flex items-center gap-1.5">
+                                <Phone className="h-3.5 w-3.5 text-amber-700" /> Phone-only contact — manage quote price above &amp; via call
+                              </span>
                             )}
 
                             <div className="flex gap-2">
