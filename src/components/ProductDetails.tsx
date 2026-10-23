@@ -1047,25 +1047,61 @@ export default function ProductDetails({
                       Thank you for your request{submittedQuoteInfo?.customerName ? `, ${submittedQuoteInfo.customerName}` : ""}! We will get back to you in 1 business day.
                     </p>
 
-                    <div className="bg-white border border-amber-200/90 rounded-[12px] p-3.5 text-stone-800 text-xs leading-relaxed space-y-2 shadow-2xs">
-                      <div className="flex items-center gap-2 text-amber-900 font-bold text-[11px] uppercase tracking-wider">
-                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-                        Confirmation Notice
-                      </div>
-                      {submittedQuoteInfo?.customerEmail ? (
-                        <p className="text-stone-700 text-xs leading-relaxed">
-                          An automated confirmation has been sent to your email (<strong>{submittedQuoteInfo.customerEmail}</strong>)
-                          {submittedQuoteInfo.customerPhone ? <span> and noted your phone (<strong>{submittedQuoteInfo.customerPhone}</strong>) for {submittedQuoteInfo.contactPreference === "phone" ? "phone call/text" : "our records"}</span> : ""}.
-                        </p>
-                      ) : (
-                        <p className="text-stone-700 text-xs leading-relaxed">
-                          Since you selected <strong>Phone</strong> as your contact method, our studio administrator Nicoletta will call or text you directly at <strong>{submittedQuoteInfo?.customerPhone}</strong> from <strong>+1 (709) 763-1315</strong> in 1 business day.
-                        </p>
-                      )}
-                      <div className="bg-amber-50/90 border border-amber-200/70 rounded-[8px] p-2 text-stone-800 text-[10px] leading-relaxed">
-                        <strong>⚠️ Didn&apos;t receive a confirmation or notice a typo?</strong> Check your spam folder or click below to submit a correction!
-                      </div>
-                    </div>
+                    {(() => {
+                      const hasEmail = Boolean(submittedQuoteInfo?.customerEmail);
+                      const hasPhone = Boolean(submittedQuoteInfo?.customerPhone);
+
+                      if (hasPhone && !hasEmail) {
+                        return (
+                          <div className="bg-white border border-amber-200/90 rounded-[12px] p-3.5 text-stone-800 text-xs leading-relaxed space-y-2 shadow-2xs">
+                            <div className="flex items-center gap-2 text-amber-900 font-bold text-[11px] uppercase tracking-wider">
+                              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                              Phone Confirmation Notice
+                            </div>
+                            <p className="text-stone-700 text-xs leading-relaxed">
+                              Since you selected <strong>Phone</strong> as your contact method, our studio administrator Tannia will call or text you directly at <strong>{submittedQuoteInfo?.customerPhone}</strong> from <strong>+1 (709) 763-1315</strong> in 1 business day.
+                            </p>
+                            <div className="bg-amber-50/90 border border-amber-200/70 rounded-[8px] p-2 text-stone-800 text-[10px] leading-relaxed">
+                              <strong>⚠️ Notice a typo in your phone number?</strong> Please check your number above. If incorrect, click below to submit a correction!
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      if (hasEmail && !hasPhone) {
+                        return (
+                          <div className="bg-white border border-amber-200/90 rounded-[12px] p-3.5 text-stone-800 text-xs leading-relaxed space-y-2 shadow-2xs">
+                            <div className="flex items-center gap-2 text-amber-900 font-bold text-[11px] uppercase tracking-wider">
+                              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                              Email Confirmation Notice
+                            </div>
+                            <p className="text-stone-700 text-xs leading-relaxed">
+                              An automated confirmation has been sent to your email (<strong>{submittedQuoteInfo?.customerEmail}</strong>).
+                            </p>
+                            <div className="bg-amber-50/90 border border-amber-200/70 rounded-[8px] p-2 text-stone-800 text-[10px] leading-relaxed">
+                              <strong>⚠️ Didn&apos;t receive a confirmation email?</strong> Check your spam folder or verify your email address below.
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // Both email and phone provided
+                      return (
+                        <div className="bg-white border border-amber-200/90 rounded-[12px] p-3.5 text-stone-800 text-xs leading-relaxed space-y-2 shadow-2xs">
+                          <div className="flex items-center gap-2 text-amber-900 font-bold text-[11px] uppercase tracking-wider">
+                            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                            Email &amp; Phone Confirmation Notice
+                          </div>
+                          <p className="text-stone-700 text-xs leading-relaxed">
+                            An automated confirmation has been sent to your email (<strong>{submittedQuoteInfo?.customerEmail}</strong>).
+                            Our studio administrator Tannia will also reach out to your phone (<strong>{submittedQuoteInfo?.customerPhone}</strong>) {submittedQuoteInfo?.contactPreference === "phone" ? "by call or text" : "for your records"} from <strong>+1 (709) 763-1315</strong>.
+                          </p>
+                          <div className="bg-amber-50/90 border border-amber-200/70 rounded-[8px] p-2 text-stone-800 text-[10px] leading-relaxed">
+                            <strong>⚠️ Didn&apos;t receive a confirmation or notice a typo?</strong> Check your spam folder or click below to submit a correction!
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     <button
                       type="button"

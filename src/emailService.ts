@@ -587,7 +587,7 @@ Dear ${contact.name},
 
 Thank you for your message! We have safely received your inquiry and will get back to you in 1 business day.
 
-As our studio administrator, Nicoletta will reach out to you directly from +1 (709) 763-1315 ${contact.contactPreference === "phone" ? "(by phone call or text message)" : "(via email, or phone if needed)"}.
+As our studio administrator, Tannia will reach out to you directly from +1 (709) 763-1315 ${contact.contactPreference === "phone" ? "(by phone call or text message)" : "(via email, or phone if needed)"}.
 
 SUMMARY OF YOUR INQUIRY:
 - Reference ID: #${refCode}
@@ -597,14 +597,14 @@ ${contact.phone ? `- Phone Number: ${contact.phone}\n` : ""}- Message Content:
 "${contact.message}"
 
 WHAT HAPPENS NEXT:
-Nicoletta personally reviews every message received at our St. John's studio. We will review your inquiry and reach back out to you via ${contact.contactPreference === "phone" ? "phone call/text" : "email"} within one business day.
+Tannia personally reviews every message received at our St. John's studio. We will review your inquiry and reach back out to you via ${contact.contactPreference === "phone" ? "phone call/text" : "email"} within one business day.
 
 VERIFICATION & TYPO NOTICE:
 Since you received this confirmation email, your email address is verified in our system.
 If you notice any typos in your phone number or email address, please reply directly to this email or send us a quick updated message via https://www.nicolettacraftsdecor.ca so we can connect with you without delay!
 
 Warm regards,
-Nicoletta & the Studio Team
+Tannia & the Studio Team
 Nicoletta Crafts & Decor
 St. John's, NL, Canada
 sales@nicolettacraftsdecor.ca
@@ -658,7 +658,7 @@ https://www.nicolettacraftsdecor.ca
                 Thank you for reaching out, ${escapeHtml(contact.name)}!
               </h2>
               <p style="font-size: 14px; line-height: 1.6; color: #423830; margin: 0 0 20px 0;">
-                Thank you for your message! We will get back to you in <strong>1 business day</strong>.<br><br>If you requested phone contact, our studio administrator Nicoletta will reach out to you directly from <strong>+1 (709) 763-1315</strong> by phone call or text message.
+                Thank you for your message! We will get back to you in <strong>1 business day</strong>.<br><br>If you requested phone contact, our studio administrator Tannia will reach out to you directly from <strong>+1 (709) 763-1315</strong> by phone call or text message.
               </p>
 
               <!-- Summary Card -->
@@ -698,7 +698,7 @@ https://www.nicolettacraftsdecor.ca
 
               <div style="font-size: 13px; color: #5a4e44; line-height: 1.6;">
                 Warm regards,<br>
-                <strong>Nicoletta &amp; the Studio Team</strong><br>
+                <strong>Tannia &amp; the Studio Team</strong><br>
                 <em>Nicoletta Crafts &amp; Decor &bull; St. John's, NL</em>
               </div>
             </td>
@@ -795,7 +795,7 @@ export async function sendQuoteConfirmationToClient(
   const files = Array.isArray(quote.uploadedFiles) && quote.uploadedFiles.length > 0 ? quote.uploadedFiles : [];
 
   const textSections: string[] = [
-    `Dear ${quote.customerName},\n\nThank you for your custom quote request! We have safely received your project details and will get back to you in 1 business day with your bespoke proposal.\n\nAs our studio administrator, Nicoletta will reach out to you directly from +1 (709) 763-1315 ${quote.contactPreference === "phone" ? "(by phone call or text message)" : "(via email, or phone if needed)"}.`,
+    `Dear ${quote.customerName},\n\nThank you for your custom quote request! We have safely received your project details and will get back to you in 1 business day with your bespoke proposal.\n\nAs our studio administrator, Tannia will reach out to you directly from +1 (709) 763-1315 ${quote.contactPreference === "phone" ? "(by phone call or text message)" : "(via email, or phone if needed)"}.`,
     `QUOTE SPECIFICATIONS:\n- Reference ID: #${refCode}\n- Item / Project: ${projectName}\n- Quantity: ${quote.quantity || 1}\n- Preferred Contact: ${prefLabel}${hasPhone ? `\n- Phone Number: ${phoneVal}` : ""}${cleanDeadline ? `\n- Target Deadline: ${cleanDeadline}` : ""}`
   ];
 
@@ -816,7 +816,7 @@ export async function sendQuoteConfirmationToClient(
   }
 
   textSections.push(
-    `WHAT HAPPENS NEXT:\nNicoletta personally reviews every quote request and will prepare your bespoke proposal within one business day.\n\nTYPO & CORRECTION NOTICE:\nIf you notice a typo in your contact details, simply reply directly to this email or send us a quick message at https://www.nicolettacraftsdecor.ca.\n\nWarm regards,\nNicoletta & the Studio Team\nNicoletta Crafts & Decor\nSt. John's, NL, Canada\nsales@nicolettacraftsdecor.ca\nhttps://www.nicolettacraftsdecor.ca`
+    `WHAT HAPPENS NEXT:\nTannia personally reviews every quote request and will prepare your bespoke proposal within one business day.\n\nTYPO & CORRECTION NOTICE:\nIf you notice a typo in your contact details, simply reply directly to this email or send us a quick message at https://www.nicolettacraftsdecor.ca.\n\nWarm regards,\nTannia & the Studio Team\nNicoletta Crafts & Decor\nSt. John's, NL, Canada\nsales@nicolettacraftsdecor.ca\nhttps://www.nicolettacraftsdecor.ca`
   );
 
   const textBody = textSections.join("\n\n");
@@ -864,7 +864,7 @@ export async function sendQuoteConfirmationToClient(
                 Thank you for your quote request, ${escapeHtml(quote.customerName)}!
               </h2>
               <p style="font-size: 14px; line-height: 1.6; color: #423830; margin: 0 0 20px 0;">
-                Thank you for your custom quote request! We have safely received your specifications and will get back to you in <strong>1 business day</strong>.<br><br>If you requested phone contact, our studio administrator Nicoletta will reach out to you directly from <strong>+1 (709) 763-1315</strong> by phone call or text message.
+                Thank you for your custom quote request! We have safely received your specifications and will get back to you in <strong>1 business day</strong>.<br><br>If you requested phone contact, our studio administrator Tannia will reach out to you directly from <strong>+1 (709) 763-1315</strong> by phone call or text message.
               </p>
               <div style="background-color: #faf8f5; border: 1px solid #ece6dc; border-radius: 12px; padding: 18px 20px; margin-bottom: 20px;">
                 <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #8c7f73; margin-bottom: 10px;">
@@ -894,7 +894,7 @@ export async function sendQuoteConfirmationToClient(
                 <div style="font-size: 13px; color: #5a4730; line-height: 1.5;">If your email or phone number needs a correction, please <strong>reply directly to this email</strong> or visit our website to send an update!</div>
               </div>
               <div style="font-size: 13px; color: #5a4e44; line-height: 1.6;">
-                Warm regards,<br><strong>Nicoletta &amp; the Studio Team</strong><br><em>Nicoletta Crafts &amp; Decor &bull; St. John's, NL</em>
+                Warm regards,<br><strong>Tannia &amp; the Studio Team</strong><br><em>Nicoletta Crafts &amp; Decor &bull; St. John's, NL</em>
               </div>
             </td>
           </tr>

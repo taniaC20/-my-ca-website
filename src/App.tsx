@@ -74,7 +74,7 @@ async function safeFetchJson(url: string, options?: RequestInit): Promise<{ ok: 
 export const DEFAULT_CONTACT_SECTION: CustomSection = {
   id: "contact-header",
   page: "contact",
-  title: "Connect with Nicoletta",
+  title: "Connect with Tannia",
   subtitle: "We'd Love to Hear from You",
   description: "Have a question, a custom request, or a special gift in mind? We'd love to help you create something meaningful. Send us a message and let's make your idea a reality!",
   extraText1: "Nicoletta Crafts & Decor",
@@ -208,9 +208,9 @@ export default function App() {
           page: "home",
           title: "Nicoletta Decor",
           subtitle: "Meet the Craftsman",
-          description: "Founded in Portland, Oregon in 2021 by artisan Nicoletta, our shop was born out of a deep reverence for organic materials and classic design. We select local, sustainably-cut timber and cure each board by hand.",
+          description: "Founded in Portland, Oregon in 2021 by artisan Tannia, our shop was born out of a deep reverence for organic materials and classic design. We select local, sustainably-cut timber and cure each board by hand.",
           extraText1: "Every laser brand and sandblast carving is executed one-by-one with surgical attention to grain and texture. We never treat your project as generic manufacture; we create future heirlooms destined to outlast us all.",
-          extraText2: "Nicoletta Vance",
+          extraText2: "Tannia",
           extraText3: "Founder & Master Engraver",
           imageUrl1: "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&q=80&w=400",
           imageUrl2: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&q=80&w=400",
@@ -2038,7 +2038,7 @@ export default function App() {
                                   {sec.title || "The Heart of Nicoletta"}
                                 </h3>
                                 <p className="text-brand-muted text-xs md:text-sm leading-relaxed font-light whitespace-pre-wrap">
-                                  {sec.description || "Founded in Portland, Oregon in 2021 by artisan Nicoletta, our shop was born out of a deep reverence for organic materials..."}
+                                  {sec.description || "Founded in Portland, Oregon in 2021 by artisan Tannia, our shop was born out of a deep reverence for organic materials..."}
                                 </p>
                                 {(sec.extraText || sec.extraText1) && (
                                   <p className="text-brand-muted text-xs md:text-sm leading-relaxed font-light whitespace-pre-wrap">
@@ -2051,7 +2051,7 @@ export default function App() {
                                   </div>
                                   <div>
                                     <span className="font-serif font-bold text-brand-dark text-sm block">
-                                      {sec.extraText2 || "Nicoletta Vance"}
+                                      {sec.extraText2 || "Tannia"}
                                     </span>
                                     <span className="text-[10px] text-brand-muted uppercase font-bold tracking-wider">
                                       {sec.extraText3 || "Founder & Master Engraver"}
@@ -2086,7 +2086,7 @@ export default function App() {
                                 {sec.title || "Bring Your Unique Vision to Life"}
                               </h4>
                               <p className="text-brand-muted text-xs md:text-sm max-w-xl mx-auto font-light">
-                                {sec.description || "Need a custom dimension or highly specific vector logo engraved? Nicoletta accepts bespoke commissions..."}
+                                {sec.description || "Need a custom dimension or highly specific vector logo engraved? Tannia accepts bespoke commissions..."}
                               </p>
                               <div className="flex flex-wrap justify-center gap-4">
                                 <button
@@ -2479,7 +2479,7 @@ export default function App() {
                 {(() => {
                   const sec = customization.sections?.find(s => s.id === "contact-header");
                   const subtitle = !sec?.subtitle || sec.subtitle === "Inquire & Locate" || sec.subtitle === "Visit Our Studio" ? "We'd Love to Hear from You" : sec.subtitle;
-                  const title = !sec?.title || sec.title === "The St. John's Workshop & Gallery" ? "Connect with Nicoletta" : sec.title;
+                  const title = !sec?.title || sec.title === "The St. John's Workshop & Gallery" ? "Connect with Tannia" : sec.title;
                   const description = !sec?.description || sec.description.includes("Have an inquiry about an event order") || sec.description.includes("Our physical workshop is located")
                     ? "Have a question, a custom request, or a special gift in mind? We'd love to help you create something meaningful. Send us a message and let's make your idea a reality!"
                     : sec.description;
@@ -2585,35 +2585,85 @@ export default function App() {
                         </div>
 
                         {/* Verification & Confirmation Note Box */}
-                        <div className="bg-white border border-amber-200/90 rounded-[18px] p-5 max-w-lg mx-auto text-left shadow-2xs space-y-3">
-                          <div className="flex items-center gap-2 text-amber-900 font-bold text-xs uppercase tracking-wider">
-                            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
-                            Email &amp; Text Confirmation Notice
-                          </div>
+                        {(() => {
+                          const hasEmail = Boolean(submittedContactInfo?.email);
+                          const hasPhone = Boolean(submittedContactInfo?.phone);
 
-                          {submittedContactInfo?.email ? (
-                            <p className="text-stone-700 text-xs leading-relaxed">
-                              An automated confirmation notice has been sent to your email (<strong>{submittedContactInfo.email}</strong>)
-                              {submittedContactInfo.phone ? <span> and noted your phone number (<strong>{submittedContactInfo.phone}</strong>) for {submittedContactInfo.contactPreference === "phone" ? "phone call/text" : "our records"}</span> : ""}.
-                            </p>
-                          ) : (
-                            <p className="text-stone-700 text-xs leading-relaxed">
-                              Since you selected <strong>Phone</strong> as your contact method, our studio administrator Nicoletta will call or text you directly at <strong>{submittedContactInfo?.phone}</strong> from <strong>+1 (709) 763-1315</strong> in 1 business day.
-                            </p>
-                          )}
+                          if (hasPhone && !hasEmail) {
+                            return (
+                              <div className="bg-white border border-amber-200/90 rounded-[18px] p-5 max-w-lg mx-auto text-left shadow-2xs space-y-3">
+                                <div className="flex items-center gap-2 text-amber-900 font-bold text-xs uppercase tracking-wider">
+                                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                  Phone Confirmation Notice
+                                </div>
+                                <p className="text-stone-700 text-xs leading-relaxed">
+                                  Since you selected <strong>Phone</strong> as your contact method, our studio administrator Tannia will call or text you directly at <strong>{submittedContactInfo?.phone}</strong> from <strong>+1 (709) 763-1315</strong> in 1 business day.
+                                </p>
+                                <div className="bg-amber-50/90 border border-amber-200/70 rounded-[12px] p-3 text-stone-800 text-xs leading-relaxed space-y-1.5">
+                                  <p className="font-semibold text-amber-950 flex items-center gap-1.5">
+                                    <span>⚠️</span> Notice a typo in your phone number?
+                                  </p>
+                                  <p className="text-stone-700 text-[11px] leading-relaxed">
+                                    Please verify that your phone number <strong>{submittedContactInfo?.phone}</strong> is correct.
+                                  </p>
+                                  <p className="text-stone-700 text-[11px] leading-relaxed pt-1.5 border-t border-amber-200/60 font-medium">
+                                    If your phone number had a typo, please click below to send us another message with the corrected number so Tannia can reach you!
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          }
 
-                          <div className="bg-amber-50/90 border border-amber-200/70 rounded-[12px] p-3 text-stone-800 text-xs leading-relaxed space-y-1.5">
-                            <p className="font-semibold text-amber-950 flex items-center gap-1.5">
-                              <span>⚠️</span> Didn&apos;t receive a confirmation email within 5 minutes?
-                            </p>
-                            <p className="text-stone-700 text-[11px] leading-relaxed">
-                              Please check your spam or junk folder, and verify that your email address and phone number were entered correctly without typos.
-                            </p>
-                            <p className="text-stone-700 text-[11px] leading-relaxed pt-1.5 border-t border-amber-200/60 font-medium">
-                              If your email or phone had a typo, please click below to send us another message with the corrected information so we can reach you!
-                            </p>
-                          </div>
-                        </div>
+                          if (hasEmail && !hasPhone) {
+                            return (
+                              <div className="bg-white border border-amber-200/90 rounded-[18px] p-5 max-w-lg mx-auto text-left shadow-2xs space-y-3">
+                                <div className="flex items-center gap-2 text-amber-900 font-bold text-xs uppercase tracking-wider">
+                                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                  Email Confirmation Notice
+                                </div>
+                                <p className="text-stone-700 text-xs leading-relaxed">
+                                  An automated confirmation notice has been sent to your email (<strong>{submittedContactInfo?.email}</strong>).
+                                </p>
+                                <div className="bg-amber-50/90 border border-amber-200/70 rounded-[12px] p-3 text-stone-800 text-xs leading-relaxed space-y-1.5">
+                                  <p className="font-semibold text-amber-950 flex items-center gap-1.5">
+                                    <span>⚠️</span> Didn&apos;t receive a confirmation email within 5 minutes?
+                                  </p>
+                                  <p className="text-stone-700 text-[11px] leading-relaxed">
+                                    Please check your spam or junk folder, and verify that your email address was entered correctly without typos.
+                                  </p>
+                                  <p className="text-stone-700 text-[11px] leading-relaxed pt-1.5 border-t border-amber-200/60 font-medium">
+                                    If your email had a typo, please click below to send us another message with the corrected email address so we can reach you!
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          // Both email and phone provided
+                          return (
+                            <div className="bg-white border border-amber-200/90 rounded-[18px] p-5 max-w-lg mx-auto text-left shadow-2xs space-y-3">
+                              <div className="flex items-center gap-2 text-amber-900 font-bold text-xs uppercase tracking-wider">
+                                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                Email &amp; Phone Confirmation Notice
+                              </div>
+                              <p className="text-stone-700 text-xs leading-relaxed">
+                                An automated confirmation notice has been sent to your email (<strong>{submittedContactInfo?.email}</strong>).
+                                Our studio administrator Tannia will also reach out to your phone (<strong>{submittedContactInfo?.phone}</strong>) {submittedContactInfo?.contactPreference === "phone" ? "by call or text" : "if needed"} from <strong>+1 (709) 763-1315</strong>.
+                              </p>
+                              <div className="bg-amber-50/90 border border-amber-200/70 rounded-[12px] p-3 text-stone-800 text-xs leading-relaxed space-y-1.5">
+                                <p className="font-semibold text-amber-950 flex items-center gap-1.5">
+                                  <span>⚠️</span> Didn&apos;t receive a confirmation email or noticed a typo?
+                                </p>
+                                <p className="text-stone-700 text-[11px] leading-relaxed">
+                                  Please check your spam or junk folder, and verify that both your email address and phone number were entered correctly.
+                                </p>
+                                <p className="text-stone-700 text-[11px] leading-relaxed pt-1.5 border-t border-amber-200/60 font-medium">
+                                  If your email or phone had a typo, please click below to send us another message with the corrected information so we can reach you!
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         <div className="pt-2">
                           <button
@@ -2962,7 +3012,7 @@ export default function App() {
                               setContactData({ ...contactData, message: e.target.value });
                               if (contactErrors.message) setContactErrors((prev) => ({ ...prev, message: undefined }));
                             }}
-                            placeholder="Hi Nicoletta, I'd love to order custom mugs for Christmas! Specifically, I would like 5 mugs of 15 oz each with designs on both sides—featuring a custom picture on one side and a beautiful quote on the other side. Could you let me know about pricing..."
+                            placeholder="Hi Tannia, I'd love to order custom mugs for Christmas! Specifically, I would like 5 mugs of 15 oz each with designs on both sides—featuring a custom picture on one side and a beautiful quote on the other side. Could you let me know about pricing..."
                             className={`bg-brand-highlight/30 border rounded-[8px] py-2.5 px-3 text-brand-text text-sm focus:outline-none focus:ring-1 ${
                               contactErrors.message ? "border-red-400 focus:ring-red-400 focus:border-red-400" : "border-brand-border focus:ring-brand-primary focus:border-brand-primary"
                             }`}
@@ -3074,7 +3124,7 @@ export default function App() {
                           type="submit"
                           className="w-full bg-brand-primary hover:bg-brand-primary-hover text-white text-[10px] uppercase tracking-widest font-bold py-3.5 px-4 rounded-full transition-colors cursor-pointer"
                         >
-                          Send Message to Nicoletta
+                          Send Message to Tannia
                         </button>
                       </form>
                     )}
@@ -3179,7 +3229,7 @@ export default function App() {
             <p className="leading-relaxed italic">
               &ldquo;{customization.philosophyQuote || "An engraving isn't just marks burnt into surface; it's the transfer of a family signature across generations."}&rdquo;
             </p>
-            <span className="text-[10px] text-brand-primary font-semibold block">- {customization.philosophyAuthor || "Nicoletta, Founder & Creative Director"}</span>
+            <span className="text-[10px] text-brand-primary font-semibold block">- {customization.philosophyAuthor || "Tannia, Founder & Creative Director"}</span>
           </div>
         </div>
       </footer>

@@ -198,7 +198,7 @@ export default function TestimonialSection({ testimonials, onSubmitTestimonial }
       {approvedTestimonials.length === 0 ? (
         <div className="bg-white border border-dashed border-brand-border rounded-[24px] p-10 text-center max-w-lg mx-auto">
           <p className="text-brand-dark font-serif font-bold text-base mb-1">No Published Testimonials Yet</p>
-          <p className="text-brand-muted text-xs font-light">Have you received a custom gift or keepsake from Nicoletta? Click &quot;Write a Review&quot; above to submit your review!</p>
+          <p className="text-brand-muted text-xs font-light">Have you received a custom gift or keepsake from Tannia? Click &quot;Write a Review&quot; above to submit your review!</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

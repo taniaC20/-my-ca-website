@@ -849,31 +849,76 @@ export default function QuoteForm({ products, selectedProduct, onSubmitQuote, on
               </p>
 
               {/* Confirmation Notice Box */}
-              <div className="bg-white border border-amber-200/90 rounded-[14px] p-4 text-stone-800 text-xs leading-relaxed space-y-2.5 shadow-2xs">
-                <div className="flex items-center gap-2 text-amber-900 font-bold text-xs uppercase tracking-wider">
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
-                  Confirmation Notice
-                </div>
-                {submittedQuoteInfo?.customerEmail ? (
-                  <p className="text-stone-700 text-xs leading-relaxed">
-                    An automated confirmation notice has been sent to your email (<strong>{submittedQuoteInfo.customerEmail}</strong>)
-                    {submittedQuoteInfo.customerPhone ? <span> and noted your phone (<strong>{submittedQuoteInfo.customerPhone}</strong>) for {submittedQuoteInfo.contactPreference === "phone" ? "phone call/text" : "our records"}</span> : ""}.
-                  </p>
-                ) : (
-                  <p className="text-stone-700 text-xs leading-relaxed">
-                    Since you selected <strong>Phone</strong> as your contact method, our studio administrator Nicoletta will call or text you directly at <strong>{submittedQuoteInfo?.customerPhone}</strong> from <strong>+1 (709) 763-1315</strong> in 1 business day.
-                  </p>
-                )}
+              {(() => {
+                const hasEmail = Boolean(submittedQuoteInfo?.customerEmail);
+                const hasPhone = Boolean(submittedQuoteInfo?.customerPhone);
 
-                <div className="bg-amber-50/90 border border-amber-200/70 rounded-[10px] p-2.5 text-stone-800 text-[11px] leading-relaxed space-y-1">
-                  <p className="font-semibold text-amber-950">
-                    ⚠️ Didn&apos;t receive a confirmation or notice a typo?
-                  </p>
-                  <p className="text-stone-700">
-                    Please check your spam folder, or double-check that your email address and phone number were entered correctly. If there was a typo, please click below to submit another quote with the corrected information so we can reach you without delay!
-                  </p>
-                </div>
-              </div>
+                if (hasPhone && !hasEmail) {
+                  return (
+                    <div className="bg-white border border-amber-200/90 rounded-[14px] p-4 text-stone-800 text-xs leading-relaxed space-y-2.5 shadow-2xs">
+                      <div className="flex items-center gap-2 text-amber-900 font-bold text-xs uppercase tracking-wider">
+                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                        Phone Confirmation Notice
+                      </div>
+                      <p className="text-stone-700 text-xs leading-relaxed">
+                        Since you selected <strong>Phone</strong> as your contact method, our studio administrator Tannia will call or text you directly at <strong>{submittedQuoteInfo?.customerPhone}</strong> from <strong>+1 (709) 763-1315</strong> in 1 business day with your quote proposal.
+                      </p>
+                      <div className="bg-amber-50/90 border border-amber-200/70 rounded-[10px] p-2.5 text-stone-800 text-[11px] leading-relaxed space-y-1">
+                        <p className="font-semibold text-amber-950">
+                          ⚠️ Notice a typo in your phone number?
+                        </p>
+                        <p className="text-stone-700">
+                          Please verify your phone number <strong>{submittedQuoteInfo?.customerPhone}</strong>. If there was a typo, please click below to submit another quote with the corrected number so Tannia can reach you!
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (hasEmail && !hasPhone) {
+                  return (
+                    <div className="bg-white border border-amber-200/90 rounded-[14px] p-4 text-stone-800 text-xs leading-relaxed space-y-2.5 shadow-2xs">
+                      <div className="flex items-center gap-2 text-amber-900 font-bold text-xs uppercase tracking-wider">
+                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                        Email Confirmation Notice
+                      </div>
+                      <p className="text-stone-700 text-xs leading-relaxed">
+                        An automated confirmation notice has been sent to your email (<strong>{submittedQuoteInfo?.customerEmail}</strong>).
+                      </p>
+                      <div className="bg-amber-50/90 border border-amber-200/70 rounded-[10px] p-2.5 text-stone-800 text-[11px] leading-relaxed space-y-1">
+                        <p className="font-semibold text-amber-950">
+                          ⚠️ Didn&apos;t receive a confirmation email within 5 minutes?
+                        </p>
+                        <p className="text-stone-700">
+                          Please check your spam or junk folder, or double-check that your email address was entered correctly. If there was a typo, please click below to submit another quote with the corrected email address so we can reach you!
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Both email and phone provided
+                return (
+                  <div className="bg-white border border-amber-200/90 rounded-[14px] p-4 text-stone-800 text-xs leading-relaxed space-y-2.5 shadow-2xs">
+                    <div className="flex items-center gap-2 text-amber-900 font-bold text-xs uppercase tracking-wider">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                      Email &amp; Phone Confirmation Notice
+                    </div>
+                    <p className="text-stone-700 text-xs leading-relaxed">
+                      An automated confirmation notice has been sent to your email (<strong>{submittedQuoteInfo?.customerEmail}</strong>).
+                      Our studio administrator Tannia will also reach out to your phone (<strong>{submittedQuoteInfo?.customerPhone}</strong>) {submittedQuoteInfo?.contactPreference === "phone" ? "by call or text" : "for your records"} from <strong>+1 (709) 763-1315</strong>.
+                    </p>
+                    <div className="bg-amber-50/90 border border-amber-200/70 rounded-[10px] p-2.5 text-stone-800 text-[11px] leading-relaxed space-y-1">
+                      <p className="font-semibold text-amber-950">
+                        ⚠️ Didn&apos;t receive a confirmation or notice a typo?
+                      </p>
+                      <p className="text-stone-700">
+                        Please check your spam folder, or double-check that your email address and phone number were entered correctly. If there was a typo, please click below to submit another quote with the corrected information so we can reach you without delay!
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="pt-1">
                 <button
