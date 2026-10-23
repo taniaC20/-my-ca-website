@@ -106,6 +106,81 @@ export const ensureContactSection = (cust: CustomizationSettings): Customization
   return { ...cust, sections };
 };
 
+export function getInitialRouteFromUrl(): {
+  page: "home" | "catalog" | "product-detail" | "quote-request" | "testimonials" | "contact" | "account";
+  admin: boolean;
+  categoryId: string;
+  productId: string | null;
+} {
+  if (typeof window === "undefined") {
+    return { page: "home", admin: false, categoryId: "all", productId: null };
+  }
+  let pathname = window.location.pathname.toLowerCase();
+  let search = window.location.search.toLowerCase();
+  const hash = window.location.hash.toLowerCase();
+
+  // Support hash fallback (e.g. /#admin?=true or /#/catalog)
+  if (hash) {
+    const cleanHash = hash.replace(/^#\/?/, "");
+    if (cleanHash.startsWith("admin")) {
+      pathname = "/admin";
+      if (cleanHash.includes("=true")) search = "?=true";
+    } else if (cleanHash.startsWith("catalog")) {
+      const [cPath, cSearch] = cleanHash.split("?");
+      pathname = "/" + cPath;
+      if (cSearch) search = "?" + cSearch;
+    } else if (cleanHash.startsWith("product")) {
+      const [pPath, pSearch] = cleanHash.split("?");
+      pathname = "/" + pPath;
+      if (pSearch) search = "?" + pSearch;
+    } else if (cleanHash.startsWith("contact")) {
+      pathname = "/contact";
+    } else if (cleanHash.startsWith("reviews") || cleanHash.startsWith("testimonials")) {
+      pathname = "/reviews";
+    } else if (cleanHash.startsWith("quote")) {
+      const [qPath, qSearch] = cleanHash.split("?");
+      pathname = "/quote";
+      if (qSearch) search = "?" + qSearch;
+    }
+  }
+
+  const params = new URLSearchParams(search);
+  const isPathAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
+  const hasAdminQuery = search.includes("=true") || params.get("") === "true" || params.get("admin") === "true";
+
+  if (isPathAdmin && hasAdminQuery) {
+    return { page: "home", admin: true, categoryId: "all", productId: null };
+  }
+
+  if (pathname === "/catalog" || pathname.startsWith("/catalog/")) {
+    const cat = params.get("category");
+    return { page: "catalog", admin: false, categoryId: cat ? decodeURIComponent(cat) : "all", productId: null };
+  }
+
+  if (pathname.startsWith("/product/")) {
+    const prodId = decodeURIComponent(window.location.pathname.replace(/^\/product\//i, "")).trim();
+    return { page: "product-detail", admin: false, categoryId: "all", productId: prodId };
+  }
+
+  if (pathname === "/quote" || pathname === "/quote-request") {
+    return { page: "quote-request", admin: false, categoryId: "all", productId: null };
+  }
+
+  if (pathname === "/reviews" || pathname === "/testimonials") {
+    return { page: "testimonials", admin: false, categoryId: "all", productId: null };
+  }
+
+  if (pathname === "/contact") {
+    return { page: "contact", admin: false, categoryId: "all", productId: null };
+  }
+
+  if (pathname === "/account") {
+    return { page: "account", admin: false, categoryId: "all", productId: null };
+  }
+
+  return { page: "home", admin: false, categoryId: "all", productId: null };
+}
+
 export default function App() {
   // Persistence state initialized immediately with the authoritative updated store data
   const isStaleCustomization = (cust: any) => {
@@ -141,6 +216,8 @@ export default function App() {
     return ensureContactSection(parsed);
   });
 
+  const initialRoute = getInitialRouteFromUrl();
+
   // Secure Session State
   const [token, setToken] = useState<string | null>(() => localStorage.getItem("nicoletta_admin_token"));
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -148,18 +225,24 @@ export default function App() {
   const [authError, setAuthError] = useState("");
   const [totalViewsState, setTotalViewsState] = useState(342);
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
+    if (initialRoute.admin) return true;
     return localStorage.getItem("nicoletta_admin_unlocked") === "true";
   });
 
   // Navigation and filtering state
-  const [isAdminMode, setIsAdminMode] = useState(false);
-  const [activePage, setActivePage] = useState<"home" | "catalog" | "product-detail" | "quote-request" | "testimonials" | "contact" | "account">("home");
+  const [isAdminMode, setIsAdminMode] = useState(initialRoute.admin);
+  const [activePage, setActivePage] = useState<"home" | "catalog" | "product-detail" | "quote-request" | "testimonials" | "contact" | "account">(initialRoute.page);
   const [customer, setCustomer] = useState<CustomerProfile | null>(() => getStoredCustomerSession());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("all");
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>(initialRoute.categoryId);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProductForQuote, setSelectedProductForQuote] = useState<Product | null>(null);
-  const [selectedProductDetail, setSelectedProductDetail] = useState<Product | null>(null);
+  const [selectedProductDetail, setSelectedProductDetail] = useState<Product | null>(() => {
+    if (initialRoute.productId) {
+      return INITIAL_PRODUCTS.find(p => p.id === initialRoute.productId || p.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") === initialRoute.productId?.toLowerCase()) || null;
+    }
+    return null;
+  });
 
   // Global In-Page Loading States (top progress bar removed per design)
   const [isPageLoading, setIsPageLoading] = useState<boolean>(true);
@@ -661,35 +744,113 @@ export default function App() {
     verifySession();
   }, []);
 
-  // Dedicated secret route: only accessible if URL address is nicolettacraftsdecor.ca/admin?=true
-  useEffect(() => {
-    const checkAdminRoute = () => {
-      const pathname = window.location.pathname.toLowerCase();
-      const search = window.location.search.toLowerCase();
-      const params = new URLSearchParams(window.location.search);
-      const hash = window.location.hash.toLowerCase();
+  // Navigation & Address Bar URL Synchronization
+  const isNavigatingFromUrl = useRef(false);
 
-      // Explicit target: /admin?=true (also handles /admin?admin=true or /admin?=true hash variants)
-      const isPathAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
-      const hasAdminQuery = search === "?=true" || search.includes("=true") || params.get("") === "true" || params.get("admin") === "true";
-      const hasHashAdmin = hash === "#admin?=true" || hash === "#/admin?=true";
-
-      if ((isPathAdmin && hasAdminQuery) || hasHashAdmin) {
-        localStorage.setItem("nicoletta_admin_unlocked", "true");
-        setIsUnlocked(true);
-        setIsAdminMode(true);
-        window.scrollTo({ top: 0, behavior: "smooth" });
+  const getUrlForState = (
+    page: "home" | "catalog" | "product-detail" | "quote-request" | "testimonials" | "contact" | "account",
+    admin: boolean,
+    productDetail: Product | null,
+    categoryId: string,
+    quoteProduct: Product | null
+  ): string => {
+    if (admin) {
+      return "/admin?=true";
+    }
+    if (page === "home") {
+      return "/";
+    }
+    if (page === "catalog") {
+      if (categoryId && categoryId !== "all") {
+        return `/catalog?category=${encodeURIComponent(categoryId)}`;
       }
-    };
+      return "/catalog";
+    }
+    if (page === "product-detail" && productDetail) {
+      return `/product/${encodeURIComponent(productDetail.id)}`;
+    }
+    if (page === "quote-request") {
+      if (quoteProduct) {
+        return `/quote?product=${encodeURIComponent(quoteProduct.id)}`;
+      }
+      return "/quote";
+    }
+    if (page === "testimonials") {
+      return "/reviews";
+    }
+    if (page === "contact") {
+      return "/contact";
+    }
+    if (page === "account") {
+      return "/account";
+    }
+    return "/";
+  };
 
-    checkAdminRoute();
-    window.addEventListener("popstate", checkAdminRoute);
-    window.addEventListener("hashchange", checkAdminRoute);
+  const syncStateFromUrl = () => {
+    if (typeof window === "undefined") return;
+    const route = getInitialRouteFromUrl();
+
+    isNavigatingFromUrl.current = true;
+
+    if (route.admin) {
+      localStorage.setItem("nicoletta_admin_unlocked", "true");
+      setIsUnlocked(true);
+      setIsAdminMode(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      setTimeout(() => { isNavigatingFromUrl.current = false; }, 50);
+      return;
+    }
+
+    setIsAdminMode(false);
+    setActivePage(route.page);
+    setSelectedCategoryId(route.categoryId);
+
+    if (route.page === "product-detail" && route.productId) {
+      const allProds = products.length > 0 ? products : INITIAL_PRODUCTS;
+      const matched = allProds.find(
+        (p) => p.id === route.productId || p.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") === route.productId?.toLowerCase()
+      );
+      if (matched) {
+        setSelectedProductDetail(matched);
+      }
+    } else {
+      setSelectedProductDetail(null);
+    }
+
+    if (route.page === "quote-request") {
+      const params = new URLSearchParams(window.location.search);
+      const prodParam = params.get("product");
+      if (prodParam) {
+        const allProds = products.length > 0 ? products : INITIAL_PRODUCTS;
+        const matched = allProds.find((p) => p.id === prodParam);
+        if (matched) setSelectedProductForQuote(matched);
+      }
+    }
+
+    setTimeout(() => { isNavigatingFromUrl.current = false; }, 50);
+  };
+
+  // Listen to browser Back/Forward (popstate) and hash changes
+  useEffect(() => {
+    syncStateFromUrl();
+    window.addEventListener("popstate", syncStateFromUrl);
+    window.addEventListener("hashchange", syncStateFromUrl);
     return () => {
-      window.removeEventListener("popstate", checkAdminRoute);
-      window.removeEventListener("hashchange", checkAdminRoute);
+      window.removeEventListener("popstate", syncStateFromUrl);
+      window.removeEventListener("hashchange", syncStateFromUrl);
     };
-  }, []);
+  }, [products]);
+
+  // Update browser address bar when user clicks buttons / navigates in page
+  useEffect(() => {
+    if (typeof window === "undefined" || isNavigatingFromUrl.current) return;
+    const targetUrl = getUrlForState(activePage, isAdminMode, selectedProductDetail, selectedCategoryId, selectedProductForQuote);
+    const currentFull = window.location.pathname + window.location.search;
+    if (currentFull !== targetUrl) {
+      window.history.pushState(null, "", targetUrl);
+    }
+  }, [activePage, isAdminMode, selectedProductDetail?.id, selectedCategoryId, selectedProductForQuote?.id]);
 
   // Secure Admin Authentication Action handlers
   const handleLogin = async (e: React.FormEvent) => {
