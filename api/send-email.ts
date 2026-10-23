@@ -44,13 +44,19 @@ export default async function handler(req: any, res: any) {
       }
     });
 
+    const uniqueMessageId = `<inquiry-${Date.now()}-${Math.random().toString(36).substring(2, 9)}@nicolettacraftsdecor.ca>`;
+
     const info = await transporter.sendMail({
       from: `"Nicoletta Crafts & Decor" <${senderEmail}>`,
       to,
       replyTo: replyTo || senderEmail,
       subject,
       text,
-      html: html || (text ? text.replace(/\n/g, "<br/>") : "")
+      html: html || (text ? text.replace(/\n/g, "<br/>") : ""),
+      messageId: uniqueMessageId,
+      headers: {
+        "X-Entity-Ref-ID": uniqueMessageId
+      }
     });
 
     return res.status(200).json({

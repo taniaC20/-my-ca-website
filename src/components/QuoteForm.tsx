@@ -243,26 +243,25 @@ export default function QuoteForm({ products, selectedProduct, onSubmitQuote, on
       return;
     }
 
-    let finalInstructions = formData.specialInstructions || "";
-    if (formData.contactPreference) {
-      finalInstructions = `[PREFERRED CONTACT: ${formData.contactPreference === "phone" ? "PHONE (Call/Text)" : "EMAIL"}]\n` + finalInstructions;
-    }
-    if (formData.alternativeRequest && formData.alternativeDetails.trim()) {
-      finalInstructions = `[ALTERNATIVE CRAFT REQUESTED: "${formData.alternativeDetails.trim()}"]\n\n` + finalInstructions;
-    }
+    const cleanInstructions = (formData.specialInstructions || "").trim();
+    const cleanEngraving = (formData.engravingText || "").trim();
+    const cleanPhone = (formData.customerPhone || "").trim();
+    const cleanDeadline = (formData.deadline || "").trim();
 
     const payload = {
       productId: formData.productId || undefined,
       productName: currentProduct ? currentProduct.name : "General Custom Craft Project",
-      customerName: formData.customerName,
-      customerEmail: formData.customerEmail,
-      customerPhone: formData.customerPhone || undefined,
+      customerName: formData.customerName.trim(),
+      customerEmail: formData.customerEmail.trim(),
+      customerPhone: cleanPhone || undefined,
       contactPreference: formData.contactPreference,
-      engravingText: formData.engravingText || undefined,
-      fontPreference: formData.fontPreference,
-      specialInstructions: finalInstructions.trim() || undefined,
-      quantity: Number(formData.quantity),
-      deadline: formData.deadline || undefined,
+      engravingText: cleanEngraving || undefined,
+      fontPreference: cleanEngraving ? formData.fontPreference : undefined,
+      specialInstructions: cleanInstructions || undefined,
+      quantity: Number(formData.quantity) || 1,
+      deadline: cleanDeadline || undefined,
+      alternativeRequest: formData.alternativeRequest || undefined,
+      alternativeDetails: formData.alternativeRequest && formData.alternativeDetails.trim() ? formData.alternativeDetails.trim() : undefined,
       uploadedFiles: uploadedFiles.length > 0 ? uploadedFiles : undefined,
     };
 
