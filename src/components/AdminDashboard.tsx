@@ -252,7 +252,7 @@ export default function AdminDashboard({
       : [...GIFT_OCCASION_PRESETS];
   });
   const [showOccasionEmojiPicker, setShowOccasionEmojiPicker] = useState(false);
-  const [activeSectionTab, setActiveSectionTab] = useState<"home" | "catalog" | "quote" | "reviews" | "workshop">("home");
+  const [activeSectionTab, setActiveSectionTab] = useState<"home" | "workshop">("home");
   const [sections, setSections] = useState<CustomSection[]>(() => {
     return customization?.sections && customization?.sections.length > 0
       ? [...customization.sections]
@@ -495,15 +495,6 @@ export default function AdminDashboard({
     const isOfActiveTab = (sec: CustomSection) => {
       if (activeSectionTab === "home") {
         return sec.page === "home" || sec.id.startsWith("home-") || sec.id.startsWith("custom_");
-      }
-      if (activeSectionTab === "catalog") {
-        return sec.id === "catalog-header" || sec.id === "catalog-process" || sec.id.startsWith("catalog-");
-      }
-      if (activeSectionTab === "quote") {
-        return sec.id === "quote-header" || sec.id.startsWith("quote-");
-      }
-      if (activeSectionTab === "reviews") {
-        return sec.id === "testimonials-header" || sec.id.startsWith("testimonials-");
       }
       if (activeSectionTab === "workshop") {
         return sec.id === "contact-header" || sec.id.startsWith("contact-");
@@ -1736,7 +1727,7 @@ export default function AdminDashboard({
             onClick={() => setActiveTab("site-customizer")}
             className={`w-full text-left py-2 px-3.5 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 transition-colors cursor-pointer ${activeTab === "site-customizer" ? "bg-brand-primary text-white" : "hover:bg-brand-primary/10 text-brand-muted"}`}
           >
-            <Sliders className="h-3.5 w-3.5" /> Site Editor &amp; Logo
+            <Sliders className="h-3.5 w-3.5" /> Site Customizer
           </button>
 
           <button
@@ -5703,7 +5694,9 @@ export default function AdminDashboard({
               <div className="flex justify-between items-center pb-2 border-b border-stone-200">
                 <div className="flex items-center gap-2">
                   <Sliders className="h-5 w-5 text-brand-primary" />
-                  <h4 className="font-serif font-bold text-stone-900 text-base">Layout Sections CMS ({sections.length})</h4>
+                  <h4 className="font-serif font-bold text-stone-900 text-base">
+                    Layout Sections CMS ({sections.filter(s => s.page === "home" || s.id.startsWith("home-") || s.id.startsWith("custom_")).length})
+                  </h4>
                 </div>
                 
                 {!isAddingSection && (
@@ -5803,27 +5796,15 @@ export default function AdminDashboard({
               )}
 
               {/* Tab Navigation for Layout Sections */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 border-b border-stone-200 pb-3 mt-4">
+              <div className="grid grid-cols-2 max-w-md gap-2 border-b border-stone-200 pb-3 mt-4">
                 {[
                   { id: "home", label: "Home Page" },
-                  { id: "catalog", label: "Artisan Catalog" },
-                  { id: "quote", label: "Request Quote" },
-                  { id: "reviews", label: "Customer Reviews" },
-                  { id: "workshop", label: "Connect & Footer Info" }
+                  { id: "workshop", label: "Connect & Footer" }
                 ].map((t) => {
                   const safeSecs = Array.isArray(sections) ? sections.filter((s) => Boolean(s && typeof s.id === "string")) : [];
                   const count = safeSecs.filter((sec) => {
                     if (t.id === "home") {
                       return sec.page === "home" || sec.id.startsWith("home-") || sec.id.startsWith("custom_");
-                    }
-                    if (t.id === "catalog") {
-                      return sec.id === "catalog-header" || sec.id === "catalog-process" || sec.id.startsWith("catalog-");
-                    }
-                    if (t.id === "quote") {
-                      return sec.id === "quote-header" || sec.id.startsWith("quote-");
-                    }
-                    if (t.id === "reviews") {
-                      return sec.id === "testimonials-header" || sec.id.startsWith("testimonials-");
                     }
                     if (t.id === "workshop") {
                       return sec.id === "contact-header" || sec.id.startsWith("contact-");
@@ -5867,15 +5848,6 @@ export default function AdminDashboard({
                     if (!sec || typeof sec.id !== "string") return false;
                     if (activeSectionTab === "home") {
                       return sec.page === "home" || sec.id.startsWith("home-") || sec.id.startsWith("custom_");
-                    }
-                    if (activeSectionTab === "catalog") {
-                      return sec.id === "catalog-header" || sec.id === "catalog-process" || sec.id.startsWith("catalog-");
-                    }
-                    if (activeSectionTab === "quote") {
-                      return sec.id === "quote-header" || sec.id.startsWith("quote-");
-                    }
-                    if (activeSectionTab === "reviews") {
-                      return sec.id === "testimonials-header" || sec.id.startsWith("testimonials-");
                     }
                     if (activeSectionTab === "workshop") {
                       return sec.id === "contact-header" || sec.id.startsWith("contact-");
