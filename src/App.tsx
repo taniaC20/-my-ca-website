@@ -1837,7 +1837,7 @@ export default function App() {
 
                         {/* D. NICOLETTA DIFFERENCE */}
                         {sec.id === "home-difference" && (
-                          <section id="nicoletta-difference" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-brand-highlight/25 py-16 rounded-[32px] border border-brand-border/40 space-y-12">
+                          <section id="nicoletta-difference" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
                             <div className="text-center space-y-2 max-w-xl mx-auto">
                               <span className="text-[10px] text-brand-primary font-bold uppercase tracking-widest block">{sec.subtitle || "Uncompromising Standards"}</span>
                               <h3 className="font-serif font-bold text-brand-dark text-2xl md:text-3xl">{sec.title || "The Nicoletta Difference"}</h3>
@@ -1938,7 +1938,7 @@ export default function App() {
 
                         {/* F. TESTIMONIALS HOME */}
                         {sec.id === "home-testimonials" && (
-                          <section id="testimonials-home" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 bg-brand-highlight/20 py-16 rounded-[32px] border border-brand-border/30">
+                          <section id="testimonials-home" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
                             <div className="text-center space-y-2">
                               <span className="text-[10px] text-brand-primary font-bold uppercase tracking-widest block">{!sec.subtitle || sec.subtitle === "Patron Affection" || sec.subtitle === "Patron Testimonials" ? "Customer Reviews" : sec.subtitle}</span>
                               <h3 className="font-serif font-bold text-brand-dark text-2xl md:text-3xl">{!sec.title || sec.title === "Stories from the Mantle" || sec.title === "Bespoke Stories" || sec.title === "Kind Words from Our Customers" ? "Words from Our Customers" : sec.title}</h3>
