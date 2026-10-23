@@ -83,7 +83,7 @@ export async function sendQuoteNotificationToAdmin(
   // Field evaluation (strictly omit empty, unselected, or default blanks)
   const phoneVal = (quote.customerPhone || "").trim();
   const hasPhone = Boolean(phoneVal);
-  const showContactPref = hasPhone && Boolean(quote.contactPreference);
+  const showContactPref = Boolean(quote.contactPreference);
   const prefLabel = quote.contactPreference === "phone" ? "Phone (Call/Text)" : "Email";
 
   const showQuantity = !isContact && typeof quote.quantity === "number" && quote.quantity > 0;
@@ -244,7 +244,10 @@ export async function sendQuoteNotificationToAdmin(
                   ${hasPhone ? `
                   <div style="margin-top: 4px;">
                     <strong>Phone:</strong> <a href="tel:${escapeHtml(phoneVal)}" style="color: #936037; font-weight: 600; text-decoration: underline;">${escapeHtml(phoneVal)}</a>
-                    ${showContactPref ? `<span style="display: inline-block; margin-left: 8px; font-size: 11px; background-color: #ebdcc5; color: #5a4b41; padding: 2px 8px; border-radius: 4px; font-weight: 600;">Prefers ${escapeHtml(prefLabel)}</span>` : ""}
+                  </div>` : ""}
+                  ${showContactPref ? `
+                  <div style="margin-top: 6px;">
+                    <span style="display: inline-block; font-size: 11px; background-color: #ebdcc5; color: #5a4b41; padding: 2px 8px; border-radius: 4px; font-weight: 600;">Preferred Contact: ${escapeHtml(prefLabel)}</span>
                   </div>` : ""}
                 </div>
               </div>
@@ -386,9 +389,9 @@ export async function sendQuoteNotificationToAdmin(
 
       if (hasPhone) {
         payload.Customer_Phone = phoneVal;
-        if (showContactPref) {
-          payload.Preferred_Contact = prefLabel;
-        }
+      }
+      if (showContactPref) {
+        payload.Preferred_Contact = prefLabel;
       }
 
       if (isContact) {
@@ -493,4 +496,295 @@ export function openGmailCompose(options: {
 }) {
   const url = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(options.to)}&su=${encodeURIComponent(options.subject)}&body=${encodeURIComponent(options.body)}`;
   window.open(url, "_blank", "width=850,height=700");
+}
+
+/**
+ * Rigorous email validation with format checking, fake domain filter, and typo detection.
+ */
+export function validateEmailAddress(email: string): { valid: boolean; error?: string; suggestion?: string } {
+  const trimmed = (email || "").trim();
+  if (!trimmed) {
+    return { valid: false, error: "Email address is required." };
+  }
+
+  // RFC-5322 standard syntax regex
+  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+  if (!emailRegex.test(trimmed)) {
+    return { valid: false, error: "Please enter a valid email address (e.g. name@domain.com)." };
+  }
+
+  const parts = trimmed.split("@");
+  if (parts.length !== 2) {
+    return { valid: false, error: "Please enter a valid email address." };
+  }
+
+  const domain = parts[1].toLowerCase();
+
+  // Reject obviously fake placeholder test domains
+  const fakeDomains = ["test.com", "fake.com", "example.com", "sample.com", "invalid.com", "temp.com", "mailinator.com", "fakemail.com"];
+  if (fakeDomains.includes(domain)) {
+    return { valid: false, error: "Please enter your real active email address so we can reach you." };
+  }
+
+  // Detect and advise on common domain typos
+  const typoMap: Record<string, string> = {
+    "gmai.com": "gmail.com",
+    "gamil.com": "gmail.com",
+    "gmial.com": "gmail.com",
+    "gmaill.com": "gmail.com",
+    "gmaik.com": "gmail.com",
+    "hotmial.com": "hotmail.com",
+    "hotmai.com": "hotmail.com",
+    "yaho.com": "yahoo.com",
+    "yahooo.com": "yahoo.com",
+    "outlok.com": "outlook.com",
+    "outloo.com": "outlook.com",
+    "iclud.com": "icloud.com"
+  };
+
+  if (typoMap[domain]) {
+    const suggestedEmail = `${parts[0]}@${typoMap[domain]}`;
+    return {
+      valid: false,
+      error: `Did you mean @${typoMap[domain]}? Please check your email spelling.`,
+      suggestion: suggestedEmail
+    };
+  }
+
+  // Ensure domain TLD has at least 2 characters and doesn't contain consecutive dots
+  if (domain.includes("..") || domain.split(".").pop()!.length < 2) {
+    return { valid: false, error: "Please enter a valid email domain (e.g. @gmail.com, @yahoo.ca)." };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Phone number validation and standard Canadian/US and International formatting.
+ */
+export function validatePhoneNumber(phone: string, isRequired: boolean = false): {
+  valid: boolean;
+  error?: string;
+  formatted?: string;
+} {
+  const trimmed = (phone || "").trim();
+  if (!trimmed) {
+    if (isRequired) {
+      return { valid: false, error: "Phone number is required when Phone contact is chosen." };
+    }
+    return { valid: true, formatted: "" };
+  }
+
+  const digits = trimmed.replace(/\D/g, "");
+
+  // International format starting with +
+  if (trimmed.startsWith("+")) {
+    if (digits.length < 10 || digits.length > 15) {
+      return { valid: false, error: "Please enter a valid international phone number (10-15 digits)." };
+    }
+    return { valid: true, formatted: trimmed };
+  }
+
+  // North American standard: 10 digits or 11 digits starting with 1
+  if (digits.length === 10) {
+    if (digits[0] === "0" || digits[0] === "1") {
+      return { valid: false, error: "Please enter a valid phone number (area code cannot start with 0 or 1)." };
+    }
+    const formatted = `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+    return { valid: true, formatted };
+  } else if (digits.length === 11 && digits.startsWith("1")) {
+    if (digits[1] === "0" || digits[1] === "1") {
+      return { valid: false, error: "Please enter a valid phone number." };
+    }
+    const formatted = `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+    return { valid: true, formatted };
+  } else {
+    return { valid: false, error: "Please enter a valid 10-digit phone number (e.g. (709) 555-0182)." };
+  }
+}
+
+/**
+ * Sends an automated confirmation email to the client when they submit a message.
+ * Verifies that their email address is real, displays a clean summary,
+ * and advises them on what to do if they made a typo.
+ */
+export async function sendContactConfirmationToClient(
+  contact: {
+    name: string;
+    email: string;
+    phone?: string;
+    contactPreference?: "email" | "phone";
+    subject?: string;
+    message: string;
+    refCode?: string;
+  },
+  settings?: EmailSettings
+): Promise<{ success: boolean; message: string }> {
+  const senderEmail = settings?.gmailUser || DEFAULT_ADMIN_EMAIL;
+  const refCode = contact.refCode || Math.random().toString(36).substring(2, 8).toUpperCase();
+  const inquirySubject = contact.subject?.trim() || "General Studio Inquiry";
+  const emailSubject = `Confirmation: We received your message - Nicoletta Crafts & Decor [#${refCode}]`;
+
+  const now = new Date();
+  const formattedDate = now.toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" });
+  const formattedTime = now.toLocaleTimeString("en-CA", { hour: "numeric", minute: "2-digit" });
+
+  const textBody = `
+Dear ${contact.name},
+
+Thank you for reaching out to Nicoletta Crafts & Decor! We have safely received your inquiry on ${formattedDate} at ${formattedTime}.
+
+SUMMARY OF YOUR INQUIRY:
+- Reference ID: #${refCode}
+- Inquiry Subject: ${inquirySubject}
+- Preferred Contact: ${contact.contactPreference === "phone" ? `Phone (${contact.phone || "provided"})` : `Email (${contact.email})`}
+${contact.phone ? `- Phone Number: ${contact.phone}\n` : ""}- Message Content:
+"${contact.message}"
+
+WHAT HAPPENS NEXT:
+Nicoletta personally reviews every message received at our St. John's studio. We will review your inquiry and reach back out to you via ${contact.contactPreference === "phone" ? "phone call/text" : "email"} within one business day.
+
+VERIFICATION & TYPO NOTICE:
+Since you received this confirmation email, your email address is verified in our system.
+If you notice any typos in your phone number or email address, please reply directly to this email or send us a quick updated message via https://www.nicolettacraftsdecor.ca so we can connect with you without delay!
+
+Warm regards,
+Nicoletta & the Studio Team
+Nicoletta Crafts & Decor
+St. John's, NL, Canada
+sales@nicolettacraftsdecor.ca
+https://www.nicolettacraftsdecor.ca
+`.trim();
+
+  const htmlBody = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(emailSubject)}</title>
+</head>
+<body style="margin: 0; padding: 24px 12px; background-color: #f6f3ee; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #2c2520; -webkit-font-smoothing: antialiased;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: 1px solid #ebe5dc;">
+          
+          <!-- Header -->
+          <tr>
+            <td style="background-color: #1e1915; padding: 28px 32px 24px; text-align: left;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td>
+                    <div style="font-family: 'Playfair Display', Georgia, serif; font-size: 20px; font-weight: 700; color: #e2b45e; letter-spacing: 0.5px;">
+                      Nicoletta Crafts &amp; Decor
+                    </div>
+                    <div style="margin-top: 4px; font-size: 11px; color: #a99e93; letter-spacing: 0.5px;">
+                      STUDIO INQUIRY CONFIRMATION &bull; ST. JOHN'S, NL
+                    </div>
+                  </td>
+                  <td align="right" valign="top">
+                    <span style="display: inline-block; padding: 5px 12px; background-color: rgba(226, 180, 94, 0.15); border: 1px solid rgba(226, 180, 94, 0.35); border-radius: 999px; color: #e2b45e; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;">
+                      Message Received
+                    </span>
+                  </td>
+                </tr>
+              </table>
+              <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.1); font-size: 12px; color: #c4baa9;">
+                Reference: <strong style="color: #ffffff;">#${refCode}</strong> &bull; Received on <strong>${formattedDate} at ${formattedTime}</strong>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Content Body -->
+          <tr>
+            <td style="padding: 28px 32px 22px;">
+              <h2 style="font-family: 'Playfair Display', Georgia, serif; font-size: 21px; color: #1e1915; margin: 0 0 12px 0;">
+                Thank you for reaching out, ${escapeHtml(contact.name)}!
+              </h2>
+              <p style="font-size: 14px; line-height: 1.6; color: #423830; margin: 0 0 20px 0;">
+                We have safely received your inquiry. Nicoletta personally reads each studio message and will get back to you via <strong>${contact.contactPreference === "phone" ? "phone call/text" : "email"}</strong> within <strong>one business day</strong>.
+              </p>
+
+              <!-- Summary Card -->
+              <div style="background-color: #faf8f5; border: 1px solid #ece6dc; border-radius: 12px; padding: 18px 20px; margin-bottom: 20px;">
+                <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #8c7f73; margin-bottom: 10px;">
+                  Summary of What You Submitted
+                </div>
+                <div style="font-size: 14px; color: #352c25; line-height: 1.6;">
+                  <div style="margin-bottom: 6px;">
+                    <strong>Subject:</strong> ${escapeHtml(inquirySubject)}
+                  </div>
+                  <div style="margin-bottom: 6px;">
+                    <strong>Preferred Contact:</strong> ${contact.contactPreference === "phone" ? "Phone (Call or Text)" : "Email"}
+                  </div>
+                  ${contact.phone ? `
+                  <div style="margin-bottom: 6px;">
+                    <strong>Phone Provided:</strong> ${escapeHtml(contact.phone)}
+                  </div>` : ""}
+                  <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2dbce;">
+                    <strong>Your Message:</strong>
+                    <div style="margin-top: 6px; font-style: italic; color: #4c3f35; background: #ffffff; padding: 12px 14px; border-radius: 8px; border: 1px solid #ebe5dc; white-space: pre-wrap; font-size: 13px; line-height: 1.5;">
+                      &ldquo;${escapeHtml(contact.message)}&rdquo;
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Verification Notice -->
+              <div style="background-color: #fcf9f2; border: 1px solid #ebdcb9; border-left: 4px solid #c59b27; border-radius: 10px; padding: 14px 18px; margin-bottom: 22px;">
+                <div style="font-size: 12px; font-weight: 700; color: #875c1b; margin-bottom: 4px;">
+                  Did you spot a typo in your email or phone number?
+                </div>
+                <div style="font-size: 13px; color: #5a4730; line-height: 1.5;">
+                  If any of your contact details above need a correction, simply <strong>reply directly to this email</strong> with the updated information, or submit a quick update on our site so we can reach you smoothly!
+                </div>
+              </div>
+
+              <div style="font-size: 13px; color: #5a4e44; line-height: 1.6;">
+                Warm regards,<br>
+                <strong>Nicoletta &amp; the Studio Team</strong><br>
+                <em>Nicoletta Crafts &amp; Decor &bull; St. John's, NL</em>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #faf8f5; border-top: 1px solid #ebe5dc; padding: 18px 32px; font-size: 11px; color: #8c7f73; text-align: center; line-height: 1.5;">
+              Nicoletta Crafts &amp; Decor &bull; St. John&rsquo;s, NL, Canada &bull; <a href="https://www.nicolettacraftsdecor.ca" style="color: #936037; text-decoration: none;">www.nicolettacraftsdecor.ca</a><br>
+              Inquiries: <a href="mailto:sales@nicolettacraftsdecor.ca" style="color: #936037; text-decoration: none;">sales@nicolettacraftsdecor.ca</a>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+
+  try {
+    const res = await fetch("/api/send-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        to: contact.email,
+        from: senderEmail,
+        subject: emailSubject,
+        text: textBody,
+        html: htmlBody,
+        appPassword: settings?.gmailAppPassword,
+        replyTo: DEFAULT_ADMIN_EMAIL
+      })
+    });
+    if (res.ok) {
+      return { success: true, message: `Confirmation dispatched to client: ${contact.email}` };
+    }
+  } catch (err) {
+    console.warn("Client confirmation email dispatch error:", err);
+  }
+
+  return { success: false, message: "Could not send client confirmation email" };
 }

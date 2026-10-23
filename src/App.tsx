@@ -48,7 +48,20 @@ import CustomerAuthPortal from "./components/CustomerAuthPortal";
 import { CustomerProfile, getStoredCustomerSession } from "./supabaseClient";
 import { safeSetLocalStorage, safeParseLocal, persistKeyVal, idbGet } from "./storage";
 import { fetchCloudStore, pushCloudStore, scoreCustomizationRichness } from "./cloudStore";
-import { sendQuoteNotificationToAdmin } from "./emailService";
+import {
+  sendQuoteNotificationToAdmin,
+  sendContactConfirmationToClient,
+  validateEmailAddress,
+  validatePhoneNumber
+} from "./emailService";
+
+function formatPhoneInput(raw: string): string {
+  if (raw.startsWith("+")) return raw;
+  const digits = raw.replace(/\D/g, "").slice(0, 10);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
 
 async function safeFetchJson(url: string, options?: RequestInit): Promise<{ ok: boolean; status: number; data: any }> {
   try {
@@ -294,7 +307,28 @@ export default function App() {
   };
 
   const [contactSubmitted, setContactSubmitted] = useState(false);
-  const [contactData, setContactData] = useState({ name: "", email: "", subject: "", message: "" });
+  const [contactData, setContactData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    contactPreference: "" as "" | "email" | "phone",
+    subject: "",
+    message: ""
+  });
+  const [contactErrors, setContactErrors] = useState<{
+    name?: string;
+    email?: string;
+    phone?: string;
+    contactPreference?: string;
+    message?: string;
+  }>({});
+  const [contactEmailSuggestion, setContactEmailSuggestion] = useState<string>("");
+  const [submittedContactInfo, setSubmittedContactInfo] = useState<{
+    name: string;
+    email: string;
+    phone?: string;
+    contactPreference?: "email" | "phone";
+  } | null>(null);
   const [contactUploadedFiles, setContactUploadedFiles] = useState<{ name: string; size: number; url: string }[]>([]);
   const [contactDragActive, setContactDragActive] = useState(false);
   const [contactUploadingFiles, setContactUploadingFiles] = useState(false);
@@ -2542,34 +2576,128 @@ export default function App() {
                     <h4 className="font-serif font-bold text-brand-dark text-xl mb-4">Send us a Message</h4>
                     
                     {contactSubmitted ? (
-                      <div className="bg-green-50 border border-green-200 rounded-[20px] p-6 text-center space-y-3 animate-fade-in py-12">
-                        <CheckCircle className="h-10 w-10 text-green-600 mx-auto" />
-                        <h5 className="font-serif font-bold text-stone-900 text-lg">Message Received Safely</h5>
-                        <p className="text-stone-600 text-xs font-light max-w-sm mx-auto leading-relaxed">
-                          Thank you for reaching out. Nicoletta personally reads all studio messages. We will review your inquiry and email you back within one business day.
-                        </p>
+                      <div className="bg-green-50/70 border border-green-200 rounded-[24px] p-6 md:p-8 text-center space-y-5 animate-fade-in py-10">
+                        <div className="w-14 h-14 bg-green-100 border border-green-300 rounded-full flex items-center justify-center mx-auto text-green-700 shadow-xs">
+                          <CheckCircle className="h-8 w-8 text-green-600" />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <h5 className="font-serif font-bold text-stone-900 text-xl">Message Sent Successfully</h5>
+                          <p className="text-stone-600 text-sm font-light max-w-md mx-auto leading-relaxed">
+                            Thank you for reaching out{submittedContactInfo?.name ? `, ${submittedContactInfo.name}` : ""}! Nicoletta personally reads all studio messages and will respond within one business day.
+                          </p>
+                        </div>
+
+                        {/* Verification & Confirmation Note Box */}
+                        <div className="bg-white border border-amber-200/90 rounded-[18px] p-5 max-w-lg mx-auto text-left shadow-2xs space-y-3">
+                          <div className="flex items-center gap-2 text-amber-900 font-bold text-xs uppercase tracking-wider">
+                            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                            Email &amp; Text Confirmation Notice
+                          </div>
+
+                          <p className="text-stone-700 text-xs leading-relaxed">
+                            An automated confirmation email has been dispatched to your address (<strong>{submittedContactInfo?.email}</strong>)
+                            {submittedContactInfo?.phone ? <span> and noted your phone number (<strong>{submittedContactInfo.phone}</strong>) for {submittedContactInfo.contactPreference === "phone" ? "phone call/text" : "our records"}</span> : ""}.
+                          </p>
+
+                          <div className="bg-amber-50/90 border border-amber-200/70 rounded-[12px] p-3 text-stone-800 text-xs leading-relaxed space-y-1.5">
+                            <p className="font-semibold text-amber-950 flex items-center gap-1.5">
+                              <span>⚠️</span> Didn&apos;t receive a confirmation email within 5 minutes?
+                            </p>
+                            <p className="text-stone-700 text-[11px] leading-relaxed">
+                              Please check your spam or junk folder, and verify that your email address and phone number were entered correctly without typos.
+                            </p>
+                            <p className="text-stone-700 text-[11px] leading-relaxed pt-1.5 border-t border-amber-200/60 font-medium">
+                              If your email or phone had a typo, please click below to send us another message with the corrected information so we can reach you!
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setContactSubmitted(false)}
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-primary hover:text-brand-dark transition-colors underline underline-offset-4 cursor-pointer"
+                          >
+                            Send another message or submit a correction &rarr;
+                          </button>
+                        </div>
                       </div>
                     ) : (
                       <form onSubmit={async (e) => {
                         e.preventDefault();
-                        if (!contactData.name || !contactData.email || !contactData.message) return;
-                        
+                        const errors: typeof contactErrors = {};
+
+                        // Validate Name
+                        if (!contactData.name.trim()) {
+                          errors.name = "Your name is required.";
+                        }
+
+                        // Validate Email Address
+                        const emailRes = validateEmailAddress(contactData.email);
+                        if (!emailRes.valid) {
+                          errors.email = emailRes.error;
+                          if (emailRes.suggestion) {
+                            setContactEmailSuggestion(emailRes.suggestion);
+                          }
+                        } else {
+                          setContactEmailSuggestion("");
+                        }
+
+                        // Validate Contact Preference (REQUIRED)
+                        if (!contactData.contactPreference) {
+                          errors.contactPreference = "Please select how you would like to be contacted (Email or Phone).";
+                        }
+
+                        // Validate Phone Number
+                        const isPhoneRequired = contactData.contactPreference === "phone";
+                        const phoneRes = validatePhoneNumber(contactData.phone, isPhoneRequired);
+                        if (!phoneRes.valid) {
+                          errors.phone = phoneRes.error;
+                        }
+
+                        // Validate Message
+                        if (!contactData.message.trim()) {
+                          errors.message = "Message details are required.";
+                        }
+
+                        if (Object.keys(errors).length > 0) {
+                          setContactErrors(errors);
+                          return;
+                        }
+
+                        setContactErrors({});
+
+                        const formattedPhone = phoneRes.formatted || contactData.phone.trim();
+                        const cleanCustomerName = contactData.name.trim();
+                        const cleanCustomerEmail = contactData.email.trim();
+                        const cleanSubject = contactData.subject.trim() || "General Inquiry";
+                        const cleanMessage = contactData.message.trim();
+                        const chosenPref = contactData.contactPreference as "email" | "phone";
+
                         const payload = {
                           type: "contact" as const,
-                          productName: `Contact Message: ${contactData.subject || "General Inquiry"}`,
-                          customerName: contactData.name,
-                          customerEmail: contactData.email,
-                          specialInstructions: contactData.message,
+                          productName: `Contact Message: ${cleanSubject}`,
+                          customerName: cleanCustomerName,
+                          customerEmail: cleanCustomerEmail,
+                          customerPhone: formattedPhone || undefined,
+                          contactPreference: chosenPref,
+                          specialInstructions: cleanMessage,
                           quantity: 1,
                           uploadedFiles: contactUploadedFiles.length > 0 ? contactUploadedFiles : undefined
                         };
+
+                        const tempId = `q-${Date.now()}`;
                         const fallbackContactQuote: QuoteRequest = {
                           ...payload,
-                          id: `q-${Date.now()}`,
+                          id: tempId,
                           status: "pending",
                           createdAt: new Date().toISOString(),
                           updatedAt: new Date().toISOString()
                         };
+
+                        let savedItem = fallbackContactQuote;
+
                         try {
                           const response = await fetch("/api/quotes", {
                             method: "POST",
@@ -2579,6 +2707,7 @@ export default function App() {
                           
                           if (response.ok) {
                             const saved = await response.json();
+                            savedItem = saved;
                             const nextQuotes = [saved, ...quotes.filter((q) => q.id !== saved.id)];
                             setQuotes(nextQuotes);
                             persistKeyVal("nicoletta_quotes", nextQuotes);
@@ -2599,12 +2728,30 @@ export default function App() {
                           pushCloudStore({ quotes: nextQuotes }).catch(() => {});
                           sendQuoteNotificationToAdmin(fallbackContactQuote, customization.emailSettings).catch(() => {});
                         }
+
+                        // Send confirmation email to client
+                        const refCode = (savedItem.id || tempId).replace(/^q-/, "").slice(-6).toUpperCase();
+                        sendContactConfirmationToClient({
+                          name: cleanCustomerName,
+                          email: cleanCustomerEmail,
+                          phone: formattedPhone || undefined,
+                          contactPreference: chosenPref,
+                          subject: cleanSubject,
+                          message: cleanMessage,
+                          refCode
+                        }, customization.emailSettings).catch(() => {});
+
+                        // Save submitted info for success view
+                        setSubmittedContactInfo({
+                          name: cleanCustomerName,
+                          email: cleanCustomerEmail,
+                          phone: formattedPhone || undefined,
+                          contactPreference: chosenPref
+                        });
+
                         setContactSubmitted(true);
                         setContactUploadedFiles([]);
-                        setContactData({ name: "", email: "", subject: "", message: "" });
-                        setTimeout(() => {
-                          setContactSubmitted(false);
-                        }, 8000);
+                        setContactData({ name: "", email: "", phone: "", contactPreference: "", subject: "", message: "" });
                       }} className="space-y-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div className="flex flex-col gap-1.5">
@@ -2614,12 +2761,19 @@ export default function App() {
                             <input
                               id="contactName"
                               type="text"
-                              required
                               value={contactData.name}
-                              onChange={(e) => setContactData({ ...contactData, name: e.target.value })}
+                              onChange={(e) => {
+                                setContactData({ ...contactData, name: e.target.value });
+                                if (contactErrors.name) setContactErrors((prev) => ({ ...prev, name: undefined }));
+                              }}
                               placeholder="Eleanor Vance"
-                              className="bg-brand-highlight/30 border border-brand-border rounded-[8px] py-2 px-3 text-brand-text text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary"
+                              className={`bg-brand-highlight/30 border rounded-[8px] py-2 px-3 text-brand-text text-sm focus:outline-none focus:ring-1 ${
+                                contactErrors.name ? "border-red-400 focus:ring-red-400 focus:border-red-400" : "border-brand-border focus:ring-brand-primary focus:border-brand-primary"
+                              }`}
                             />
+                            {contactErrors.name && (
+                              <p className="text-[11px] text-red-600 font-medium">{contactErrors.name}</p>
+                            )}
                           </div>
                           
                           <div className="flex flex-col gap-1.5">
@@ -2629,13 +2783,119 @@ export default function App() {
                             <input
                               id="contactEmail"
                               type="email"
-                              required
                               value={contactData.email}
-                              onChange={(e) => setContactData({ ...contactData, email: e.target.value })}
+                              onChange={(e) => {
+                                setContactData({ ...contactData, email: e.target.value });
+                                if (contactErrors.email) setContactErrors((prev) => ({ ...prev, email: undefined }));
+                                if (contactEmailSuggestion) setContactEmailSuggestion("");
+                              }}
                               placeholder="eleanor@example.com"
-                              className="bg-brand-highlight/30 border border-brand-border rounded-[8px] py-2 px-3 text-brand-text text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary"
+                              className={`bg-brand-highlight/30 border rounded-[8px] py-2 px-3 text-brand-text text-sm focus:outline-none focus:ring-1 ${
+                                contactErrors.email ? "border-red-400 focus:ring-red-400 focus:border-red-400" : "border-brand-border focus:ring-brand-primary focus:border-brand-primary"
+                              }`}
                             />
+                            {contactErrors.email && (
+                              <p className="text-[11px] text-red-600 font-medium">{contactErrors.email}</p>
+                            )}
+                            {contactEmailSuggestion && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setContactData((prev) => ({ ...prev, email: contactEmailSuggestion }));
+                                  setContactEmailSuggestion("");
+                                  setContactErrors((prev) => ({ ...prev, email: undefined }));
+                                }}
+                                className="text-[11px] text-brand-primary text-left hover:underline font-medium cursor-pointer"
+                              >
+                                Did you mean <strong>{contactEmailSuggestion}</strong>? Click to apply.
+                              </button>
+                            )}
                           </div>
+                        </div>
+
+                        {/* Preferred Contact Method (REQUIRED) */}
+                        <div className="flex flex-col gap-1.5 pt-1">
+                          <label className="text-[10px] font-bold text-brand-muted uppercase tracking-wider flex items-center justify-between">
+                            <span>
+                              How would you like to be contacted? <span className="text-red-500">*</span>
+                            </span>
+                            <span className="text-[10px] text-brand-muted font-normal lowercase">(Required selection)</span>
+                          </label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setContactData((prev) => ({ ...prev, contactPreference: "email" }));
+                                if (contactErrors.contactPreference) setContactErrors((prev) => ({ ...prev, contactPreference: undefined }));
+                              }}
+                              className={`flex items-center gap-2.5 p-3 rounded-[12px] border text-left transition-all cursor-pointer ${
+                                contactData.contactPreference === "email"
+                                  ? "bg-brand-primary/10 border-brand-primary ring-1 ring-brand-primary text-brand-dark shadow-2xs"
+                                  : "bg-white border-brand-border hover:bg-stone-50 text-stone-700"
+                              }`}
+                            >
+                              <div className={`p-2 rounded-full shrink-0 ${contactData.contactPreference === "email" ? "bg-brand-primary text-white" : "bg-stone-100 text-stone-600"}`}>
+                                <Mail className="h-4 w-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold leading-tight">By Email</p>
+                                <p className="text-[11px] text-brand-muted truncate">Receive studio reply via email</p>
+                              </div>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setContactData((prev) => ({ ...prev, contactPreference: "phone" }));
+                                if (contactErrors.contactPreference) setContactErrors((prev) => ({ ...prev, contactPreference: undefined }));
+                              }}
+                              className={`flex items-center gap-2.5 p-3 rounded-[12px] border text-left transition-all cursor-pointer ${
+                                contactData.contactPreference === "phone"
+                                  ? "bg-brand-primary/10 border-brand-primary ring-1 ring-brand-primary text-brand-dark shadow-2xs"
+                                  : "bg-white border-brand-border hover:bg-stone-50 text-stone-700"
+                              }`}
+                            >
+                              <div className={`p-2 rounded-full shrink-0 ${contactData.contactPreference === "phone" ? "bg-brand-primary text-white" : "bg-stone-100 text-stone-600"}`}>
+                                <Phone className="h-4 w-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold leading-tight">By Phone</p>
+                                <p className="text-[11px] text-brand-muted truncate">Phone call or text message</p>
+                              </div>
+                            </button>
+                          </div>
+                          {contactErrors.contactPreference && (
+                            <p className="text-[11px] text-red-600 font-medium">{contactErrors.contactPreference}</p>
+                          )}
+                        </div>
+
+                        {/* Phone Number Field */}
+                        <div className="flex flex-col gap-1.5">
+                          <label htmlFor="contactPhone" className="text-[10px] font-bold text-brand-muted uppercase tracking-wider flex items-center justify-between">
+                            <span>
+                              Phone Number {contactData.contactPreference === "phone" ? <span className="text-red-500">*</span> : <span className="text-stone-400 font-normal lowercase">(optional)</span>}
+                            </span>
+                            {contactData.contactPreference === "phone" && (
+                              <span className="text-[10px] text-amber-700 font-semibold normal-case">Required for phone contact</span>
+                            )}
+                          </label>
+                          <input
+                            id="contactPhone"
+                            type="tel"
+                            value={contactData.phone}
+                            onChange={(e) => {
+                              const formatted = formatPhoneInput(e.target.value);
+                              setContactData((prev) => ({ ...prev, phone: formatted }));
+                              if (contactErrors.phone) setContactErrors((prev) => ({ ...prev, phone: undefined }));
+                            }}
+                            placeholder="(709) 763-1315"
+                            className={`bg-brand-highlight/30 border rounded-[8px] py-2 px-3 text-brand-text text-sm focus:outline-none focus:ring-1 ${
+                              contactErrors.phone ? "border-red-400 focus:ring-red-400 focus:border-red-400" : "border-brand-border focus:ring-brand-primary focus:border-brand-primary"
+                            }`}
+                          />
+                          {contactErrors.phone && (
+                            <p className="text-[11px] text-red-600 font-medium">{contactErrors.phone}</p>
+                          )}
                         </div>
 
                         <div className="flex flex-col gap-1.5">
@@ -2658,13 +2918,20 @@ export default function App() {
                           </label>
                           <textarea
                             id="contactMessage"
-                            required
                             rows={4}
                             value={contactData.message}
-                            onChange={(e) => setContactData({ ...contactData, message: e.target.value })}
+                            onChange={(e) => {
+                              setContactData({ ...contactData, message: e.target.value });
+                              if (contactErrors.message) setContactErrors((prev) => ({ ...prev, message: undefined }));
+                            }}
                             placeholder="Hi Nicoletta, I'd love to order custom mugs for Christmas! Specifically, I would like 5 mugs of 15 oz each with designs on both sides—featuring a custom picture on one side and a beautiful quote on the other side. Could you let me know about pricing..."
-                            className="bg-brand-highlight/30 border border-brand-border rounded-[8px] py-2.5 px-3 text-brand-text text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary"
+                            className={`bg-brand-highlight/30 border rounded-[8px] py-2.5 px-3 text-brand-text text-sm focus:outline-none focus:ring-1 ${
+                              contactErrors.message ? "border-red-400 focus:ring-red-400 focus:border-red-400" : "border-brand-border focus:ring-brand-primary focus:border-brand-primary"
+                            }`}
                           />
+                          {contactErrors.message && (
+                            <p className="text-[11px] text-red-600 font-medium">{contactErrors.message}</p>
+                          )}
                         </div>
 
                         {/* File Upload Zone */}
@@ -2788,7 +3055,8 @@ export default function App() {
                     setContactData((prev) => ({
                       ...prev,
                       name: prev.name || updatedCustomer.fullName,
-                      email: prev.email || updatedCustomer.email
+                      email: prev.email || updatedCustomer.email,
+                      phone: prev.phone || updatedCustomer.phone || ""
                     }));
                   }
                 }}
