@@ -30,12 +30,6 @@ import {
   Info
 } from "lucide-react";
 import { Product, Category, Testimonial, Announcement, QuoteRequest, AnalyticsSummary, CustomizationSettings, CustomSection, GIFT_OCCASION_PRESETS } from "./types";
-import {
-  INITIAL_CATEGORIES,
-  INITIAL_PRODUCTS,
-  INITIAL_TESTIMONIALS,
-  INITIAL_ANNOUNCEMENTS
-} from "./data";
 import AnnouncementBar from "./components/AnnouncementBar";
 import ProductCard from "./components/ProductCard";
 import QuoteForm from "./components/QuoteForm";
@@ -48,6 +42,13 @@ import CustomerAuthPortal from "./components/CustomerAuthPortal";
 import { CustomerProfile, getStoredCustomerSession } from "./supabaseClient";
 import { safeSetLocalStorage, safeParseLocal, persistKeyVal, idbGet } from "./storage";
 import { fetchCloudStore, pushCloudStore, scoreCustomizationRichness } from "./cloudStore";
+import {
+  INITIAL_CATEGORIES,
+  INITIAL_PRODUCTS,
+  INITIAL_TESTIMONIALS,
+  INITIAL_ANNOUNCEMENTS,
+  INITIAL_CUSTOMIZATION
+} from "./initialData";
 import {
   sendQuoteNotificationToAdmin,
   sendQuoteConfirmationToClient,
@@ -106,134 +107,36 @@ export const ensureContactSection = (cust: CustomizationSettings): Customization
 };
 
 export default function App() {
-  // Ensure legacy sample dummy data is purged from local browser cache on initial boot
-  if (typeof window !== "undefined" && !localStorage.getItem("nicoletta_sample_data_cleared_v2")) {
-    try {
-      localStorage.removeItem("nicoletta_products");
-      localStorage.removeItem("nicoletta_categories");
-      localStorage.removeItem("nicoletta_testimonials");
-      localStorage.removeItem("nicoletta_announcements");
-      localStorage.removeItem("nicoletta_quotes");
-      safeSetLocalStorage("nicoletta_sample_data_cleared_v2", "true");
-    } catch {
-      // Ignore storage errors
-    }
-  }
+  // Persistence state initialized immediately with the authoritative updated store data
+  const isStaleCustomization = (cust: any) => {
+    if (!cust || typeof cust !== "object" || !Array.isArray(cust.sections) || cust.sections.length === 0) return true;
+    const hero = cust.sections.find((s: any) => s && s.id === "home-hero");
+    if (!hero) return true;
+    if (hero.title && (hero.title.includes("Handcrafted Wood") || hero.title.includes("Portland"))) return true;
+    if (hero.description && hero.description.includes("Portland, Oregon")) return true;
+    return false;
+  };
 
-  // Persistence state
   const [products, setProducts] = useState<Product[]>(() =>
-    safeParseLocal<Product[]>("nicoletta_products", [], Array.isArray)
+    safeParseLocal<Product[]>("nicoletta_products", INITIAL_PRODUCTS, (v) => Array.isArray(v) && v.length > 0)
   );
   const [categories, setCategories] = useState<Category[]>(() =>
-    safeParseLocal<Category[]>("nicoletta_categories", [], Array.isArray)
+    safeParseLocal<Category[]>("nicoletta_categories", INITIAL_CATEGORIES, (v) => Array.isArray(v) && v.length > 0)
   );
   const [testimonials, setTestimonials] = useState<Testimonial[]>(() =>
-    safeParseLocal<Testimonial[]>("nicoletta_testimonials", [], Array.isArray)
+    safeParseLocal<Testimonial[]>("nicoletta_testimonials", INITIAL_TESTIMONIALS, (v) => Array.isArray(v) && v.length > 0)
   );
   const [announcements, setAnnouncements] = useState<Announcement[]>(() =>
-    safeParseLocal<Announcement[]>("nicoletta_announcements", [], Array.isArray)
+    safeParseLocal<Announcement[]>("nicoletta_announcements", INITIAL_ANNOUNCEMENTS, (v) => Array.isArray(v))
   );
   const [quotes, setQuotes] = useState<QuoteRequest[]>(() =>
     safeParseLocal<QuoteRequest[]>("nicoletta_quotes", [], Array.isArray)
   );
   const [customization, setCustomization] = useState<CustomizationSettings>(() => {
-    const defaultCust: CustomizationSettings = {
-      logoText: "Nicoletta",
-      logoSubtext: "Crafts & Decor",
-      logoImageUrl: "",
-      logoShowText: true,
-      logoSize: 48,
-      logoHideBorder: true,
-      sections: [
-        {
-          id: "home-hero",
-          page: "home",
-          title: "Handcrafted Wood.",
-          subtitle: "Fire-Etched Memories.",
-          description: "We create luxury heirlooms and custom gifts in Portland, Oregon. From hand-planed walnut cutting boards to deep-sandblasted glassware, every piece is laser-etched with exquisite care and hand-finished in natural, organic board oils.",
-          visible: true,
-          order: 1,
-          buttonText1: "Browse Collections",
-          buttonText2: "Request Custom Quote"
-        },
-        {
-          id: "home-categories",
-          page: "home",
-          title: "Crafted Categories",
-          subtitle: "Signature Materials",
-          description: "Click a core medium to browse our dedicated collection and filter the workshop showcase.",
-          visible: true,
-          order: 2
-        },
-        {
-          id: "home-featured",
-          page: "home",
-          title: "Featured Shop Works",
-          subtitle: "The Masterpieces",
-          description: "Explore our handpicked curation of laser-branded and sandblast-etched creations.",
-          visible: true,
-          order: 3,
-          buttonText1: "View All Products"
-        },
-        {
-          id: "home-difference",
-          page: "home",
-          title: "The Nicoletta Difference",
-          subtitle: "Uncompromising Standards",
-          description: "We craft future family heirlooms, not disposable woodware. Every piece conforms to a high-contrast standard of luxury.",
-          visible: true,
-          order: 4
-        },
-        {
-          id: "home-announcements",
-          page: "home",
-          title: "Shop News & Events",
-          subtitle: "Workshop Ledger",
-          description: "Latest happenings, local pop-up markets, and limited seasonal craft offers.",
-          visible: true,
-          order: 5
-        },
-        {
-          id: "home-testimonials",
-          page: "home",
-          title: "Stories from the Mantle",
-          subtitle: "Patron Affection",
-          description: "Read direct feedback from clients who have gifted our engraving pieces.",
-          visible: true,
-          order: 6,
-          buttonText1: "See All Verified Reviews"
-        },
-        {
-          id: "home-about",
-          page: "home",
-          title: "Nicoletta Decor",
-          subtitle: "Meet the Craftsman",
-          description: "Founded in Portland, Oregon in 2021 by artisan Tannia, our shop was born out of a deep reverence for organic materials and classic design. We select local, sustainably-cut timber and cure each board by hand.",
-          extraText1: "Every laser brand and sandblast carving is executed one-by-one with surgical attention to grain and texture. We never treat your project as generic manufacture; we create future heirlooms destined to outlast us all.",
-          extraText2: "Tannia",
-          extraText3: "Founder & Master Engraver",
-          imageUrl1: "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&q=80&w=400",
-          imageUrl2: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&q=80&w=400",
-          visible: true,
-          order: 7
-        },
-        {
-          id: "home-cta",
-          page: "home",
-          title: "Looking for a custom size, wood variety, or corporate logo commission?",
-          subtitle: "",
-          description: "We frequently design bespoke collections for corporate gifts, weddings, and local restaurants. Let us turn your sketch into an everlasting physical masterpiece.",
-          visible: true,
-          order: 8,
-          buttonText1: "Submit Quote Request"
-        },
-        DEFAULT_CONTACT_SECTION
-      ]
-    };
     const parsed = safeParseLocal<CustomizationSettings>(
       "nicoletta_customization",
-      defaultCust,
-      (val) => Boolean(val && typeof val === "object" && Array.isArray(val.sections) && val.sections.length > 0)
+      INITIAL_CUSTOMIZATION,
+      (val) => Boolean(val && typeof val === "object" && Array.isArray(val.sections) && val.sections.length > 0 && !isStaleCustomization(val))
     );
     return ensureContactSection(parsed);
   });
@@ -258,46 +161,26 @@ export default function App() {
   const [selectedProductForQuote, setSelectedProductForQuote] = useState<Product | null>(null);
   const [selectedProductDetail, setSelectedProductDetail] = useState<Product | null>(null);
 
-  // Global Page Loading & Progress Bar States
-  const [pageLoadingProgress, setPageLoadingProgress] = useState<number>(0);
+  // Global In-Page Loading States (top progress bar removed per design)
   const [isPageLoading, setIsPageLoading] = useState<boolean>(true);
   const [isSlowLoading, setIsSlowLoading] = useState<boolean>(false);
-  const loadingProgressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const slowLoadingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const startLoadingBar = () => {
     setIsPageLoading(true);
     setIsSlowLoading(false);
-    setPageLoadingProgress(22);
-
-    if (loadingProgressTimerRef.current) clearInterval(loadingProgressTimerRef.current);
     if (slowLoadingTimerRef.current) clearTimeout(slowLoadingTimerRef.current);
 
-    loadingProgressTimerRef.current = setInterval(() => {
-      setPageLoadingProgress((prev) => {
-        if (prev < 48) return prev + 14;
-        if (prev < 78) return prev + 7;
-        if (prev < 91) return prev + 2;
-        return prev;
-      });
-    }, 180);
-
-    // If a page transition takes more than 1.1s, mark as slow loading to show the helpful notification banner
+    // If initial loading takes longer than 1.1s, display polite in-page notification
     slowLoadingTimerRef.current = setTimeout(() => {
       setIsSlowLoading(true);
     }, 1100);
   };
 
   const finishLoadingBar = () => {
-    if (loadingProgressTimerRef.current) clearInterval(loadingProgressTimerRef.current);
     if (slowLoadingTimerRef.current) clearTimeout(slowLoadingTimerRef.current);
-    setPageLoadingProgress(100);
-
-    setTimeout(() => {
-      setIsPageLoading(false);
-      setIsSlowLoading(false);
-      setPageLoadingProgress(0);
-    }, 380);
+    setIsPageLoading(false);
+    setIsSlowLoading(false);
   };
 
   const [contactSubmitted, setContactSubmitted] = useState(false);
@@ -498,7 +381,7 @@ export default function App() {
       const localStore = await readBestLocalStore();
 
       // Apply local IndexedDB hydration immediately so the user sees their local work without flicker
-      if (localStore.customization) setCustomization(ensureContactSection(localStore.customization));
+      if (localStore.customization && !isStaleCustomization(localStore.customization)) setCustomization(ensureContactSection(localStore.customization));
       if (localStore.products.length > 0) setProducts(localStore.products);
       if (localStore.categories.length > 0) setCategories(localStore.categories);
       if (localStore.testimonials.length > 0) setTestimonials(localStore.testimonials);
@@ -666,23 +549,6 @@ export default function App() {
   };
 
   const [initialLoadDone, setInitialLoadDone] = useState(false);
-
-  // One-time cleanup for old dummy sample records
-  useEffect(() => {
-    try {
-      const cleanedFlag = localStorage.getItem("nicoletta_sample_data_cleared_v1");
-      if (!cleanedFlag) {
-        localStorage.removeItem("nicoletta_products");
-        localStorage.removeItem("nicoletta_categories");
-        localStorage.removeItem("nicoletta_testimonials");
-        localStorage.removeItem("nicoletta_announcements");
-        localStorage.removeItem("nicoletta_quotes");
-        safeSetLocalStorage("nicoletta_sample_data_cleared_v1", "true");
-      }
-    } catch {
-      // Ignore storage access errors
-    }
-  }, []);
 
   // Keep localStorage + IndexedDB backup updated once initial load has fetched active states from the server
   useEffect(() => {
@@ -1278,15 +1144,6 @@ export default function App() {
     }
   }, [selectedCategoryId, categories]);
 
-  // Trigger top loading bar progress on page, category, or product navigation
-  useEffect(() => {
-    startLoadingBar();
-    const timer = setTimeout(() => {
-      finishLoadingBar();
-    }, 420);
-    return () => clearTimeout(timer);
-  }, [activePage, selectedProductDetail?.id, selectedCategoryId]);
-
   // CLIENT FORM ACTIONS
   const handleClientSubmitQuote = async (payload: Omit<QuoteRequest, "id" | "createdAt" | "updatedAt" | "status">) => {
     const fallbackQuote: QuoteRequest = {
@@ -1421,38 +1278,18 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-brand-bg flex flex-col font-sans selection:bg-brand-primary selection:text-white relative">
-      {/* Global Top Sleek Progress & Loading Bar */}
-      {isPageLoading && (
-        <div className="fixed top-0 left-0 right-0 z-[9999] pointer-events-none">
-          {/* Luminous Brand Progress Track */}
-          <div className="h-1 md:h-1.5 w-full bg-stone-900/10 backdrop-blur-xs overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-amber-700 via-amber-500 to-amber-300 shadow-[0_0_14px_rgba(217,119,6,0.95)] relative"
-              style={{
-                width: `${pageLoadingProgress}%`,
-                opacity: pageLoadingProgress >= 100 ? 0 : 1,
-                transition: pageLoadingProgress === 100 ? "width 200ms ease-out, opacity 400ms ease-in 150ms" : "width 280ms ease-out"
-              }}
-            >
-              {/* Dynamic Head Shimmer Light Beam */}
-              <div className="absolute right-0 top-0 bottom-0 w-28 bg-gradient-to-r from-transparent via-white/50 to-white animate-pulse" />
-            </div>
+      {/* In-page friendly message if loading takes long */}
+      {isSlowLoading && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 animate-fade-in pointer-events-none px-4">
+          <div className="bg-white/95 text-stone-900 border border-amber-300/90 shadow-2xl px-6 py-3 rounded-full flex items-center gap-3 backdrop-blur-md">
+            <span className="h-4 w-4 border-2 border-amber-700 border-t-transparent rounded-full animate-spin shrink-0" />
+            <span className="font-serif font-bold text-stone-900 text-sm">
+              Nicoletta is loading...
+            </span>
+            <span className="text-[10px] text-amber-900 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full font-sans font-medium">
+              Almost there!
+            </span>
           </div>
-
-          {/* Polite Glassmorphism Pill if Loading Takes More Than 1.1s */}
-          {isSlowLoading && (
-            <div className="flex justify-center pt-3 animate-fade-in px-4">
-              <div className="bg-stone-900/95 text-white border border-amber-500/30 shadow-xl px-4 py-2 rounded-full text-xs flex items-center gap-2.5 backdrop-blur-md">
-                <span className="h-3.5 w-3.5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin shrink-0" />
-                <span className="font-medium text-stone-200">
-                  Handcrafting page content... almost there!
-                </span>
-                <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-400/30 px-2 py-0.5 rounded-full font-mono uppercase tracking-wider">
-                  Loading
-                </span>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
