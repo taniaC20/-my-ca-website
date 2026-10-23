@@ -282,7 +282,7 @@ const DEFAULT_CUSTOMIZATION = {
     {
       id: "testimonials-header",
       page: "testimonials",
-      title: "Kind Words from Our Customers",
+      title: "Words from Our Customers",
       subtitle: "Customer Reviews",
       description: "Every creation has a story, and we love being part of yours! Read what our customers have to say about their personalized gifts and handmade creations. Have you ordered from Nicoletta? We'd love to hear about your experience! Leave us a review.",
       visible: true,
@@ -294,9 +294,9 @@ const DEFAULT_CUSTOMIZATION = {
       title: "Connect with Nicoletta",
       subtitle: "We'd Love to Hear from You",
       description: "Have a question, a custom request, or a special gift in mind? We'd love to help you create something meaningful. Send us a message and let's make your idea a reality!",
-      extraText1: "Nicoletta Crafts Workshop",
-      extraText2: "305 Water St, St. John's, NL, Canada",
-      extraText3: "(709) 555-0182",
+      extraText1: "Nicoletta Crafts & Decor",
+      extraText2: "Close to Village Mall",
+      extraText3: "+1(709)7631315",
       extraText: "sales@nicolettacraftsdecor.ca",
       visible: true,
       order: 1

@@ -26,7 +26,8 @@ import {
   Upload,
   Trash2,
   Paperclip,
-  User
+  User,
+  Info
 } from "lucide-react";
 import { Product, Category, Testimonial, Announcement, QuoteRequest, AnalyticsSummary, CustomizationSettings, CustomSection, GIFT_OCCASION_PRESETS } from "./types";
 import {
@@ -69,9 +70,9 @@ export const DEFAULT_CONTACT_SECTION: CustomSection = {
   title: "Connect with Nicoletta",
   subtitle: "We'd Love to Hear from You",
   description: "Have a question, a custom request, or a special gift in mind? We'd love to help you create something meaningful. Send us a message and let's make your idea a reality!",
-  extraText1: "Nicoletta Crafts Workshop",
-  extraText2: "305 Water St, St. John's, NL, Canada",
-  extraText3: "(709) 555-0182",
+  extraText1: "Nicoletta Crafts & Decor",
+  extraText2: "Close to Village Mall",
+  extraText3: "+1(709)7631315",
   extraText: "sales@nicolettacraftsdecor.ca",
   visible: true,
   order: 9
@@ -84,13 +85,14 @@ export const ensureContactSection = (cust: CustomizationSettings): Customization
   if (idx === -1) {
     sections.push({ ...DEFAULT_CONTACT_SECTION });
   } else {
+    const s = sections[idx];
     sections[idx] = {
       ...DEFAULT_CONTACT_SECTION,
-      ...sections[idx],
-      extraText1: sections[idx].extraText1 !== undefined ? sections[idx].extraText1 : DEFAULT_CONTACT_SECTION.extraText1,
-      extraText2: sections[idx].extraText2 !== undefined ? sections[idx].extraText2 : DEFAULT_CONTACT_SECTION.extraText2,
-      extraText3: sections[idx].extraText3 !== undefined ? sections[idx].extraText3 : DEFAULT_CONTACT_SECTION.extraText3,
-      extraText: sections[idx].extraText !== undefined ? sections[idx].extraText : DEFAULT_CONTACT_SECTION.extraText,
+      ...s,
+      extraText1: !s.extraText1 || s.extraText1 === "Nicoletta Crafts Workshop" ? "Nicoletta Crafts & Decor" : s.extraText1,
+      extraText2: !s.extraText2 || s.extraText2 === "305 Water St, St. John's, NL, Canada" ? "Close to Village Mall" : s.extraText2,
+      extraText3: !s.extraText3 || s.extraText3 === "(709) 555-0182" ? "+1(709)7631315" : s.extraText3,
+      extraText: !s.extraText || s.extraText === "crafts@nicolettadecor.com" || s.extraText === "tnchevez@mun.ca" ? "sales@nicolettacraftsdecor.ca" : s.extraText,
     };
   }
   return { ...cust, sections };
@@ -2495,8 +2497,8 @@ export default function App() {
                 {(() => {
                   const sec = customization.sections?.find(s => s.id === "testimonials-header");
                   const subtitle = !sec?.subtitle || sec.subtitle === "Patron Testimonials" ? "Customer Reviews" : sec.subtitle;
-                  const title = !sec?.title || sec.title === "Bespoke Stories" || sec.title === "Stories from the Mantle" ? "Kind Words from Our Customers" : sec.title;
-                  const description = !sec?.description || sec.description.includes("Verified reviews left by our luxury gift patrons")
+                  const title = !sec?.title || sec.title === "Bespoke Stories" || sec.title === "Stories from the Mantle" || sec.title === "Kind Words from Our Customers" || sec.title === "Stories from our Costumers" ? "Words from Our Customers" : sec.title;
+                  const description = !sec?.description || sec.description.includes("Verified reviews left by our luxury gift patrons") || sec.description.includes("Verified reviews left by our amazing customers")
                     ? "Every creation has a story, and we love being part of yours! Read what our customers have to say about their personalized gifts and handmade creations. Have you ordered from Nicoletta? We'd love to hear about your experience! Leave us a review."
                     : sec.description;
 
@@ -2558,10 +2560,10 @@ export default function App() {
                     {/* Visual details card */}
                     {(() => {
                       const sec = customization.sections?.find(s => s.id === "contact-header");
-                      const workshopTitle = sec?.extraText1 || "Nicoletta Crafts Workshop";
-                      const pickupAddress = sec?.extraText2 || "305 Water St, St. John's, NL, Canada";
-                      const voiceContact = sec?.extraText3 || "(709) 555-0182";
-                      const emailInquiry = sec?.extraText || "sales@nicolettacraftsdecor.ca";
+                      const workshopTitle = sec?.extraText1 && sec.extraText1 !== "Nicoletta Crafts Workshop" ? sec.extraText1 : "Nicoletta Crafts & Decor";
+                      const pickupAddress = sec?.extraText2 && sec.extraText2 !== "305 Water St, St. John's, NL, Canada" ? sec.extraText2 : "Close to Village Mall";
+                      const voiceContact = sec?.extraText3 && sec.extraText3 !== "(709) 555-0182" ? sec.extraText3 : "+1(709)7631315";
+                      const emailInquiry = sec?.extraText && sec.extraText !== "crafts@nicolettadecor.com" && sec.extraText !== "tnchevez@mun.ca" ? sec.extraText : "sales@nicolettacraftsdecor.ca";
                       return (
                         <div className="bg-brand-highlight/40 border border-brand-border/60 rounded-[24px] p-6 space-y-4">
                           <h4 className="font-serif font-bold text-brand-dark text-lg border-b border-brand-border pb-2.5">
@@ -2604,6 +2606,13 @@ export default function App() {
                                 </div>
                               </div>
                             )}
+
+                            <div className="pt-3 border-t border-brand-border/60">
+                              <p className="text-[11px] text-brand-muted font-medium italic flex items-center gap-1.5">
+                                <Info className="h-3.5 w-3.5 text-brand-primary shrink-0" />
+                                Exact address will be shared once order is confirmed
+                              </p>
+                            </div>
                           </div>
                         </div>
                       );
@@ -2909,10 +2918,10 @@ export default function App() {
           {/* Col 2: Workshop Contact */}
           {(() => {
             const sec = customization.sections?.find(s => s.id === "contact-header");
-            const workshopTitle = sec?.extraText1 || "Nicoletta Crafts Workshop";
-            const pickupAddress = sec?.extraText2 || "305 Water St, St. John's, NL, Canada";
-            const phoneContact = sec?.extraText3 || "(709) 555-0182";
-            const emailContact = sec?.extraText || "sales@nicolettacraftsdecor.ca";
+            const workshopTitle = sec?.extraText1 && sec.extraText1 !== "Nicoletta Crafts Workshop" ? sec.extraText1 : "Nicoletta Crafts & Decor";
+            const pickupAddress = sec?.extraText2 && sec.extraText2 !== "305 Water St, St. John's, NL, Canada" ? sec.extraText2 : "Close to Village Mall";
+            const phoneContact = sec?.extraText3 && sec.extraText3 !== "(709) 555-0182" ? sec.extraText3 : "+1(709)7631315";
+            const emailContact = sec?.extraText && sec.extraText !== "crafts@nicolettadecor.com" && sec.extraText !== "tnchevez@mun.ca" ? sec.extraText : "sales@nicolettacraftsdecor.ca";
             return (
               <div className="space-y-2.5">
                 <span className="text-brand-highlight font-bold uppercase tracking-widest block text-[11px]">{workshopTitle}</span>
@@ -2932,6 +2941,9 @@ export default function App() {
                       <Mail className="h-3.5 w-3.5 text-brand-primary shrink-0" /> {emailContact}
                     </p>
                   )}
+                  <p className="text-[10px] text-stone-400 italic pt-1">
+                    Exact address will be shared once order is confirmed
+                  </p>
                 </div>
               </div>
             );

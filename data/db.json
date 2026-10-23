@@ -148,24 +148,24 @@
       {
         "id": "testimonials-header",
         "page": "testimonials",
-        "title": "Stories from our Costumers",
-        "subtitle": "Reviews & Experience",
-        "description": "Verified reviews left by our amazing customers. Submit your own review below.",
+        "title": "Words from Our Customers",
+        "subtitle": "Customer Reviews",
+        "description": "Every creation has a story, and we love being part of yours! Read what our customers have to say about their personalized gifts and handmade creations. Have you ordered from Nicoletta? We'd love to hear about your experience! Leave us a review.",
         "visible": true,
         "order": 1
       },
       {
         "id": "contact-header",
         "page": "contact",
-        "title": "Connect with Us",
-        "subtitle": "Can't find exactly what you're looking for?",
-        "description": "We'd love to help! Send us your idea, inspiration, or a custom request, and we'll let you know if we can create it. If it's possible, we'll work with you to design a personalized piece that's exactly what you had in mind.",
+        "title": "Connect with Nicoletta",
+        "subtitle": "We'd Love to Hear from You",
+        "description": "Have a question, a custom request, or a special gift in mind? We'd love to help you create something meaningful. Send us a message and let's make your idea a reality!",
         "extraText1": "Nicoletta Crafts & Decor",
-        "extraText2": "Located near Village Mall. Full location shared once your order is confirmed.",
-        "extraText3": "(709) 763 1315",
-        "extraText": "tnchevez@mun.ca",
+        "extraText2": "Close to Village Mall",
+        "extraText3": "+1(709)7631315",
+        "extraText": "sales@nicolettacraftsdecor.ca",
         "visible": true,
-        "order": 1
+        "order": 9
       }
     ]
   },

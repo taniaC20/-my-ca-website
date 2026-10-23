@@ -245,9 +245,9 @@ export default function AdminDashboard({
     title: "Connect with Nicoletta",
     subtitle: "We'd Love to Hear from You",
     description: "Have a question, a custom request, or a special gift in mind? We'd love to help you create something meaningful. Send us a message and let's make your idea a reality!",
-    extraText1: "Nicoletta Crafts Workshop",
-    extraText2: "305 Water St, St. John's, NL, Canada",
-    extraText3: "(709) 555-0182",
+    extraText1: "Nicoletta Crafts & Decor",
+    extraText2: "Close to Village Mall",
+    extraText3: "+1(709)7631315",
     extraText: "sales@nicolettacraftsdecor.ca",
     visible: true,
     order: 9
@@ -265,10 +265,10 @@ export default function AdminDashboard({
     const merged: CustomSection = {
       ...DEFAULT_CONTACT_HEADER_SECTION,
       ...existing,
-      extraText1: existing.extraText1 !== undefined ? existing.extraText1 : DEFAULT_CONTACT_HEADER_SECTION.extraText1,
-      extraText2: existing.extraText2 !== undefined ? existing.extraText2 : DEFAULT_CONTACT_HEADER_SECTION.extraText2,
-      extraText3: existing.extraText3 !== undefined ? existing.extraText3 : DEFAULT_CONTACT_HEADER_SECTION.extraText3,
-      extraText: existing.extraText !== undefined ? existing.extraText : DEFAULT_CONTACT_HEADER_SECTION.extraText,
+      extraText1: !existing.extraText1 || existing.extraText1 === "Nicoletta Crafts Workshop" ? "Nicoletta Crafts & Decor" : existing.extraText1,
+      extraText2: !existing.extraText2 || existing.extraText2 === "305 Water St, St. John's, NL, Canada" ? "Close to Village Mall" : existing.extraText2,
+      extraText3: !existing.extraText3 || existing.extraText3 === "(709) 555-0182" ? "+1(709)7631315" : existing.extraText3,
+      extraText: !existing.extraText || existing.extraText === "crafts@nicolettadecor.com" ? "sales@nicolettacraftsdecor.ca" : existing.extraText,
     };
     const copy = [...safe];
     copy[idx] = merged;
@@ -6086,9 +6086,9 @@ export default function AdminDashboard({
                                       </label>
                                       <input
                                         type="text"
-                                        value={sec.extraText1 ?? "Nicoletta Crafts Workshop"}
+                                        value={sec.extraText1 ?? "Nicoletta Crafts & Decor"}
                                         onChange={(e) => updateSectionText(sec.id, "extraText1", e.target.value)}
-                                        placeholder="Nicoletta Crafts Workshop"
+                                        placeholder="Nicoletta Crafts & Decor"
                                         className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary bg-white font-medium"
                                       />
                                       <span className="text-[9px] text-stone-400 mt-0.5 block">Header for the workshop card and footer column</span>
@@ -6100,9 +6100,9 @@ export default function AdminDashboard({
                                       </label>
                                       <input
                                         type="text"
-                                        value={sec.extraText2 ?? "305 Water St, St. John's, NL, Canada"}
+                                        value={sec.extraText2 ?? "Close to Village Mall"}
                                         onChange={(e) => updateSectionText(sec.id, "extraText2", e.target.value)}
-                                        placeholder="305 Water St, St. John's, NL, Canada"
+                                        placeholder="Close to Village Mall"
                                         className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary bg-white font-medium"
                                       />
                                       <span className="text-[9px] text-stone-400 mt-0.5 block">Physical address for customer pickups and visits</span>
@@ -6114,9 +6114,9 @@ export default function AdminDashboard({
                                       </label>
                                       <input
                                         type="text"
-                                        value={sec.extraText3 ?? "(709) 555-0182"}
+                                        value={sec.extraText3 ?? "+1(709)7631315"}
                                         onChange={(e) => updateSectionText(sec.id, "extraText3", e.target.value)}
-                                        placeholder="(709) 555-0182"
+                                        placeholder="+1(709)7631315"
                                         className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary bg-white font-medium"
                                       />
                                       <span className="text-[9px] text-stone-400 mt-0.5 block">Voice phone number displayed on website</span>
@@ -6147,18 +6147,21 @@ export default function AdminDashboard({
                                         <span className="font-bold text-[9px] uppercase tracking-wider text-brand-primary block">
                                           Connect Page Card
                                         </span>
-                                        <p className="font-bold text-stone-900">{sec.extraText1 || "Nicoletta Crafts Workshop"}</p>
+                                        <p className="font-bold text-stone-900">{sec.extraText1 || "Nicoletta Crafts & Decor"}</p>
                                         <p className="text-stone-600 flex items-center gap-1">
                                           <MapPin className="h-3 w-3 text-brand-primary shrink-0" />
-                                          {sec.extraText2 || "305 Water St, St. John's, NL, Canada"}
+                                          {sec.extraText2 || "Close to Village Mall"}
                                         </p>
                                         <p className="text-stone-600 flex items-center gap-1">
                                           <Phone className="h-3 w-3 text-brand-primary shrink-0" />
-                                          {sec.extraText3 || "(709) 555-0182"}
+                                          {sec.extraText3 || "+1(709)7631315"}
                                         </p>
                                         <p className="text-stone-600 flex items-center gap-1">
                                           <Mail className="h-3 w-3 text-brand-primary shrink-0" />
                                           {sec.extraText || "sales@nicolettacraftsdecor.ca"}
+                                        </p>
+                                        <p className="text-[10px] text-stone-500 italic pt-1 border-t border-brand-border/40 mt-1">
+                                          Exact address will be shared once order is confirmed
                                         </p>
                                       </div>
 
@@ -6166,18 +6169,21 @@ export default function AdminDashboard({
                                         <span className="font-bold text-[9px] uppercase tracking-wider text-amber-400 block">
                                           Website Footer
                                         </span>
-                                        <p className="font-bold text-white">{sec.extraText1 || "Nicoletta Crafts Workshop"}</p>
+                                        <p className="font-bold text-white">{sec.extraText1 || "Nicoletta Crafts & Decor"}</p>
                                         <p className="text-stone-400 text-[10px] flex items-center gap-1">
                                           <MapPin className="h-3 w-3 text-brand-primary shrink-0" />
-                                          {sec.extraText2 || "305 Water St, St. John's, NL, Canada"}
+                                          {sec.extraText2 || "Close to Village Mall"}
                                         </p>
                                         <p className="text-stone-400 text-[10px] flex items-center gap-1">
                                           <Phone className="h-3 w-3 text-brand-primary shrink-0" />
-                                          {sec.extraText3 || "(709) 555-0182"}
+                                          {sec.extraText3 || "+1(709)7631315"}
                                         </p>
                                         <p className="text-stone-400 text-[10px] flex items-center gap-1">
                                           <Mail className="h-3 w-3 text-brand-primary shrink-0" />
                                           {sec.extraText || "sales@nicolettacraftsdecor.ca"}
+                                        </p>
+                                        <p className="text-[10px] text-stone-400 italic pt-1 border-t border-stone-800 mt-1">
+                                          Exact address will be shared once order is confirmed
                                         </p>
                                       </div>
                                     </div>
