@@ -1044,7 +1044,7 @@ export default function ProductDetails({
                       <span>Quote Request Received Successfully!</span>
                     </div>
                     <p className="font-normal text-emerald-800 text-xs leading-relaxed">
-                      Thank you for your request{submittedQuoteInfo?.customerName ? `, ${submittedQuoteInfo.customerName}` : ""}! Nicoletta personally reviews each project and will get back to you within <strong>one business day</strong>.
+                      Thank you for your request{submittedQuoteInfo?.customerName ? `, ${submittedQuoteInfo.customerName}` : ""}! We will get back to you in 1 business day.
                     </p>
 
                     <div className="bg-white border border-amber-200/90 rounded-[12px] p-3.5 text-stone-800 text-xs leading-relaxed space-y-2 shadow-2xs">
@@ -1059,7 +1059,7 @@ export default function ProductDetails({
                         </p>
                       ) : (
                         <p className="text-stone-700 text-xs leading-relaxed">
-                          Since you chose <strong>Phone</strong> as your contact method, Nicoletta will call or text you directly at <strong>{submittedQuoteInfo?.customerPhone}</strong>.
+                          Since you selected <strong>Phone</strong> as your contact method, our studio administrator Nicoletta will call or text you directly at <strong>{submittedQuoteInfo?.customerPhone}</strong> from <strong>+1 (709) 763-1315</strong> in 1 business day.
                         </p>
                       )}
                       <div className="bg-amber-50/90 border border-amber-200/70 rounded-[8px] p-2 text-stone-800 text-[10px] leading-relaxed">

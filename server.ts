@@ -835,7 +835,7 @@ app.post("/api/send-email", async (req, res) => {
   }
 
   const senderEmail = from || process.env.GMAIL_USER || "sales@nicolettacraftsdecor.ca";
-  const password = (appPassword || process.env.GMAIL_APP_PASSWORD || "").trim().replace(/\s+/g, "");
+  const password = (appPassword || process.env.GMAIL_APP_PASSWORD || (dbState.customization as any)?.emailSettings?.gmailAppPassword || "").trim().replace(/\s+/g, "");
 
   if (!password) {
     return res.status(400).json({

@@ -845,7 +845,7 @@ export default function QuoteForm({ products, selectedProduct, onSubmitQuote, on
                 <span>Quote Request Received Successfully!</span>
               </div>
               <p className="font-normal text-emerald-800 text-xs leading-relaxed">
-                Thank you for your custom quote request{submittedQuoteInfo?.customerName ? `, ${submittedQuoteInfo.customerName}` : ""}! Nicoletta personally reviews each project specification and will prepare your bespoke proposal within <strong>one business day</strong>.
+                Thank you for your custom quote request{submittedQuoteInfo?.customerName ? `, ${submittedQuoteInfo.customerName}` : ""}! We will get back to you in 1 business day with your proposal.
               </p>
 
               {/* Confirmation Notice Box */}
@@ -861,7 +861,7 @@ export default function QuoteForm({ products, selectedProduct, onSubmitQuote, on
                   </p>
                 ) : (
                   <p className="text-stone-700 text-xs leading-relaxed">
-                    Since you chose <strong>Phone</strong> as your contact method, Nicoletta will call or text you directly at <strong>{submittedQuoteInfo?.customerPhone}</strong>.
+                    Since you selected <strong>Phone</strong> as your contact method, our studio administrator Nicoletta will call or text you directly at <strong>{submittedQuoteInfo?.customerPhone}</strong> from <strong>+1 (709) 763-1315</strong> in 1 business day.
                   </p>
                 )}
 

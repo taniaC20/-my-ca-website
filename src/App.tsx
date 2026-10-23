@@ -2580,7 +2580,7 @@ export default function App() {
                         <div className="space-y-1.5">
                           <h5 className="font-serif font-bold text-stone-900 text-xl">Message Sent Successfully</h5>
                           <p className="text-stone-600 text-sm font-light max-w-md mx-auto leading-relaxed">
-                            Thank you for reaching out{submittedContactInfo?.name ? `, ${submittedContactInfo.name}` : ""}! Nicoletta personally reads all studio messages and will respond within one business day.
+                            Thank you for your message{submittedContactInfo?.name ? `, ${submittedContactInfo.name}` : ""}! We will get back to you in 1 business day.
                           </p>
                         </div>
 
@@ -2598,7 +2598,7 @@ export default function App() {
                             </p>
                           ) : (
                             <p className="text-stone-700 text-xs leading-relaxed">
-                              Since you selected <strong>Phone</strong> as your contact method, Nicoletta will call or text you directly at <strong>{submittedContactInfo?.phone}</strong>.
+                              Since you selected <strong>Phone</strong> as your contact method, our studio administrator Nicoletta will call or text you directly at <strong>{submittedContactInfo?.phone}</strong> from <strong>+1 (709) 763-1315</strong> in 1 business day.
                             </p>
                           )}
 

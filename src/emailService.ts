@@ -319,11 +319,15 @@ export async function sendQuoteNotificationToAdmin(
 
               <!-- Direct Action Buttons -->
               <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #ece6dc; text-align: left;">
-                <a href="mailto:${escapeHtml(quote.customerEmail)}?subject=Re:%20${encodeURIComponent(subject)}" style="display: inline-block; background-color: #1e1915; color: #ffffff; padding: 12px 24px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; margin-right: 12px; margin-bottom: 8px;">
+                ${quote.customerEmail ? `
+                <a href="mailto:${escapeHtml(quote.customerEmail)}?subject=Re:%20${encodeURIComponent(subject)}" style="display: inline-block; background-color: #1e1915; color: #ffffff; padding: 12px 22px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; margin-right: 10px; margin-bottom: 8px;">
                   Reply via Email &rarr;
-                </a>
+                </a>` : ""}
                 ${hasPhone ? `
-                <a href="tel:${escapeHtml(phoneVal)}" style="display: inline-block; background-color: #f3efe9; color: #44372e; border: 1px solid #d5cbc0; padding: 12px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; margin-bottom: 8px;">
+                <a href="sms:${escapeHtml(phoneVal)}?body=Hi%20${encodeURIComponent(quote.customerName)},%20this%20is%20Nicoletta%20from%20Nicoletta%20Crafts%20%26%20Decor%20following%20up%20on%20your%20inquiry!" style="display: inline-block; background-color: #936037; color: #ffffff; padding: 12px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; margin-right: 10px; margin-bottom: 8px;">
+                  Text Customer from +1 (709) 763-1315 &rarr;
+                </a>
+                <a href="tel:${escapeHtml(phoneVal)}" style="display: inline-block; background-color: #f3efe9; color: #44372e; border: 1px solid #d5cbc0; padding: 12px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; margin-bottom: 8px;">
                   Call ${escapeHtml(phoneVal)}
                 </a>` : ""}
               </div>
@@ -374,74 +378,7 @@ export async function sendQuoteNotificationToAdmin(
     console.warn("Backend /api/send-email endpoint not reachable, using fallback notification service", err);
   }
 
-  // 2. Fallback: FormSubmit zero-config AJAX delivery directly to sales@nicolettacraftsdecor.ca
-  // Crucial: Only include keys that have actual user content so no "N/A" or empty fields appear
-  if (!apiSuccess) {
-    try {
-      const payload: Record<string, any> = {
-        _subject: subject,
-        _replyto: quote.customerEmail,
-        _template: "table",
-        Inquiry_Reference: `#${refCode}`,
-        Customer_Name: quote.customerName,
-        Customer_Email: quote.customerEmail
-      };
-
-      if (hasPhone) {
-        payload.Customer_Phone = phoneVal;
-      }
-      if (showContactPref) {
-        payload.Preferred_Contact = prefLabel;
-      }
-      if (quote.customerEmail && quote.customerEmail.trim()) {
-        payload.Customer_Email = quote.customerEmail.trim();
-        payload._autoresponse = `Thank you for contacting Nicoletta Crafts & Decor, ${quote.customerName}! We have received your inquiry for: "${cleanTopic}" (Ref: #${refCode}). Nicoletta personally reviews every inquiry and will respond within one business day.\n\nIf you notice any typos in your submitted information, reply directly to this email or send us a message at https://www.nicolettacraftsdecor.ca.`;
-      }
-
-      if (isContact) {
-        payload.Inquiry_Topic = cleanTopic;
-      } else {
-        payload.Selected_Item = cleanTopic;
-        if (showQuantity) {
-          payload.Quantity = quote.quantity;
-        }
-      }
-
-      if (cleanDeadline) {
-        payload.Target_Deadline = cleanDeadline;
-      }
-
-      if (cleanEngraving) {
-        payload.Personalization_Text = cleanEngraving;
-        if (cleanFont) {
-          payload.Selected_Typography = cleanFont;
-        }
-      }
-
-      if (cleanInstructions) {
-        payload.Client_Notes = cleanInstructions;
-      }
-
-      if (hasAlternative) {
-        payload.Alternative_Craft_Requested = alternativeDetails || "Yes, open to artisan suggestions";
-      }
-
-      if (hasFiles) {
-        payload.Attachments = files.map((f, i) => `${i + 1}. ${f.name}`).join(", ");
-      }
-
-      await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(recipient)}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json"
-        },
-        body: JSON.stringify(payload)
-      });
-    } catch (fallbackErr) {
-      console.warn("FormSubmit fallback attempt:", fallbackErr);
-    }
-  }
+  // Dispatched solely from sales@nicolettacraftsdecor.ca via Gmail SMTP API
 
   return { success: true, message: `Notification dispatched to ${recipient}` };
 }
@@ -639,7 +576,7 @@ export async function sendContactConfirmationToClient(
   const senderEmail = settings?.gmailUser || DEFAULT_ADMIN_EMAIL;
   const refCode = contact.refCode || Math.random().toString(36).substring(2, 8).toUpperCase();
   const inquirySubject = contact.subject?.trim() || "General Studio Inquiry";
-  const emailSubject = `Confirmation: We received your message - Nicoletta Crafts & Decor [#${refCode}]`;
+  const emailSubject = `Thank you for your message - Nicoletta Crafts & Decor [#${refCode}]`;
 
   const now = new Date();
   const formattedDate = now.toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" });
@@ -648,7 +585,9 @@ export async function sendContactConfirmationToClient(
   const textBody = `
 Dear ${contact.name},
 
-Thank you for reaching out to Nicoletta Crafts & Decor! We have safely received your inquiry on ${formattedDate} at ${formattedTime}.
+Thank you for your message! We have safely received your inquiry and will get back to you in 1 business day.
+
+As our studio administrator, Nicoletta will reach out to you directly from +1 (709) 763-1315 ${contact.contactPreference === "phone" ? "(by phone call or text message)" : "(via email, or phone if needed)"}.
 
 SUMMARY OF YOUR INQUIRY:
 - Reference ID: #${refCode}
@@ -719,7 +658,7 @@ https://www.nicolettacraftsdecor.ca
                 Thank you for reaching out, ${escapeHtml(contact.name)}!
               </h2>
               <p style="font-size: 14px; line-height: 1.6; color: #423830; margin: 0 0 20px 0;">
-                We have safely received your inquiry. Nicoletta personally reads each studio message and will get back to you via <strong>${contact.contactPreference === "phone" ? "phone call/text" : "email"}</strong> within <strong>one business day</strong>.
+                Thank you for your message! We will get back to you in <strong>1 business day</strong>.<br><br>If you requested phone contact, our studio administrator Nicoletta will reach out to you directly from <strong>+1 (709) 763-1315</strong> by phone call or text message.
               </p>
 
               <!-- Summary Card -->
@@ -811,32 +750,7 @@ https://www.nicolettacraftsdecor.ca
     console.warn("Client confirmation email dispatch error:", err);
   }
 
-  // Fallback: FormSubmit direct delivery to client
-  if (!sent) {
-    try {
-      await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(contact.email)}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({
-          _subject: emailSubject,
-          _replyto: DEFAULT_ADMIN_EMAIL,
-          _template: "table",
-          Studio: "Nicoletta Crafts & Decor",
-          Inquiry_Reference: `#${refCode}`,
-          Customer_Name: contact.name,
-          Inquiry_Subject: inquirySubject,
-          Preferred_Contact: contact.contactPreference === "phone" ? "Phone (Call or Text)" : "Email",
-          Phone_Number: contact.phone || undefined,
-          Message: contact.message,
-          Status: "Safely received - Nicoletta will review your message within 1 business day",
-          Correction_Notice: "If any details have a typo, reply to this email or send us a message at https://www.nicolettacraftsdecor.ca"
-        })
-      });
-      sent = true;
-    } catch (fallbackErr) {
-      console.warn("FormSubmit contact confirmation fallback error:", fallbackErr);
-    }
-  }
+  // Client confirmation delivered solely from sales@nicolettacraftsdecor.ca
 
   return { success: sent, message: sent ? `Confirmation dispatched to client: ${contact.email}` : "Could not send client confirmation email" };
 }
@@ -859,7 +773,7 @@ export async function sendQuoteConfirmationToClient(
   const rawId = quote.id || `q-${Date.now()}`;
   const refCode = rawId.replace(/^q-/, "").slice(-6).toUpperCase();
   const projectName = (quote.productName || "Custom Craft Project").trim();
-  const emailSubject = `Confirmation: We received your quote request - Nicoletta Crafts & Decor [#${refCode}]`;
+  const emailSubject = `Thank you for your quote request - Nicoletta Crafts & Decor [#${refCode}]`;
 
   const now = new Date();
   const formattedDate = now.toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" });
@@ -881,7 +795,7 @@ export async function sendQuoteConfirmationToClient(
   const files = Array.isArray(quote.uploadedFiles) && quote.uploadedFiles.length > 0 ? quote.uploadedFiles : [];
 
   const textSections: string[] = [
-    `Dear ${quote.customerName},\n\nThank you for requesting a custom quote from Nicoletta Crafts & Decor! We have safely received your project details on ${timeStampDisplay}.`,
+    `Dear ${quote.customerName},\n\nThank you for your custom quote request! We have safely received your project details and will get back to you in 1 business day with your bespoke proposal.\n\nAs our studio administrator, Nicoletta will reach out to you directly from +1 (709) 763-1315 ${quote.contactPreference === "phone" ? "(by phone call or text message)" : "(via email, or phone if needed)"}.`,
     `QUOTE SPECIFICATIONS:\n- Reference ID: #${refCode}\n- Item / Project: ${projectName}\n- Quantity: ${quote.quantity || 1}\n- Preferred Contact: ${prefLabel}${hasPhone ? `\n- Phone Number: ${phoneVal}` : ""}${cleanDeadline ? `\n- Target Deadline: ${cleanDeadline}` : ""}`
   ];
 
@@ -950,7 +864,7 @@ export async function sendQuoteConfirmationToClient(
                 Thank you for your quote request, ${escapeHtml(quote.customerName)}!
               </h2>
               <p style="font-size: 14px; line-height: 1.6; color: #423830; margin: 0 0 20px 0;">
-                We have received your custom project specifications. Nicoletta personally reviews every inquiry and will prepare your proposal within <strong>one business day</strong>.
+                Thank you for your custom quote request! We have safely received your specifications and will get back to you in <strong>1 business day</strong>.<br><br>If you requested phone contact, our studio administrator Nicoletta will reach out to you directly from <strong>+1 (709) 763-1315</strong> by phone call or text message.
               </p>
               <div style="background-color: #faf8f5; border: 1px solid #ece6dc; border-radius: 12px; padding: 18px 20px; margin-bottom: 20px;">
                 <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #8c7f73; margin-bottom: 10px;">
@@ -1024,35 +938,7 @@ export async function sendQuoteConfirmationToClient(
     console.warn("API quote confirmation dispatch error:", err);
   }
 
-  // 2. Fallback: FormSubmit direct delivery to client
-  if (!sent) {
-    try {
-      await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(clientEmail)}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({
-          _subject: emailSubject,
-          _replyto: DEFAULT_ADMIN_EMAIL,
-          _template: "table",
-          Studio: "Nicoletta Crafts & Decor",
-          Inquiry_Reference: `#${refCode}`,
-          Customer_Name: quote.customerName,
-          Selected_Craft: projectName,
-          Quantity: quote.quantity || 1,
-          Preferred_Contact: prefLabel,
-          Phone_Number: phoneVal || undefined,
-          Deadline: cleanDeadline || undefined,
-          Personalization_Text: cleanEngraving || undefined,
-          Special_Notes: cleanInstructions || undefined,
-          Status: "Safely received - Nicoletta will prepare your proposal within 1 business day",
-          Correction_Notice: "If any details have a typo, reply to this email or send us a message at https://www.nicolettacraftsdecor.ca"
-        })
-      });
-      sent = true;
-    } catch (fallbackErr) {
-      console.warn("FormSubmit quote confirmation fallback error:", fallbackErr);
-    }
-  }
+  // Quote confirmation delivered solely from sales@nicolettacraftsdecor.ca
 
   return { success: sent, message: sent ? "Confirmation dispatched to client" : "Failed to dispatch client confirmation" };
 }
