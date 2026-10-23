@@ -947,19 +947,8 @@ export default function AdminDashboard({
         setSelectedQuoteId(null);
       }, 1500);
     } else {
-      if (result.error) {
-        setEmailError(result.error);
-      }
-      openGmailCompose({
-        to: emailQuote.customerEmail,
-        subject: emailSubject,
-        body: emailBody
-      });
-      setEmailStatus("sent");
-      setTimeout(() => {
-        setEmailQuote(null);
-        setSelectedQuoteId(null);
-      }, 2500);
+      setEmailStatus("idle");
+      setEmailError(result.error || "Could not dispatch via Gmail SMTP directly. Please use 'Open in Gmail' to send this proposal directly to the client.");
     }
   };
 
@@ -2787,6 +2776,14 @@ export default function AdminDashboard({
                           >
                             Close
                           </button>
+
+                          <a
+                            href={`mailto:${emailQuote.customerEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`}
+                            className="bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold py-2 px-3 rounded-md cursor-pointer transition-colors flex items-center gap-1.5 shadow-2xs text-xs"
+                            title="Open in your default computer email client (Outlook, Mail, etc.)"
+                          >
+                            Default Mail
+                          </a>
 
                           <button
                             type="button"

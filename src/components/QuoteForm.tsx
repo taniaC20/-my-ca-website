@@ -880,17 +880,17 @@ export default function QuoteForm({ products, selectedProduct, onSubmitQuote, on
                     <div className="bg-white border border-amber-200/90 rounded-[14px] p-4 text-stone-800 text-xs leading-relaxed space-y-2.5 shadow-2xs">
                       <div className="flex items-center gap-2 text-amber-900 font-bold text-xs uppercase tracking-wider">
                         <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
-                        Email Confirmation Notice
+                        Quote Request Received
                       </div>
                       <p className="text-stone-700 text-xs leading-relaxed">
-                        An automated confirmation notice has been sent to your email (<strong>{submittedQuoteInfo?.customerEmail}</strong>).
+                        Thank you for your custom request! Studio owner Tannia has received your specifications and will prepare a tailored proposal directly to your email (<strong>{submittedQuoteInfo?.customerEmail}</strong>) within 1 business day.
                       </p>
                       <div className="bg-amber-50/90 border border-amber-200/70 rounded-[10px] p-2.5 text-stone-800 text-[11px] leading-relaxed space-y-1">
                         <p className="font-semibold text-amber-950">
-                          ⚠️ Didn&apos;t receive a confirmation email within 5 minutes?
+                          ⚠️ Notice a typo in your email address?
                         </p>
                         <p className="text-stone-700">
-                          Please check your spam or junk folder, or double-check that your email address was entered correctly. If there was a typo, please click below to submit another quote with the corrected email address so we can reach you!
+                          Please verify your email address <strong>{submittedQuoteInfo?.customerEmail}</strong>. If there was a typo, please click below to submit another quote with the corrected email address so Tannia can reach you!
                         </p>
                       </div>
                     </div>
@@ -902,18 +902,17 @@ export default function QuoteForm({ products, selectedProduct, onSubmitQuote, on
                   <div className="bg-white border border-amber-200/90 rounded-[14px] p-4 text-stone-800 text-xs leading-relaxed space-y-2.5 shadow-2xs">
                     <div className="flex items-center gap-2 text-amber-900 font-bold text-xs uppercase tracking-wider">
                       <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
-                      Email &amp; Phone Confirmation Notice
+                      Quote Request Received
                     </div>
                     <p className="text-stone-700 text-xs leading-relaxed">
-                      An automated confirmation notice has been sent to your email (<strong>{submittedQuoteInfo?.customerEmail}</strong>).
-                      Our studio administrator Tannia will also reach out to your phone (<strong>{submittedQuoteInfo?.customerPhone}</strong>) {submittedQuoteInfo?.contactPreference === "phone" ? "by call or text" : "for your records"} from <strong>+1 (709) 763-1315</strong>.
+                      Thank you for your custom request! Studio owner Tannia has received your specifications and will reach out to you within 1 business day via email (<strong>{submittedQuoteInfo?.customerEmail}</strong>) or phone (<strong>{submittedQuoteInfo?.customerPhone}</strong>).
                     </p>
                     <div className="bg-amber-50/90 border border-amber-200/70 rounded-[10px] p-2.5 text-stone-800 text-[11px] leading-relaxed space-y-1">
                       <p className="font-semibold text-amber-950">
-                        ⚠️ Didn&apos;t receive a confirmation or notice a typo?
+                        ⚠️ Notice a typo in your contact details?
                       </p>
                       <p className="text-stone-700">
-                        Please check your spam folder, or double-check that your email address and phone number were entered correctly. If there was a typo, please click below to submit another quote with the corrected information so we can reach you without delay!
+                        Please double-check that your email address and phone number are correct. If there was a typo, please click below to submit another quote with the corrected information!
                       </p>
                     </div>
                   </div>

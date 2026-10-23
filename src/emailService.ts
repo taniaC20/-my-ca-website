@@ -317,20 +317,35 @@ export async function sendQuoteNotificationToAdmin(
                 </ul>
               </div>` : ""}
 
-              <!-- Direct Action Buttons -->
-              <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #ece6dc; text-align: left;">
-                ${quote.customerEmail ? `
-                <a href="mailto:${escapeHtml(quote.customerEmail)}?subject=Re:%20${encodeURIComponent(subject)}" style="display: inline-block; background-color: #1e1915; color: #ffffff; padding: 12px 22px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; margin-right: 10px; margin-bottom: 8px;">
-                  Reply via Email &rarr;
-                </a>` : ""}
-                ${hasPhone ? `
-                <a href="sms:${escapeHtml(phoneVal)}?body=Hi%20${encodeURIComponent(quote.customerName)},%20this%20is%20Nicoletta%20from%20Nicoletta%20Crafts%20%26%20Decor%20following%20up%20on%20your%20inquiry!" style="display: inline-block; background-color: #936037; color: #ffffff; padding: 12px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; margin-right: 10px; margin-bottom: 8px;">
-                  Text Customer from +1 (709) 763-1315 &rarr;
-                </a>
-                <a href="tel:${escapeHtml(phoneVal)}" style="display: inline-block; background-color: #f3efe9; color: #44372e; border: 1px solid #d5cbc0; padding: 12px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; margin-bottom: 8px;">
-                  Call ${escapeHtml(phoneVal)}
-                </a>` : ""}
-              </div>
+              <!-- Direct Action: Reply via Email -->
+              ${quote.customerEmail ? `
+              <div style="margin-top: 24px; padding: 18px 20px; background-color: #faf8f5; border: 1px solid #e8e0d5; border-radius: 12px; text-align: left;">
+                <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #7c6f62; margin-bottom: 6px;">
+                  Reply to Customer
+                </div>
+                <div style="font-size: 13px; color: #1e1915; margin-bottom: 12px; line-height: 1.5;">
+                  Client: <strong>${escapeHtml(quote.customerName)}</strong> &bull; Email: <a href="mailto:${escapeHtml(quote.customerEmail)}?subject=Re:%20${encodeURIComponent(subject)}" style="color: #936037; font-weight: 700; text-decoration: underline;">${escapeHtml(quote.customerEmail)}</a>
+                </div>
+                <div style="margin-bottom: 10px;">
+                  <a href="mailto:${escapeHtml(quote.customerEmail)}?subject=Re:%20${encodeURIComponent(subject)}" style="display: inline-block; background-color: #1e1915; color: #ffffff; padding: 12px 22px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; margin-right: 10px; margin-bottom: 8px;">
+                    Reply via Email &rarr;
+                  </a>
+                  <a href="https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(quote.customerEmail)}&su=Re:%20${encodeURIComponent(subject)}" target="_blank" style="display: inline-block; background-color: #936037; color: #ffffff; padding: 12px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; margin-bottom: 8px;">
+                    Open in Gmail Web &rarr;
+                  </a>
+                </div>
+                <div style="font-size: 11px; color: #8c7f73; line-height: 1.4;">
+                  Tip: Hitting the regular &ldquo;Reply&rdquo; button in your email client will also reply directly to ${escapeHtml(quote.customerEmail)}.
+                </div>
+              </div>` : `
+              <div style="margin-top: 24px; padding: 16px 20px; background-color: #faf8f5; border: 1px solid #e8e0d5; border-radius: 12px; text-align: left;">
+                <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #7c6f62; margin-bottom: 6px;">
+                  Customer Contact Method
+                </div>
+                <div style="font-size: 13px; color: #1e1915;">
+                  Customer requested phone contact: <strong>${escapeHtml(phoneVal)}</strong> (No email address was provided).
+                </div>
+              </div>`}
 
             </td>
           </tr>
@@ -365,7 +380,7 @@ export async function sendQuoteNotificationToAdmin(
         text: messageText,
         html: messageHtml,
         appPassword: settings?.gmailAppPassword,
-        replyTo: quote.customerEmail
+        replyTo: quote.customerEmail ? `"${quote.customerName.replace(/["\r\n]/g, "")}" <${quote.customerEmail.trim()}>` : undefined
       })
     });
     if (res.ok) {

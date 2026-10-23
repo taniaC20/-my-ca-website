@@ -2619,20 +2619,20 @@ export default function App() {
                               <div className="bg-white border border-amber-200/90 rounded-[18px] p-5 max-w-lg mx-auto text-left shadow-2xs space-y-3">
                                 <div className="flex items-center gap-2 text-amber-900 font-bold text-xs uppercase tracking-wider">
                                   <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
-                                  Email Confirmation Notice
+                                  Email Inquiry Received
                                 </div>
                                 <p className="text-stone-700 text-xs leading-relaxed">
-                                  An automated confirmation notice has been sent to your email (<strong>{submittedContactInfo?.email}</strong>).
+                                  Thank you for reaching out! Studio owner Tannia has safely received your message and will reply directly to your email (<strong>{submittedContactInfo?.email}</strong>) within 1 business day.
                                 </p>
                                 <div className="bg-amber-50/90 border border-amber-200/70 rounded-[12px] p-3 text-stone-800 text-xs leading-relaxed space-y-1.5">
                                   <p className="font-semibold text-amber-950 flex items-center gap-1.5">
-                                    <span>⚠️</span> Didn&apos;t receive a confirmation email within 5 minutes?
+                                    <span>⚠️</span> Notice a typo in your email address?
                                   </p>
                                   <p className="text-stone-700 text-[11px] leading-relaxed">
-                                    Please check your spam or junk folder, and verify that your email address was entered correctly without typos.
+                                    Please verify that your email address <strong>{submittedContactInfo?.email}</strong> was entered correctly.
                                   </p>
                                   <p className="text-stone-700 text-[11px] leading-relaxed pt-1.5 border-t border-amber-200/60 font-medium">
-                                    If your email had a typo, please click below to send us another message with the corrected email address so we can reach you!
+                                    If your email had a typo, please click below to send us another message with the corrected email address so Tannia can reach you!
                                   </p>
                                 </div>
                               </div>
@@ -2644,18 +2644,17 @@ export default function App() {
                             <div className="bg-white border border-amber-200/90 rounded-[18px] p-5 max-w-lg mx-auto text-left shadow-2xs space-y-3">
                               <div className="flex items-center gap-2 text-amber-900 font-bold text-xs uppercase tracking-wider">
                                 <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
-                                Email &amp; Phone Confirmation Notice
+                                Contact Details Received
                               </div>
                               <p className="text-stone-700 text-xs leading-relaxed">
-                                An automated confirmation notice has been sent to your email (<strong>{submittedContactInfo?.email}</strong>).
-                                Our studio administrator Tannia will also reach out to your phone (<strong>{submittedContactInfo?.phone}</strong>) {submittedContactInfo?.contactPreference === "phone" ? "by call or text" : "if needed"} from <strong>+1 (709) 763-1315</strong>.
+                                Thank you for reaching out! Studio owner Tannia has safely received your inquiry and will reach out to you within 1 business day via email (<strong>{submittedContactInfo?.email}</strong>) or phone (<strong>{submittedContactInfo?.phone}</strong>).
                               </p>
                               <div className="bg-amber-50/90 border border-amber-200/70 rounded-[12px] p-3 text-stone-800 text-xs leading-relaxed space-y-1.5">
                                 <p className="font-semibold text-amber-950 flex items-center gap-1.5">
-                                  <span>⚠️</span> Didn&apos;t receive a confirmation email or noticed a typo?
+                                  <span>⚠️</span> Notice a typo in your contact info?
                                 </p>
                                 <p className="text-stone-700 text-[11px] leading-relaxed">
-                                  Please check your spam or junk folder, and verify that both your email address and phone number were entered correctly.
+                                  Please double-check that both your email address and phone number were entered correctly.
                                 </p>
                                 <p className="text-stone-700 text-[11px] leading-relaxed pt-1.5 border-t border-amber-200/60 font-medium">
                                   If your email or phone had a typo, please click below to send us another message with the corrected information so we can reach you!

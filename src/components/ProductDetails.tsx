@@ -1073,13 +1073,13 @@ export default function ProductDetails({
                           <div className="bg-white border border-amber-200/90 rounded-[12px] p-3.5 text-stone-800 text-xs leading-relaxed space-y-2 shadow-2xs">
                             <div className="flex items-center gap-2 text-amber-900 font-bold text-[11px] uppercase tracking-wider">
                               <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-                              Email Confirmation Notice
+                              Quote Request Received
                             </div>
                             <p className="text-stone-700 text-xs leading-relaxed">
-                              An automated confirmation has been sent to your email (<strong>{submittedQuoteInfo?.customerEmail}</strong>).
+                              Thank you for your custom request! Studio owner Tannia has received your details and will prepare a tailored proposal directly to your email (<strong>{submittedQuoteInfo?.customerEmail}</strong>) within 1 business day.
                             </p>
                             <div className="bg-amber-50/90 border border-amber-200/70 rounded-[8px] p-2 text-stone-800 text-[10px] leading-relaxed">
-                              <strong>⚠️ Didn&apos;t receive a confirmation email?</strong> Check your spam folder or verify your email address below.
+                              <strong>⚠️ Notice a typo in your email?</strong> Please verify your address above or click below to submit a correction!
                             </div>
                           </div>
                         );
@@ -1090,14 +1090,13 @@ export default function ProductDetails({
                         <div className="bg-white border border-amber-200/90 rounded-[12px] p-3.5 text-stone-800 text-xs leading-relaxed space-y-2 shadow-2xs">
                           <div className="flex items-center gap-2 text-amber-900 font-bold text-[11px] uppercase tracking-wider">
                             <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-                            Email &amp; Phone Confirmation Notice
+                            Quote Request Received
                           </div>
                           <p className="text-stone-700 text-xs leading-relaxed">
-                            An automated confirmation has been sent to your email (<strong>{submittedQuoteInfo?.customerEmail}</strong>).
-                            Our studio administrator Tannia will also reach out to your phone (<strong>{submittedQuoteInfo?.customerPhone}</strong>) {submittedQuoteInfo?.contactPreference === "phone" ? "by call or text" : "for your records"} from <strong>+1 (709) 763-1315</strong>.
+                            Thank you for your custom request! Studio owner Tannia has received your specifications and will reach out to you within 1 business day via email (<strong>{submittedQuoteInfo?.customerEmail}</strong>) or phone (<strong>{submittedQuoteInfo?.customerPhone}</strong>).
                           </p>
                           <div className="bg-amber-50/90 border border-amber-200/70 rounded-[8px] p-2 text-stone-800 text-[10px] leading-relaxed">
-                            <strong>⚠️ Didn&apos;t receive a confirmation or notice a typo?</strong> Check your spam folder or click below to submit a correction!
+                            <strong>⚠️ Notice a typo in your contact info?</strong> Please verify your details above or click below to submit a correction!
                           </div>
                         </div>
                       );
