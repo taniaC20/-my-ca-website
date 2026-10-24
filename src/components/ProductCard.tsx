@@ -112,6 +112,14 @@ export default function ProductCard({ product, categoryName, onRequestQuote }: P
               </div>
             </div>
           )}
+
+          {/* Customization Note */}
+          <div className="mb-2 bg-amber-50/90 border border-amber-200/90 rounded-[10px] px-2.5 py-1.5 text-[10px] text-amber-950 flex items-center gap-1.5 shadow-3xs">
+            <Sparkles className="h-3 w-3 text-amber-700 shrink-0" />
+            <span className="font-medium leading-tight">
+              Can be customized — click to request similar pieces or custom sizes!
+            </span>
+          </div>
         </div>
 
         {/* Footer Availability and Quote Trigger */}

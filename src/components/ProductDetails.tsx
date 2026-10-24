@@ -611,6 +611,9 @@ export default function ProductDetails({
                   <Ruler className="h-3 w-3 text-brand-primary" /> {product.dimensions.trim()}
                 </span>
               )}
+              <span className="text-[9px] bg-amber-100/90 text-amber-950 border border-amber-300 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider flex items-center gap-1 shadow-3xs">
+                <Sparkles className="h-3 w-3 text-amber-800" /> Fully Customizable
+              </span>
               {product.readyForPickup && (
                 <div className="flex items-center gap-1.5 text-xs text-emerald-700">
                   <span className="flex items-center gap-1 font-semibold text-[11px]">
@@ -709,6 +712,26 @@ export default function ProductDetails({
             <h4 className="font-serif font-bold text-brand-dark text-base">Description</h4>
             <p className="text-brand-muted text-xs leading-relaxed font-light whitespace-pre-line">
               {product.description}
+            </p>
+          </div>
+
+          {/* Obvious Customization & Similar Item Request Notice */}
+          <div className="bg-gradient-to-r from-amber-50 via-amber-50/90 to-amber-100/60 border-2 border-amber-300 rounded-[22px] p-4.5 sm:p-5 shadow-xs space-y-2">
+            <div className="flex items-center gap-2 flex-wrap justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-full bg-amber-200 text-amber-900 shrink-0">
+                  <Sparkles className="h-4 w-4" />
+                </div>
+                <h4 className="font-serif font-bold text-amber-950 text-sm sm:text-base">
+                  Every Piece Can Be Fully Customized
+                </h4>
+              </div>
+              <span className="text-[9px] bg-amber-200/90 text-amber-900 font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full">
+                Custom Orders Welcome
+              </span>
+            </div>
+            <p className="text-xs text-amber-950/90 leading-relaxed font-medium">
+              Don't see something you like or want a custom variation? Every craft can be tailored to your specifications. If you would like something similar, a custom size, or an alternative design, simply check the <strong className="text-amber-950 font-bold underline decoration-amber-500 underline-offset-2">"Request a Similar or Alternative Item?"</strong> box in the order form below!
             </p>
           </div>
 
@@ -903,41 +926,49 @@ export default function ProductDetails({
                 </div>
 
                 {/* Similar or Alternative Craft Request Toggle - Located immediately below Special Design Instructions */}
-                {product.alternativeRequestText && product.alternativeRequestText.trim() && (
-                  <div className="bg-amber-50/60 border border-amber-200 p-4 rounded-[16px] space-y-3 mt-2">
-                    <label className="flex items-start gap-2.5 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        name="alternativeRequest"
-                        checked={formData.alternativeRequest}
-                        onChange={(e) => setFormData(prev => ({ ...prev, alternativeRequest: e.target.checked }))}
-                        className="rounded border-amber-300 text-amber-800 focus:ring-amber-500 h-4.5 w-4.5 cursor-pointer mt-0.5 shrink-0"
-                      />
-                      <div className="space-y-0.5">
-                        <span className="font-serif font-bold text-brand-dark text-sm block">Request a Similar or Alternative Item?</span>
-                        <span className="text-xs text-brand-muted leading-relaxed block font-light">
-                          {product.alternativeRequestText.trim()}
-                        </span>
-                      </div>
-                    </label>
-                    
-                    {formData.alternativeRequest && (
-                      <div className="space-y-2 pl-7 animate-fade-in">
-                        <label className="text-[10px] font-bold text-amber-900 uppercase tracking-wider block">
-                          Describe what you would like instead (and ask for a price quote):
-                        </label>
-                        <textarea
-                          name="alternativeDetails"
-                          rows={2}
-                          value={formData.alternativeDetails}
-                          onChange={(e) => setFormData(prev => ({ ...prev, alternativeDetails: e.target.value }))}
-                          placeholder={isPipeCleaner ? "e.g. Can I request a hand-made Lavender and Rose bouquet instead of the Sunflower? Please provide pricing for 3 stems..." : "e.g. Can I request this printed on an 11oz gloss porcelain mug instead of the ceramic one?"}
-                          className="w-full bg-white border border-amber-300 rounded-[8px] py-2 px-3 text-brand-text text-sm focus:outline-none focus:ring-1 focus:ring-amber-800 focus:border-amber-800"
+                {(() => {
+                  const altPrompt = (product.alternativeRequestText && product.alternativeRequestText.trim()) || "If you want a custom size, design, or specialized piece, check this box to specify what you'd like!";
+                  return (
+                    <div className="bg-amber-50/80 border-2 border-amber-300/90 p-4 rounded-[16px] space-y-3 mt-2 shadow-3xs">
+                      <label className="flex items-start gap-2.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          name="alternativeRequest"
+                          checked={formData.alternativeRequest}
+                          onChange={(e) => setFormData(prev => ({ ...prev, alternativeRequest: e.target.checked }))}
+                          className="rounded border-amber-400 text-amber-800 focus:ring-amber-500 h-4.5 w-4.5 cursor-pointer mt-0.5 shrink-0"
                         />
-                      </div>
-                    )}
-                  </div>
-                )}
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-serif font-bold text-brand-dark text-sm block">Request a Similar or Alternative Item?</span>
+                            <span className="text-[9px] bg-amber-200/90 text-amber-900 font-bold uppercase px-1.5 py-0.5 rounded-full">
+                              Customizable
+                            </span>
+                          </div>
+                          <span className="text-xs text-amber-950/80 leading-relaxed block font-medium">
+                            {altPrompt}
+                          </span>
+                        </div>
+                      </label>
+                      
+                      {formData.alternativeRequest && (
+                        <div className="space-y-2 pl-7 animate-fade-in pt-1">
+                          <label className="text-[10px] font-bold text-amber-900 uppercase tracking-wider block">
+                            Describe what you would like instead (and ask for a price quote):
+                          </label>
+                          <textarea
+                            name="alternativeDetails"
+                            rows={2.5}
+                            value={formData.alternativeDetails}
+                            onChange={(e) => setFormData(prev => ({ ...prev, alternativeDetails: e.target.value }))}
+                            placeholder={isPipeCleaner ? "e.g. Can I request a hand-made Lavender and Rose bouquet instead of the Sunflower? Please provide pricing for 3 stems..." : "e.g. Can I request a custom size, specific wood finish, or personalized design? Please let me know what options are possible..."}
+                            className="w-full bg-white border border-amber-300 rounded-[8px] py-2 px-3 text-brand-text text-xs focus:outline-none focus:ring-1 focus:ring-amber-800 focus:border-amber-800 font-medium"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Text to Engrave Input (Available for both: keep font or change font) */}
                 {hasEngravingText && (
