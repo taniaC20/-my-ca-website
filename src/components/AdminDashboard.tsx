@@ -43,9 +43,11 @@ import {
   ZoomOut,
   RotateCcw,
   Crop,
-  Maximize2
+  Maximize2,
+  Video,
+  Play
 } from "lucide-react";
-import { Product, Category, Testimonial, Announcement, QuoteRequest, AnalyticsSummary, CustomizationSettings, CustomSection, GIFT_OCCASION_PRESETS, GiftOccasionFilter } from "../types";
+import { Product, Category, Testimonial, Announcement, QuoteRequest, AnalyticsSummary, CustomizationSettings, CustomSection, GIFT_OCCASION_PRESETS, GiftOccasionFilter, getEmbedVideoUrl } from "../types";
 import { NicolettaLogo } from "./NicolettaLogo";
 import { safeSetLocalStorage, persistKeyVal } from "../storage";
 import { pushCloudStore, subscribeCloudSync, CloudSyncState } from "../cloudStore";
@@ -907,6 +909,7 @@ export default function AdminDashboard({
     materialDetails?: string;
     pricingNotice?: string;
     alternativeRequestText?: string;
+    videoUrl?: string;
   }>({
     name: "",
     description: "",
@@ -934,8 +937,12 @@ export default function AdminDashboard({
     giftOccasions: [],
     materialDetails: "",
     pricingNotice: "",
-    alternativeRequestText: ""
+    alternativeRequestText: "",
+    videoUrl: ""
   });
+
+  const [videoUploading, setVideoUploading] = useState(false);
+  const [videoError, setVideoError] = useState<string | null>(null);
 
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
@@ -1401,7 +1408,8 @@ export default function AdminDashboard({
                 giftOccasions: occasionsArray,
                 materialDetails: (productForm.materialDetails || "").trim(),
                 pricingNotice: (productForm.pricingNotice || "").trim(),
-                alternativeRequestText: (productForm.alternativeRequestText || "").trim()
+                alternativeRequestText: (productForm.alternativeRequestText || "").trim(),
+                videoUrl: (productForm.videoUrl || "").trim() || undefined
               }
               : p
       );
@@ -1437,7 +1445,8 @@ export default function AdminDashboard({
         giftOccasions: occasionsArray,
         materialDetails: (productForm.materialDetails || "").trim(),
         pricingNotice: (productForm.pricingNotice || "").trim(),
-        alternativeRequestText: (productForm.alternativeRequestText || "").trim()
+        alternativeRequestText: (productForm.alternativeRequestText || "").trim(),
+        videoUrl: (productForm.videoUrl || "").trim() || undefined
       };
       onUpdateProducts([...products, newProduct]);
       setIsAddingProduct(false);
@@ -1472,8 +1481,34 @@ export default function AdminDashboard({
       giftOccasions: [],
       materialDetails: "",
       pricingNotice: "",
-      alternativeRequestText: ""
+      alternativeRequestText: "",
+      videoUrl: ""
     });
+  };
+
+  const handleProductVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const MAX_SIZE = 35 * 1024 * 1024; // 35MB
+    if (file.size > MAX_SIZE) {
+      alert("The selected video file is larger than 35MB. Direct uploads are limited to 35MB for optimal browser speed. For larger or longer videos, please paste a YouTube, Vimeo, or direct MP4 URL into the video link field.");
+      return;
+    }
+
+    setVideoUploading(true);
+    setVideoError(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      setProductForm((prev) => ({ ...prev, videoUrl: result }));
+      setVideoUploading(false);
+    };
+    reader.onerror = () => {
+      setVideoError("Failed to read video file. Please try again or use a video link.");
+      setVideoUploading(false);
+    };
+    reader.readAsDataURL(file);
   };
 
   const startEditProduct = (p: Product) => {
@@ -1507,7 +1542,8 @@ export default function AdminDashboard({
       giftOccasions: Array.isArray(p.giftOccasions) ? [...p.giftOccasions] : [],
       materialDetails: p.materialDetails || "",
       pricingNotice: p.pricingNotice || "",
-      alternativeRequestText: p.alternativeRequestText || ""
+      alternativeRequestText: p.alternativeRequestText || "",
+      videoUrl: p.videoUrl || ""
     });
   };
 
@@ -1548,7 +1584,8 @@ export default function AdminDashboard({
       giftOccasions: Array.isArray(p.giftOccasions) ? [...p.giftOccasions] : [],
       materialDetails: p.materialDetails || "",
       pricingNotice: p.pricingNotice || "",
-      alternativeRequestText: p.alternativeRequestText || ""
+      alternativeRequestText: p.alternativeRequestText || "",
+      videoUrl: p.videoUrl || ""
     });
   };
 
@@ -4306,6 +4343,108 @@ export default function AdminDashboard({
                   </div>
                 </div>
 
+                {/* Product Showcase Video Manager */}
+                <div className="border border-stone-200 rounded-lg p-3.5 bg-stone-50/80 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 bg-amber-100 text-amber-900 rounded-md">
+                        <Video className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-stone-800 block">Product Showcase Video (Optional)</span>
+                        <span className="text-[10px] text-stone-500">
+                          Upload an MP4, WebM, or MOV video file (up to 35MB) or paste a YouTube, Vimeo, or direct video stream URL.
+                        </span>
+                      </div>
+                    </div>
+                    {productForm.videoUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setProductForm((prev) => ({ ...prev, videoUrl: "" }))}
+                        className="text-xs text-red-600 hover:text-red-800 font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Remove Video
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                    {/* Direct Upload Button */}
+                    <div className="sm:col-span-4">
+                      <label className="w-full bg-white hover:bg-stone-50 text-stone-800 border border-stone-300 text-xs font-bold py-2 px-3 rounded-md cursor-pointer transition-colors flex items-center justify-center gap-2 shadow-3xs">
+                        <Upload className="h-3.5 w-3.5 text-amber-800" />
+                        <span>{videoUploading ? "Reading Video File..." : "Upload Video File"}</span>
+                        <input
+                          type="file"
+                          accept="video/mp4,video/webm,video/ogg,video/quicktime"
+                          onChange={handleProductVideoUpload}
+                          className="hidden"
+                          disabled={videoUploading}
+                        />
+                      </label>
+                    </div>
+
+                    {/* Or URL input */}
+                    <div className="sm:col-span-8">
+                      <div className="relative">
+                        <input
+                          type="url"
+                          placeholder="Or paste video link (YouTube, Vimeo, or .mp4 URL)..."
+                          value={productForm.videoUrl?.startsWith("data:") ? "" : (productForm.videoUrl || "")}
+                          onChange={(e) => setProductForm((prev) => ({ ...prev, videoUrl: e.target.value }))}
+                          className="w-full text-xs p-2 pl-8 border border-stone-300 rounded bg-white text-stone-900 focus:ring-1 focus:ring-amber-800 focus:outline-none"
+                        />
+                        <Video className="h-3.5 w-3.5 text-stone-400 absolute left-2.5 top-2.5 pointer-events-none" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {videoError && (
+                    <p className="text-xs text-red-600 flex items-center gap-1">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {videoError}
+                    </p>
+                  )}
+
+                  {/* Video Live Preview Player */}
+                  {productForm.videoUrl && (
+                    <div className="mt-2 bg-stone-900/5 rounded-lg border border-stone-200 p-2.5 space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px] font-semibold text-stone-700">
+                        <span className="flex items-center gap-1.5">
+                          <Play className="h-3 w-3 text-amber-800" /> Live Video Showcase Preview
+                        </span>
+                        <span className="text-[10px] text-stone-500 font-mono">
+                          {productForm.videoUrl.startsWith("data:") ? "Direct Uploaded Video File" : "External Video Stream"}
+                        </span>
+                      </div>
+                      <div className="relative rounded overflow-hidden aspect-video max-h-56 bg-black flex items-center justify-center">
+                        {(() => {
+                          const parsed = getEmbedVideoUrl(productForm.videoUrl);
+                          if (parsed.type === "youtube" || parsed.type === "vimeo") {
+                            return (
+                              <iframe
+                                src={parsed.embedUrl}
+                                title="Product Video Preview"
+                                className="w-full h-full border-0"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                              />
+                            );
+                          }
+                          return (
+                            <video
+                              src={parsed.embedUrl}
+                              controls
+                              className="w-full h-full object-contain"
+                            >
+                              Your browser does not support the video tag.
+                            </video>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* Custom Options Config */}
                 <div className="flex flex-col gap-1.5 text-xs">
                   <div className="flex items-center justify-between">
@@ -5008,6 +5147,11 @@ export default function AdminDashboard({
                           {p.featured && (
                             <span className="text-[8px] bg-amber-100 text-amber-800 font-bold uppercase px-1.5 py-0.5 rounded-sm">
                               ★ Featured
+                            </span>
+                          )}
+                          {p.videoUrl && (
+                            <span className="text-[8px] bg-sky-100 text-sky-800 font-bold uppercase px-1.5 py-0.5 rounded-sm flex items-center gap-1">
+                              <Video className="h-2.5 w-2.5" /> Video
                             </span>
                           )}
                           {(p.giftOccasions || []).map((occ) => (

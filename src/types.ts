@@ -41,6 +41,7 @@ export interface Product {
   materialDetails?: string; // Detailed material info override
   pricingNotice?: string; // Custom note under pricing (e.g., "*The final cost will be calculated and sent by the crafter after reviewing your order details.")
   alternativeRequestText?: string; // Custom prompt for "Request a Similar or Alternative Craft"
+  videoUrl?: string; // Optional showcase video (MP4/WebM video file data URL or YouTube/Vimeo link)
 }
 
 export interface Category {
@@ -154,5 +155,19 @@ export interface CustomizationSettings {
     emailNotificationsEnabled?: boolean;
   };
   sections: CustomSection[];
+}
+
+export function getEmbedVideoUrl(url?: string): { type: "youtube" | "vimeo" | "video"; embedUrl: string } {
+  if (!url) return { type: "video", embedUrl: "" };
+  const trimmed = url.trim();
+  const ytMatch = trimmed.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
+  if (ytMatch && ytMatch[1]) {
+    return { type: "youtube", embedUrl: `https://www.youtube.com/embed/${ytMatch[1]}?autoplay=0&rel=0` };
+  }
+  const vimeoMatch = trimmed.match(/vimeo\.com\/(?:video\/)?([0-9]+)/i);
+  if (vimeoMatch && vimeoMatch[1]) {
+    return { type: "vimeo", embedUrl: `https://player.vimeo.com/video/${vimeoMatch[1]}` };
+  }
+  return { type: "video", embedUrl: trimmed };
 }
 

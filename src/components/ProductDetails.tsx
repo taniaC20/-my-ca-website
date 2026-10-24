@@ -19,9 +19,12 @@ import {
   Clock,
   Ruler,
   Mail,
-  Phone
+  Phone,
+  Video,
+  Play,
+  Image as ImageIcon
 } from "lucide-react";
-import { Product, QuoteRequest } from "../types";
+import { Product, QuoteRequest, getEmbedVideoUrl } from "../types";
 import { validateEmailAddress, validatePhoneNumber, formatPhoneInput } from "../emailService";
 
 interface ProductDetailsProps {
@@ -40,6 +43,7 @@ export default function ProductDetails({
   onSubmitQuote
 }: ProductDetailsProps): React.JSX.Element {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [activeMedia, setActiveMedia] = useState<"image" | "video">("image");
 
   // Form States
   const [formData, setFormData] = useState({
@@ -423,13 +427,60 @@ export default function ProductDetails({
         {/* Left Column: Image Gallery, Custom Engraving Visualizer, and Trust Assurances */}
         <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-24">
           <div className="relative aspect-4/3 bg-brand-highlight rounded-[24px] overflow-hidden border border-brand-border shadow-xs">
-            <img
-              src={product.images[activeImageIndex] || "https://images.unsplash.com/photo-1544982503-9f984c14501a?auto=format&fit=crop&q=80&w=600"}
-              alt={product.name}
-              className="w-full h-full object-cover"
-              referrerPolicy="no-referrer"
-            />
-            <div className="absolute top-4 left-4 flex flex-col gap-1.5">
+            {activeMedia === "video" && product.videoUrl ? (
+              <div className="w-full h-full bg-black flex items-center justify-center relative">
+                {(() => {
+                  const parsed = getEmbedVideoUrl(product.videoUrl);
+                  if (parsed.type === "youtube" || parsed.type === "vimeo") {
+                    return (
+                      <iframe
+                        src={parsed.embedUrl}
+                        title={`${product.name} Showcase Video`}
+                        className="w-full h-full border-0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    );
+                  }
+                  return (
+                    <video
+                      src={parsed.embedUrl}
+                      controls
+                      autoPlay
+                      className="w-full h-full object-contain"
+                    >
+                      Your browser does not support the video tag.
+                    </video>
+                  );
+                })()}
+                <button
+                  type="button"
+                  onClick={() => setActiveMedia("image")}
+                  className="absolute top-4 right-4 bg-brand-dark/85 hover:bg-brand-dark text-white text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-md cursor-pointer transition-colors backdrop-blur-xs border border-white/20 z-10"
+                >
+                  <ImageIcon className="h-3 w-3" /> View Photos
+                </button>
+              </div>
+            ) : (
+              <>
+                <img
+                  src={product.images[activeImageIndex] || "https://images.unsplash.com/photo-1544982503-9f984c14501a?auto=format&fit=crop&q=80&w=600"}
+                  alt={product.name}
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+                {product.videoUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveMedia("video")}
+                    className="absolute bottom-4 right-4 bg-brand-dark/85 hover:bg-brand-primary text-white text-[10px] font-bold px-3.5 py-1.5 rounded-full flex items-center gap-1.5 shadow-md cursor-pointer transition-all duration-300 backdrop-blur-xs border border-white/20 hover:scale-105 z-10"
+                  >
+                    <Play className="h-3.5 w-3.5 fill-white stroke-none" /> Watch Showcase Video
+                  </button>
+                )}
+              </>
+            )}
+            <div className="absolute top-4 left-4 flex flex-col gap-1.5 z-10 pointer-events-none">
               <span className="bg-brand-dark/95 backdrop-blur-xs text-white text-[9px] tracking-widest uppercase font-bold px-3 py-1 rounded-full">
                 {categoryName}
               </span>
@@ -441,22 +492,44 @@ export default function ProductDetails({
             </div>
           </div>
 
-          {/* Gallery Thumbnails */}
-          {product.images.length > 1 && (
-            <div className="flex gap-3">
+          {/* Gallery Thumbnails & Video Showcase */}
+          {(product.images.length > 1 || product.videoUrl) && (
+            <div className="flex flex-wrap gap-3">
               {product.images.map((img, i) => (
                 <button
                   key={i}
-                  onClick={() => setActiveImageIndex(i)}
+                  type="button"
+                  onClick={() => {
+                    setActiveMedia("image");
+                    setActiveImageIndex(i);
+                  }}
                   className={`relative aspect-4/3 w-20 rounded-[12px] overflow-hidden border cursor-pointer transition-all ${
-                    activeImageIndex === i
+                    activeMedia === "image" && activeImageIndex === i
                       ? "border-brand-primary ring-2 ring-brand-primary/10"
-                      : "border-brand-border hover:border-brand-primary/40"
+                      : "border-brand-border hover:border-brand-primary/40 opacity-80 hover:opacity-100"
                   }`}
                 >
                   <img src={img} alt={`Thumbnail ${i}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 </button>
               ))}
+
+              {product.videoUrl && (
+                <button
+                  type="button"
+                  onClick={() => setActiveMedia("video")}
+                  className={`relative aspect-4/3 w-20 rounded-[12px] overflow-hidden border cursor-pointer transition-all flex flex-col items-center justify-center bg-stone-900 text-white ${
+                    activeMedia === "video"
+                      ? "border-brand-primary ring-2 ring-brand-primary/20 bg-amber-950/80"
+                      : "border-brand-border hover:border-brand-primary/40 opacity-90 hover:opacity-100"
+                  }`}
+                  title="Watch Showcase Video"
+                >
+                  <div className="p-1 rounded-full bg-white/20 text-white mb-0.5">
+                    <Play className="h-3.5 w-3.5 fill-white stroke-none ml-0.5" />
+                  </div>
+                  <span className="text-[9px] font-bold tracking-wider uppercase text-amber-200">Video</span>
+                </button>
+              )}
             </div>
           )}
 

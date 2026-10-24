@@ -1,5 +1,5 @@
 import React from "react";
-import { Tag, Sparkles, CheckCircle, AlertTriangle, MessageSquare } from "lucide-react";
+import { Tag, Sparkles, CheckCircle, AlertTriangle, MessageSquare, Play } from "lucide-react";
 import { Product, Category } from "../types";
 
 interface ProductCardProps {
@@ -34,6 +34,11 @@ export default function ProductCard({ product, categoryName, onRequestQuote }: P
           {product.featured && (
             <span className="bg-brand-primary text-white text-[9px] tracking-widest uppercase font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-brand-border/20">
               <Sparkles className="h-2.5 w-2.5 fill-white stroke-none" /> Featured
+            </span>
+          )}
+          {product.videoUrl && (
+            <span className="bg-amber-950/90 backdrop-blur-xs text-amber-200 text-[9px] tracking-wider uppercase font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-amber-500/20 shadow-xs">
+              <Play className="h-2 w-2 fill-amber-200 stroke-none" /> Video
             </span>
           )}
         </div>
