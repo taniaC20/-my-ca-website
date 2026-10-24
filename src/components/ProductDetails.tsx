@@ -56,6 +56,8 @@ export default function ProductDetails({
     alternativeDetails: "",
   });
 
+  const [changeFont, setChangeFont] = useState<boolean>(false);
+
   const [uploadedFiles, setUploadedFiles] = useState<{ name: string; size: number; url: string }[]>([]);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -351,8 +353,8 @@ export default function ProductDetails({
         customerEmail: cleanCustomerEmail || undefined,
         customerPhone: cleanPhone || undefined,
         contactPreference: formData.contactPreference,
-        engravingText: cleanEngraving || undefined,
-        fontPreference: cleanEngraving ? formData.fontPreference : undefined,
+        engravingText: changeFont && cleanEngraving ? cleanEngraving : undefined,
+        fontPreference: changeFont ? formData.fontPreference : "Leave as in picture reference",
         specialInstructions: cleanInstructions || undefined,
         quantity: Number(formData.quantity) || 1,
         deadline: cleanDeadline || undefined,
@@ -363,6 +365,7 @@ export default function ProductDetails({
     }
 
     setSubmitted(true);
+    setChangeFont(false);
     setFormData({
       customerName: "",
       customerEmail: "",
@@ -457,8 +460,8 @@ export default function ProductDetails({
             </div>
           )}
 
-          {/* Premium Live Personalization Simulation Panel */}
-          {hasVisualizer && (
+          {/* Premium Live Personalization Simulation Panel (Appears when client checks change font) */}
+          {hasVisualizer && changeFont && (
             <div className="bg-white text-brand-dark rounded-[24px] p-5 border border-brand-border shadow-2xs space-y-4">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-4.5 w-4.5 text-brand-primary animate-pulse" />
@@ -810,9 +813,75 @@ export default function ProductDetails({
                   </div>
                 </div>
 
-                {/* Custom Text/Typography Inputs */}
+                {/* Font Preference Question */}
                 {hasEngravingText && (
-                  <div className="flex flex-col gap-1.5 border-t border-brand-border/40 pt-4 mt-2">
+                  <div className="space-y-3 border-t border-brand-border/40 pt-4 mt-2">
+                    <div>
+                      <span className="text-[10px] font-bold text-brand-primary uppercase tracking-widest block flex items-center gap-1.5">
+                        <PenTool className="h-3.5 w-3.5" /> {isSublimation ? "Font & Print Style Preference" : "Font & Typography Preference"}
+                      </span>
+                      <p className="text-xs text-stone-800 font-serif font-bold mt-1">
+                        Would you like to change the font or leave it as in the picture reference?
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <label
+                        onClick={() => setChangeFont(false)}
+                        className={`flex items-start gap-2.5 p-3 rounded-[12px] border cursor-pointer transition-all ${
+                          !changeFont
+                            ? "border-amber-800 bg-amber-50/70 ring-1 ring-amber-800/30 text-stone-900 shadow-3xs"
+                            : "border-stone-200 bg-white hover:border-amber-600/50 text-stone-600"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="fontPreferenceOption"
+                          checked={!changeFont}
+                          onChange={() => setChangeFont(false)}
+                          className="text-amber-800 focus:ring-amber-800 mt-0.5 cursor-pointer"
+                        />
+                        <div className="space-y-0.5">
+                          <span className="font-bold text-xs block text-stone-900">
+                            Leave as in the picture reference
+                          </span>
+                          <span className="text-[10px] text-stone-500 block leading-tight font-light">
+                            Crafted using the exact typography shown in the sample photos
+                          </span>
+                        </div>
+                      </label>
+
+                      <label
+                        onClick={() => setChangeFont(true)}
+                        className={`flex items-start gap-2.5 p-3 rounded-[12px] border cursor-pointer transition-all ${
+                          changeFont
+                            ? "border-amber-800 bg-amber-50/70 ring-1 ring-amber-800/30 text-stone-900 shadow-3xs"
+                            : "border-stone-200 bg-white hover:border-amber-600/50 text-stone-600"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="fontPreferenceOption"
+                          checked={changeFont}
+                          onChange={() => setChangeFont(true)}
+                          className="text-amber-800 focus:ring-amber-800 mt-0.5 cursor-pointer"
+                        />
+                        <div className="space-y-0.5">
+                          <span className="font-bold text-xs block text-stone-900">
+                            Change font
+                          </span>
+                          <span className="text-[10px] text-stone-500 block leading-tight font-light">
+                            Customize text to engrave & font style with live visualizer
+                          </span>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                {/* Custom Text/Typography Inputs (Displayed only when Change Font is selected) */}
+                {hasEngravingText && changeFont && (
+                  <div className="flex flex-col gap-1.5 border-t border-brand-border/40 pt-4 mt-2 animate-fade-in">
                     <div className="flex justify-between items-center">
                       <label htmlFor="engravingText" className="text-[10px] font-bold text-brand-primary uppercase tracking-widest flex items-center gap-1">
                         <PenTool className="h-3.5 w-3.5" /> {isSublimation ? "Custom Text to Print on Item" : "Text to Engrave"}
@@ -839,8 +908,8 @@ export default function ProductDetails({
                   </div>
                 )}
 
-                {hasTypography && (
-                  <div className="flex flex-col gap-1.5">
+                {hasTypography && changeFont && (
+                  <div className="flex flex-col gap-1.5 animate-fade-in">
                     <label htmlFor="fontPreference" className="text-[10px] font-bold text-brand-muted uppercase tracking-wider block">
                       {isSublimation ? "Printed Font Style" : "Typography Style"}
                     </label>

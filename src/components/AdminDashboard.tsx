@@ -1389,9 +1389,9 @@ export default function AdminDashboard({
                 customOptions: optionsArray,
                 hideCustomOptions: productForm.hideCustomOptions,
                 hideOptionsAvailable: productForm.hideCustomOptions,
-                hasVisualizer: productForm.hasVisualizer,
-                hasEngravingText: productForm.hasEngravingText,
-                hasTypography: productForm.hasTypography,
+                hasVisualizer: Boolean(productForm.hasEngravingText),
+                hasEngravingText: Boolean(productForm.hasEngravingText),
+                hasTypography: Boolean(productForm.hasEngravingText),
                 leadTime: (productForm.leadTime || "").trim(),
                 dimensions: (productForm.dimensions || "").trim(),
                 badge: (productForm.badge || "").trim(),
@@ -1425,9 +1425,9 @@ export default function AdminDashboard({
         customOptions: optionsArray,
         hideCustomOptions: productForm.hideCustomOptions,
         hideOptionsAvailable: productForm.hideCustomOptions,
-        hasVisualizer: productForm.hasVisualizer !== undefined ? productForm.hasVisualizer : true,
-        hasEngravingText: productForm.hasEngravingText !== undefined ? productForm.hasEngravingText : true,
-        hasTypography: productForm.hasTypography !== undefined ? productForm.hasTypography : true,
+        hasVisualizer: Boolean(productForm.hasEngravingText),
+        hasEngravingText: Boolean(productForm.hasEngravingText),
+        hasTypography: Boolean(productForm.hasEngravingText),
         leadTime: (productForm.leadTime || "").trim(),
         dimensions: (productForm.dimensions || "").trim(),
         badge: (productForm.badge || "").trim(),
@@ -1495,9 +1495,9 @@ export default function AdminDashboard({
       isHandmadeFlowers: Boolean(p.isHandmadeFlowers),
       customOptions: p.customOptions ? p.customOptions.join(", ") : "",
       hideCustomOptions: !!(p.hideCustomOptions || p.hideOptionsAvailable),
-      hasVisualizer: p.hasVisualizer !== false,
-      hasEngravingText: p.hasEngravingText !== undefined ? p.hasEngravingText : (p.hasVisualizer !== false),
-      hasTypography: p.hasTypography !== undefined ? p.hasTypography : (p.hasVisualizer !== false),
+      hasVisualizer: p.hasEngravingText !== undefined ? Boolean(p.hasEngravingText) : (p.hasVisualizer !== false),
+      hasEngravingText: p.hasEngravingText !== undefined ? Boolean(p.hasEngravingText) : (p.hasVisualizer !== false),
+      hasTypography: p.hasEngravingText !== undefined ? Boolean(p.hasEngravingText) : (p.hasVisualizer !== false),
       leadTime: p.leadTime || "",
       dimensions: p.dimensions || "",
       badge: p.badge || "",
@@ -4705,31 +4705,18 @@ export default function AdminDashboard({
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                    {/* Visualizer Toggle */}
+                  <div className="grid grid-cols-1 gap-3 pt-1">
+                    {/* Text to Engrave & Typography Toggle (Automatically activates live visualizer) */}
                     <label className="flex items-start gap-2.5 bg-white p-3 rounded-lg border border-amber-200/90 cursor-pointer hover:border-amber-400 transition-colors shadow-3xs">
                       <input
                         type="checkbox"
-                        checked={productForm.hasVisualizer}
-                        onChange={(e) => setProductForm({ ...productForm, hasVisualizer: e.target.checked })}
-                        className="rounded-sm border-stone-300 text-amber-800 focus:ring-amber-800 mt-0.5"
-                      />
-                      <div>
-                        <span className="font-bold text-stone-900 text-xs block">🎨 Personalization Visualizer</span>
-                        <span className="text-[10px] text-stone-500 block leading-tight font-light mt-0.5">Live 2D simulation preview box</span>
-                      </div>
-                    </label>
-
-                    {/* Text to Engrave Toggle */}
-                    <label className="flex items-start gap-2.5 bg-white p-3 rounded-lg border border-amber-200/90 cursor-pointer hover:border-amber-400 transition-colors shadow-3xs">
-                      <input
-                        type="checkbox"
-                        checked={productForm.hasEngravingText}
+                        checked={Boolean(productForm.hasEngravingText)}
                         onChange={(e) =>
                           setProductForm({
                             ...productForm,
                             hasEngravingText: e.target.checked,
                             hasTypography: e.target.checked,
+                            hasVisualizer: e.target.checked,
                             isEngravingProduct: e.target.checked
                           })
                         }
@@ -4737,12 +4724,12 @@ export default function AdminDashboard({
                       />
                       <div>
                         <span className="font-bold text-stone-900 text-xs block">✒️ Text to Engrave Field & Typography</span>
-                        <span className="text-[10px] text-stone-500 block leading-tight font-light mt-0.5">Custom text input and font style selection</span>
+                        <span className="text-[10px] text-stone-500 block leading-tight font-light mt-0.5">Custom text input, font style selection, and automatic live personalization visualizer</span>
                       </div>
                     </label>
 
                     {/* Handmade Flowers Layout Toggle */}
-                    <label className="flex items-start gap-2.5 bg-white p-3 rounded-lg border border-amber-200/90 cursor-pointer hover:border-amber-400 transition-colors shadow-3xs sm:col-span-2">
+                    <label className="flex items-start gap-2.5 bg-white p-3 rounded-lg border border-amber-200/90 cursor-pointer hover:border-amber-400 transition-colors shadow-3xs">
                       <input
                         type="checkbox"
                         checked={Boolean(productForm.isHandmadeFlowers)}
