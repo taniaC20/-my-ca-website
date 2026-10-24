@@ -461,9 +461,10 @@ export default function App() {
     startLoadingBar();
     try {
       const currentToken = activeToken !== undefined ? activeToken : token;
-      const localStore = await readBestLocalStore();
+      const adminToken = currentToken || (typeof window !== "undefined" ? localStorage.getItem("nicoletta_admin_token") : null);
 
-      // Apply local IndexedDB hydration immediately so the user sees their local work without flicker
+      // Hydrate from fast local cache immediately
+      const localStore = await readBestLocalStore();
       if (localStore.customization && !isStaleCustomization(localStore.customization)) setCustomization(ensureContactSection(localStore.customization));
       if (localStore.products.length > 0) setProducts(localStore.products);
       if (localStore.categories.length > 0) setCategories(localStore.categories);
@@ -471,8 +472,26 @@ export default function App() {
       if (localStore.announcements.length > 0) setAnnouncements(localStore.announcements);
       if (localStore.quotes.length > 0) setQuotes(localStore.quotes);
 
-      // 1. Check shared Cloud Store (works across all browsers, phones, and devices on Vercel)
-      const cloudData = await fetchCloudStore();
+      // Concurrently fetch Cloud Store snapshot and local Express endpoints in parallel
+      const [cloudData, resProds, resCats, resTests, resAnns, resCust, resAdminQuotes, resAdminTests] = await Promise.all([
+        fetchCloudStore(),
+        safeFetchJson("/api/products"),
+        safeFetchJson("/api/categories"),
+        safeFetchJson("/api/testimonials"),
+        safeFetchJson("/api/announcements"),
+        safeFetchJson("/api/customization"),
+        adminToken
+          ? safeFetchJson("/api/admin/quotes", {
+              headers: { "Authorization": `Bearer ${adminToken}` }
+            })
+          : Promise.resolve({ ok: false, data: null }),
+        adminToken
+          ? safeFetchJson("/api/admin/testimonials", {
+              headers: { "Authorization": `Bearer ${adminToken}` }
+            })
+          : Promise.resolve({ ok: false, data: null })
+      ]);
+
       const migrationDone = localStorage.getItem("nicoletta_cloud_initial_migration_done") === "true";
       const localUnsynced = localStorage.getItem("nicoletta_customization_unsynced") === "true";
       const isAdminBrowser = Boolean(
@@ -491,17 +510,17 @@ export default function App() {
       if (!cloudData) {
         // Cloud store has no snapshot yet: if this browser has user work, publish it to the cloud automatically!
         if (hasLocalUserWork || localUnsynced || isAdminBrowser) {
-          await pushCloudStore({
+          pushCloudStore({
             customization: localStore.customization || customization,
             products: localStore.products,
             categories: localStore.categories,
             testimonials: localStore.testimonials,
             announcements: localStore.announcements,
             quotes: localStore.quotes
-          });
+          }).catch(() => {});
         }
       } else {
-        // Cloud store exists: check if this browser has un-migrated local admin work that is richer than cloud
+        // Cloud store exists: reconcile with local state preserving any freshly added crafts or quotes
         const cloudProds = Array.isArray(cloudData.products) ? cloudData.products : [];
         const cloudCats = Array.isArray(cloudData.categories) ? cloudData.categories : [];
         const cloudTests = Array.isArray(cloudData.testimonials) ? cloudData.testimonials : [];
@@ -523,11 +542,11 @@ export default function App() {
             localUnsynced);
 
         if (localHasMoreData) {
-          const mergedProds = localStore.products.length >= cloudProds.length ? localStore.products : cloudProds;
+          const mergedProds = Array.from(new Map([...cloudProds, ...localStore.products].map(p => [p.id, p])).values());
           const mergedCats = localStore.categories.length >= cloudCats.length ? localStore.categories : cloudCats;
           const mergedTests = localStore.testimonials.length >= cloudTests.length ? localStore.testimonials : cloudTests;
           const mergedAnns = localStore.announcements.length >= cloudAnns.length ? localStore.announcements : cloudAnns;
-          const mergedQuotes = localStore.quotes.length >= cloudQuotes.length ? localStore.quotes : cloudQuotes;
+          const mergedQuotes = Array.from(new Map([...cloudQuotes, ...localStore.quotes].map(q => [q.id, q])).values());
           const mergedCust =
             (localUnsynced ||
               scoreCustomizationRichness(localStore.customization) >= scoreCustomizationRichness(cloudCust)) &&
@@ -542,21 +561,28 @@ export default function App() {
           setQuotes(mergedQuotes);
           if (mergedCust) setCustomization(ensureContactSection(mergedCust));
 
-          await pushCloudStore({
+          pushCloudStore({
             customization: mergedCust ? ensureContactSection(mergedCust) : mergedCust,
             products: mergedProds,
             categories: mergedCats,
             testimonials: mergedTests,
             announcements: mergedAnns,
             quotes: mergedQuotes
-          });
+          }).catch(() => {});
         } else {
-          // Use authoritative cloud state so all browsers and customer devices see the exact same site!
-          setProducts(cloudProds);
-          setCategories(cloudCats);
-          setTestimonials(cloudTests);
-          setAnnouncements(cloudAnns);
-          const preservedQuotes = Array.from(new Map([...localStore.quotes, ...cloudQuotes].map((q) => [q.id, q])).values());
+          // Use authoritative cloud state, merging any locally pending items so newly added crafts never vanish
+          const preservedProds = Array.from(
+            new Map([...cloudProds, ...localStore.products].map((p) => [p.id, p])).values()
+          );
+          setProducts(preservedProds);
+          setCategories(cloudCats.length > 0 ? cloudCats : localStore.categories);
+          setTestimonials(cloudTests.length > 0 ? cloudTests : localStore.testimonials);
+          setAnnouncements(cloudAnns.length > 0 ? cloudAnns : localStore.announcements);
+          
+          const serverAdminQuotesList = resAdminQuotes.ok && Array.isArray(resAdminQuotes.data) ? resAdminQuotes.data : [];
+          const preservedQuotes = Array.from(
+            new Map([...serverAdminQuotesList, ...cloudQuotes, ...localStore.quotes].map((q) => [q.id, q])).values()
+          );
           setQuotes(preservedQuotes);
           if (cloudCust) {
             setCustomization(ensureContactSection(cloudCust));
@@ -566,14 +592,6 @@ export default function App() {
       }
 
       // 2. Also check local Express /api endpoints when running local dev server
-      const [resProds, resCats, resTests, resAnns, resCust] = await Promise.all([
-        safeFetchJson("/api/products"),
-        safeFetchJson("/api/categories"),
-        safeFetchJson("/api/testimonials"),
-        safeFetchJson("/api/announcements"),
-        safeFetchJson("/api/customization")
-      ]);
-
       if (resProds.ok && Array.isArray(resProds.data) && resProds.data.length > 0 && !cloudData) {
         setProducts(resProds.data);
       }
@@ -590,54 +608,39 @@ export default function App() {
         setCustomization(ensureContactSection(resCust.data));
       }
 
-      // Views metric counter ping
-      try {
-        const resHit = await safeFetchJson("/api/analytics/view-hit", { method: "POST" });
-        if (resHit.ok && resHit.data && typeof resHit.data.views === "number") {
-          setTotalViewsState(resHit.data.views);
-          safeSetLocalStorage("nicoletta_total_views", String(resHit.data.views));
-        } else {
+      // If authorized session exists and returned admin quotes, merge them
+      if (resAdminQuotes.ok && Array.isArray(resAdminQuotes.data) && resAdminQuotes.data.length > 0) {
+        setQuotes(prev => {
+          const map = new Map<string, QuoteRequest>();
+          (resAdminQuotes.data as QuoteRequest[]).forEach(q => map.set(q.id, q));
+          prev.forEach(q => { if (!map.has(q.id)) map.set(q.id, q); });
+          const merged = Array.from(map.values());
+          persistKeyVal("nicoletta_quotes", merged);
+          return merged;
+        });
+      }
+      if (resAdminTests.ok && Array.isArray(resAdminTests.data) && resAdminTests.data.length > 0) {
+        setTestimonials(resAdminTests.data);
+        persistKeyVal("nicoletta_testimonials", resAdminTests.data);
+      }
+
+      // Views metric counter ping (fire in background)
+      safeFetchJson("/api/analytics/view-hit", { method: "POST" })
+        .then(resHit => {
+          if (resHit.ok && resHit.data && typeof resHit.data.views === "number") {
+            setTotalViewsState(resHit.data.views);
+            safeSetLocalStorage("nicoletta_total_views", String(resHit.data.views));
+          } else {
+            const nextViews = (parseInt(localStorage.getItem("nicoletta_total_views") || "1", 10) || 0) + 1;
+            safeSetLocalStorage("nicoletta_total_views", String(nextViews));
+            setTotalViewsState(nextViews);
+          }
+        })
+        .catch(() => {
           const nextViews = (parseInt(localStorage.getItem("nicoletta_total_views") || "1", 10) || 0) + 1;
           safeSetLocalStorage("nicoletta_total_views", String(nextViews));
           setTotalViewsState(nextViews);
-        }
-      } catch {
-        const nextViews = (parseInt(localStorage.getItem("nicoletta_total_views") || "1", 10) || 0) + 1;
-        safeSetLocalStorage("nicoletta_total_views", String(nextViews));
-        setTotalViewsState(nextViews);
-      }
-
-      // If authorized session exists, load protected administrative logs & quotes immediately
-      const adminToken = currentToken || (typeof window !== "undefined" ? localStorage.getItem("nicoletta_admin_token") : null);
-      if (adminToken) {
-        try {
-          const [resQuotes, resAllTests] = await Promise.all([
-            safeFetchJson("/api/admin/quotes", {
-              headers: { "Authorization": `Bearer ${adminToken}` }
-            }),
-            safeFetchJson("/api/admin/testimonials", {
-              headers: { "Authorization": `Bearer ${adminToken}` }
-            })
-          ]);
-
-          if (resQuotes.ok && Array.isArray(resQuotes.data)) {
-            setQuotes(prev => {
-              const map = new Map<string, QuoteRequest>();
-              (resQuotes.data as QuoteRequest[]).forEach(q => map.set(q.id, q));
-              prev.forEach(q => { if (!map.has(q.id)) map.set(q.id, q); });
-              const merged = Array.from(map.values());
-              persistKeyVal("nicoletta_quotes", merged);
-              return merged;
-            });
-          }
-          if (resAllTests.ok && Array.isArray(resAllTests.data) && resAllTests.data.length > 0) {
-            setTestimonials(resAllTests.data);
-            persistKeyVal("nicoletta_testimonials", resAllTests.data);
-          }
-        } catch (adminErr) {
-          console.error("Admin data refresh warning:", adminErr);
-        }
-      }
+        });
     } catch (err) {
       console.error("Artisan cloud database synchronization failure:", err);
     } finally {
@@ -722,7 +725,7 @@ export default function App() {
         if (storedToken === "static-admin-session-token") {
           setIsLoggedIn(true);
           setToken(storedToken);
-          await restoreDatabaseToServer(storedToken);
+          restoreDatabaseToServer(storedToken).catch(() => {});
           await fetchAllData(storedToken);
           setInitialLoadDone(true);
           return;
@@ -734,7 +737,7 @@ export default function App() {
           if (res.ok && res.data && res.data.authenticated) {
             setIsLoggedIn(true);
             setToken(storedToken);
-            await restoreDatabaseToServer(storedToken);
+            restoreDatabaseToServer(storedToken).catch(() => {});
             await fetchAllData(storedToken);
             setInitialLoadDone(true);
             return;
@@ -995,8 +998,9 @@ export default function App() {
           synced = res.ok;
         }
       }
+      // State is already updated instantaneously without waiting for refetches
       if (synced) {
-        await fetchAllData();
+        // Background sync verified
       }
     } catch (err) {
       console.error("Failed to sync products update:", err);
@@ -1059,8 +1063,9 @@ export default function App() {
           synced = res.ok;
         }
       }
+      // State is already updated instantaneously without waiting for refetches
       if (synced) {
-        await fetchAllData();
+        // Background sync verified
       }
     } catch (err) {
       console.error("Failed to sync categories update:", err);
@@ -1130,8 +1135,9 @@ export default function App() {
           synced = res.ok;
         }
       }
+      // State is already updated instantaneously without waiting for refetches
       if (synced) {
-        await fetchAllData();
+        // Background sync verified
       }
     } catch (err) {
       console.error("Failed to sync testimonials approval/removal:", err);
@@ -1191,8 +1197,9 @@ export default function App() {
           synced = res.ok;
         }
       }
+      // State is already updated instantaneously without waiting for refetches
       if (synced) {
-        await fetchAllData();
+        // Background sync verified
       }
     } catch (err) {
       console.error("Failed to sync announcements ledger:", err);
@@ -1238,12 +1245,29 @@ export default function App() {
           synced = res.ok;
         }
       }
+      // State is already updated instantaneously without waiting for refetches
       if (synced) {
-        await fetchAllData();
+        // Background sync verified
       }
     } catch (err) {
       console.error("Failed to sync quote modification:", err);
     }
+  };
+
+  const syncQuotesFromAdmin = (serverQuotes: QuoteRequest[]) => {
+    if (!Array.isArray(serverQuotes) || serverQuotes.length === 0) return;
+    setQuotes((prev) => {
+      const map = new Map<string, QuoteRequest>();
+      serverQuotes.forEach((q) => map.set(q.id, q));
+      prev.forEach((q) => {
+        if (!map.has(q.id)) {
+          map.set(q.id, q);
+        }
+      });
+      const merged = Array.from(map.values());
+      persistKeyVal("nicoletta_quotes", merged);
+      return merged;
+    });
   };
 
   // Dynamic analytic calculations
@@ -1334,7 +1358,7 @@ export default function App() {
         pushCloudStore({ quotes: nextQuotes }).catch(() => {});
         sendQuoteNotificationToAdmin(savedQuote, customization.emailSettings).catch(() => {});
         sendQuoteConfirmationToClient(savedQuote, customization.emailSettings).catch(() => {});
-        await fetchAllData();
+        // Instant update without blocking on fetchAllData
       } else {
         const nextQuotes = [fallbackQuote, ...quotes];
         setQuotes(nextQuotes);
@@ -1366,7 +1390,11 @@ export default function App() {
         body: JSON.stringify(payload)
       });
       if (response.ok) {
-        await fetchAllData();
+        const saved = await response.json();
+        const nextTests = [saved, ...testimonials.filter((t) => t.id !== saved.id)];
+        setTestimonials(nextTests);
+        persistKeyVal("nicoletta_testimonials", nextTests);
+        pushCloudStore({ testimonials: nextTests }).catch(() => {});
         alert("Thank you! Your testimonial has been submitted successfully for moderator review.");
       } else {
         const nextTests = [fallbackTestimonial, ...testimonials];
@@ -1691,6 +1719,7 @@ export default function App() {
                 onUpdateTestimonials={updateTestimonialsState}
                 onUpdateAnnouncements={updateAnnouncementsState}
                 onUpdateQuotes={updateQuotesState}
+                onSyncQuotes={syncQuotesFromAdmin}
               />
             </div>
           )
@@ -2799,7 +2828,7 @@ export default function App() {
                             persistKeyVal("nicoletta_quotes", nextQuotes);
                             pushCloudStore({ quotes: nextQuotes }).catch(() => {});
                             sendQuoteNotificationToAdmin(saved, customization.emailSettings).catch(() => {});
-                            await fetchAllData();
+                            // Instant update without blocking on fetchAllData
                           } else {
                             const nextQuotes = [fallbackContactQuote, ...quotes];
                             setQuotes(nextQuotes);

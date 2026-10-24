@@ -36,6 +36,8 @@ function getHeaders(raw = false): Record<string, string> {
 }
 
 let cachedSnapshot: CloudStoreSnapshot | null = null;
+let lastFetchTimestamp = 0;
+const CACHE_TTL_MS = 20000; // 20s in-memory freshness for instantaneous updates
 let syncState: CloudSyncState = "idle";
 let lastSyncedAt: string | null =
   typeof window !== "undefined" ? localStorage.getItem("nicoletta_cloud_synced_at") : null;
@@ -72,32 +74,47 @@ export function getCloudSyncInfo(): { state: CloudSyncState; lastSyncedAt: strin
 /**
  * Fetches the authoritative cloud store snapshot from the repository's meta/cms-store ref.
  */
-export async function fetchCloudStore(): Promise<CloudStoreSnapshot | null> {
+export async function fetchCloudStore(force = false): Promise<CloudStoreSnapshot | null> {
+  const now = Date.now();
+  if (!force && cachedSnapshot && (now - lastFetchTimestamp < CACHE_TTL_MS)) {
+    return cachedSnapshot;
+  }
+
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4500);
+
     const refRes = await fetch(`${REPO_API_BASE}/ref/${STORE_REF_NAME}?t=${Date.now()}`, {
       method: "GET",
       headers: getHeaders(false),
-      cache: "no-store"
+      cache: "no-store",
+      signal: controller.signal
     });
 
     if (refRes.status === 404) {
+      clearTimeout(timeoutId);
       return null;
     }
     if (!refRes.ok) {
+      clearTimeout(timeoutId);
       return cachedSnapshot;
     }
 
     const refData = await refRes.json();
     const blobSha: string | undefined = refData?.object?.sha;
     if (!blobSha) {
+      clearTimeout(timeoutId);
       return null;
     }
 
     const blobRes = await fetch(`${REPO_API_BASE}/blobs/${blobSha}`, {
       method: "GET",
       headers: getHeaders(true),
-      cache: "no-store"
+      cache: "no-store",
+      signal: controller.signal
     });
+
+    clearTimeout(timeoutId);
 
     if (!blobRes.ok) {
       return cachedSnapshot;
@@ -107,6 +124,7 @@ export async function fetchCloudStore(): Promise<CloudStoreSnapshot | null> {
     const parsed = JSON.parse(text) as CloudStoreSnapshot;
     if (parsed && typeof parsed === "object") {
       cachedSnapshot = parsed;
+      lastFetchTimestamp = Date.now();
       notifyListeners("synced", parsed.updatedAt || lastSyncedAt);
       return parsed;
     }
@@ -147,6 +165,7 @@ export function pushCloudStore(partial: Partial<CloudStoreSnapshot>): Promise<bo
         };
 
         cachedSnapshot = merged;
+        lastFetchTimestamp = Date.now();
 
         // 1. Create UTF-8 Git Blob (supports up to 100MB of JSON + base64 images)
         const blobRes = await fetch(`${REPO_API_BASE}/blobs`, {

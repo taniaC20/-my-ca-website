@@ -65,6 +65,7 @@ interface AdminDashboardProps {
   onUpdateTestimonials: (testimonials: Testimonial[]) => void;
   onUpdateAnnouncements: (announcements: Announcement[]) => void;
   onUpdateQuotes: (quotes: QuoteRequest[]) => void;
+  onSyncQuotes?: (quotes: QuoteRequest[]) => void;
 }
 
 type AdminTab = "analytics" | "products" | "categories" | "testimonials" | "quotes" | "messages" | "announcements" | "site-customizer" | "security";
@@ -215,7 +216,8 @@ export default function AdminDashboard({
   onUpdateCategories,
   onUpdateTestimonials,
   onUpdateAnnouncements,
-  onUpdateQuotes
+  onUpdateQuotes,
+  onSyncQuotes
 }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>("site-customizer");
 
@@ -244,25 +246,38 @@ export default function AdminDashboard({
     }
   }, [activeTab, token, quotes]);
 
-  // Immediate administrative quotes & messages fast loader
+  // Immediate administrative quotes & messages fast loader with 8s polling
   React.useEffect(() => {
     const authToken = token || (typeof window !== "undefined" ? localStorage.getItem("nicoletta_admin_token") : null);
-    if (authToken && (activeTab === "quotes" || activeTab === "messages" || activeTab === "analytics" || quotes.length === 0)) {
+    if (!authToken) return;
+
+    let isMounted = true;
+    const fetchLatestQuotes = () => {
       fetch(`/api/admin/quotes?t=${Date.now()}`, {
         headers: { "Authorization": `Bearer ${authToken}` }
       })
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
-          if (Array.isArray(data) && data.length > 0) {
+          if (!isMounted || !Array.isArray(data) || data.length === 0) return;
+          if (onSyncQuotes) {
+            onSyncQuotes(data);
+          } else {
             onUpdateQuotes(data);
-            try {
-              localStorage.setItem("nicoletta_quotes", JSON.stringify(data));
-            } catch {}
           }
+          try {
+            localStorage.setItem("nicoletta_quotes", JSON.stringify(data));
+          } catch {}
         })
         .catch(() => {});
-    }
-  }, [activeTab, token]);
+    };
+
+    fetchLatestQuotes();
+    const intervalId = setInterval(fetchLatestQuotes, 8000);
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
+  }, [activeTab, token, onSyncQuotes, onUpdateQuotes]);
 
   // Product Photo Position & Resize Adjuster States
   const [photoAdjusterOpen, setPhotoAdjusterOpen] = useState(false);
