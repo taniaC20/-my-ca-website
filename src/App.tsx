@@ -41,7 +41,7 @@ import ProductDetails from "./components/ProductDetails";
 import CustomerAuthPortal from "./components/CustomerAuthPortal";
 import { CustomerProfile, getStoredCustomerSession } from "./supabaseClient";
 import { safeSetLocalStorage, safeParseLocal, persistKeyVal, idbGet } from "./storage";
-import { fetchCloudStore, pushCloudStore, scoreCustomizationRichness } from "./cloudStore";
+import { fetchCloudStore, fetchCloudQuotes, pushCloudStore, scoreCustomizationRichness } from "./cloudStore";
 import {
   INITIAL_CATEGORIES,
   INITIAL_PRODUCTS,
@@ -463,7 +463,7 @@ export default function App() {
       const currentToken = activeToken !== undefined ? activeToken : token;
       const adminToken = currentToken || (typeof window !== "undefined" ? localStorage.getItem("nicoletta_admin_token") : null);
 
-      // Hydrate from fast local cache immediately
+      // Hydrate from fast local cache & initial data immediately (0ms visual delay)
       const localStore = await readBestLocalStore();
       if (localStore.customization && !isStaleCustomization(localStore.customization)) setCustomization(ensureContactSection(localStore.customization));
       if (localStore.products.length > 0) setProducts(localStore.products);
@@ -471,10 +471,12 @@ export default function App() {
       if (localStore.testimonials.length > 0) setTestimonials(localStore.testimonials);
       if (localStore.announcements.length > 0) setAnnouncements(localStore.announcements);
       if (localStore.quotes.length > 0) setQuotes(localStore.quotes);
+      finishLoadingBar(); // Release UI immediately so the user never sees "takes too long to load"
 
       // Concurrently fetch Cloud Store snapshot and local Express endpoints in parallel
-      const [cloudData, resProds, resCats, resTests, resAnns, resCust, resAdminQuotes, resAdminTests] = await Promise.all([
+      const [cloudData, cloudQuotesData, resProds, resCats, resTests, resAnns, resCust, resAdminQuotes, resAdminTests] = await Promise.all([
         fetchCloudStore(),
+        adminToken ? fetchCloudQuotes() : Promise.resolve([]),
         safeFetchJson("/api/products"),
         safeFetchJson("/api/categories"),
         safeFetchJson("/api/testimonials"),
@@ -546,7 +548,7 @@ export default function App() {
           const mergedCats = localStore.categories.length >= cloudCats.length ? localStore.categories : cloudCats;
           const mergedTests = localStore.testimonials.length >= cloudTests.length ? localStore.testimonials : cloudTests;
           const mergedAnns = localStore.announcements.length >= cloudAnns.length ? localStore.announcements : cloudAnns;
-          const mergedQuotes = Array.from(new Map([...cloudQuotes, ...localStore.quotes].map(q => [q.id, q])).values());
+          const mergedQuotes = Array.from(new Map([...cloudQuotesData, ...cloudQuotes, ...localStore.quotes].map(q => [q.id, q])).values());
           const mergedCust =
             (localUnsynced ||
               scoreCustomizationRichness(localStore.customization) >= scoreCustomizationRichness(cloudCust)) &&
@@ -581,7 +583,7 @@ export default function App() {
           
           const serverAdminQuotesList = resAdminQuotes.ok && Array.isArray(resAdminQuotes.data) ? resAdminQuotes.data : [];
           const preservedQuotes = Array.from(
-            new Map([...serverAdminQuotesList, ...cloudQuotes, ...localStore.quotes].map((q) => [q.id, q])).values()
+            new Map([...cloudQuotesData, ...serverAdminQuotesList, ...cloudQuotes, ...localStore.quotes].map((q) => [q.id, q])).values()
           );
           setQuotes(preservedQuotes);
           if (cloudCust) {

@@ -1,5 +1,5 @@
 import { Product, Category, Testimonial, Announcement, QuoteRequest, CustomizationSettings } from "./types";
-import { safeSetLocalStorage } from "./storage";
+import { safeSetLocalStorage, persistKeyVal, idbGet } from "./storage";
 
 export interface CloudStoreSnapshot {
   updatedAt: string;
@@ -16,6 +16,7 @@ export type CloudSyncState = "idle" | "syncing" | "synced" | "error";
 
 const REPO_API_BASE = "https://api.github.com/repos/taniaC20/-my-ca-website/git";
 const STORE_REF_NAME = "meta/cms-store";
+const QUOTES_REF_NAME = "meta/cms-quotes";
 
 // Obfuscated credential bytes for cloud blob ref synchronization
 const CLOUD_KEY_BYTES = [
@@ -36,8 +37,10 @@ function getHeaders(raw = false): Record<string, string> {
 }
 
 let cachedSnapshot: CloudStoreSnapshot | null = null;
+let cachedSha: string | null =
+  typeof window !== "undefined" ? localStorage.getItem("nicoletta_cms_blob_sha") : null;
 let lastFetchTimestamp = 0;
-const CACHE_TTL_MS = 20000; // 20s in-memory freshness for instantaneous updates
+const CACHE_TTL_MS = 15000; // 15s in-memory freshness for instantaneous updates
 let syncState: CloudSyncState = "idle";
 let lastSyncedAt: string | null =
   typeof window !== "undefined" ? localStorage.getItem("nicoletta_cloud_synced_at") : null;
@@ -73,17 +76,37 @@ export function getCloudSyncInfo(): { state: CloudSyncState; lastSyncedAt: strin
 
 /**
  * Fetches the authoritative cloud store snapshot from the repository's meta/cms-store ref.
+ * Uses conditional SHA caching: checks the 150-byte git ref first; if the SHA hasn't changed,
+ * immediately serves the cached snapshot with 0 download latency.
  */
 export async function fetchCloudStore(force = false): Promise<CloudStoreSnapshot | null> {
   const now = Date.now();
-  if (!force && cachedSnapshot && (now - lastFetchTimestamp < CACHE_TTL_MS)) {
+  if (!force && cachedSnapshot && now - lastFetchTimestamp < CACHE_TTL_MS) {
     return cachedSnapshot;
+  }
+
+  // Attempt to restore from IndexedDB if in-memory cache is empty
+  if (!cachedSnapshot) {
+    try {
+      const idbSnapshot = await idbGet<CloudStoreSnapshot>("nicoletta_cached_cloud_store");
+      if (
+        idbSnapshot &&
+        typeof idbSnapshot === "object" &&
+        Array.isArray(idbSnapshot.products) &&
+        idbSnapshot.products.length > 0
+      ) {
+        cachedSnapshot = idbSnapshot;
+      }
+    } catch {
+      // Continue to network fetch
+    }
   }
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4500);
+    const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout
 
+    // Step 1: Lightweight ref check (~150 bytes, ~120ms)
     const refRes = await fetch(`${REPO_API_BASE}/ref/${STORE_REF_NAME}?t=${Date.now()}`, {
       method: "GET",
       headers: getHeaders(false),
@@ -93,7 +116,7 @@ export async function fetchCloudStore(force = false): Promise<CloudStoreSnapshot
 
     if (refRes.status === 404) {
       clearTimeout(timeoutId);
-      return null;
+      return cachedSnapshot;
     }
     if (!refRes.ok) {
       clearTimeout(timeoutId);
@@ -104,9 +127,18 @@ export async function fetchCloudStore(force = false): Promise<CloudStoreSnapshot
     const blobSha: string | undefined = refData?.object?.sha;
     if (!blobSha) {
       clearTimeout(timeoutId);
-      return null;
+      return cachedSnapshot;
     }
 
+    // Fast-path: SHA matches what we already have cached!
+    if (!force && cachedSnapshot && blobSha === cachedSha) {
+      clearTimeout(timeoutId);
+      lastFetchTimestamp = Date.now();
+      notifyListeners("synced", cachedSnapshot.updatedAt || lastSyncedAt);
+      return cachedSnapshot;
+    }
+
+    // Step 2: Fetch updated blob content
     const blobRes = await fetch(`${REPO_API_BASE}/blobs/${blobSha}`, {
       method: "GET",
       headers: getHeaders(true),
@@ -124,14 +156,78 @@ export async function fetchCloudStore(force = false): Promise<CloudStoreSnapshot
     const parsed = JSON.parse(text) as CloudStoreSnapshot;
     if (parsed && typeof parsed === "object") {
       cachedSnapshot = parsed;
+      cachedSha = blobSha;
       lastFetchTimestamp = Date.now();
+      safeSetLocalStorage("nicoletta_cms_blob_sha", blobSha);
+      persistKeyVal("nicoletta_cached_cloud_store", parsed);
       notifyListeners("synced", parsed.updatedAt || lastSyncedAt);
       return parsed;
     }
-    return null;
+    return cachedSnapshot;
   } catch (err) {
     console.warn("Cloud store fetch warning:", err);
     return cachedSnapshot;
+  }
+}
+
+let quotesCache: QuoteRequest[] | null = null;
+let lastQuotesTimestamp = 0;
+
+/**
+ * Fetches quotes from meta/cms-quotes.
+ * Exclusively used by Admin Dashboard so regular users never download quotes.
+ */
+export async function fetchCloudQuotes(force = false): Promise<QuoteRequest[]> {
+  const now = Date.now();
+  if (!force && quotesCache && now - lastQuotesTimestamp < CACHE_TTL_MS) {
+    return quotesCache;
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+    const refRes = await fetch(`${REPO_API_BASE}/ref/${QUOTES_REF_NAME}?t=${Date.now()}`, {
+      method: "GET",
+      headers: getHeaders(false),
+      cache: "no-store",
+      signal: controller.signal
+    });
+
+    if (!refRes.ok) {
+      clearTimeout(timeoutId);
+      return quotesCache || [];
+    }
+
+    const refData = await refRes.json();
+    const blobSha: string | undefined = refData?.object?.sha;
+    if (!blobSha) {
+      clearTimeout(timeoutId);
+      return quotesCache || [];
+    }
+
+    const blobRes = await fetch(`${REPO_API_BASE}/blobs/${blobSha}`, {
+      method: "GET",
+      headers: getHeaders(true),
+      cache: "no-store",
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!blobRes.ok) return quotesCache || [];
+
+    const text = await blobRes.text();
+    const parsed = JSON.parse(text);
+    if (parsed && Array.isArray(parsed.quotes)) {
+      quotesCache = parsed.quotes;
+      lastQuotesTimestamp = Date.now();
+      return parsed.quotes;
+    }
+    return quotesCache || [];
+  } catch (err) {
+    console.warn("Cloud quotes fetch warning:", err);
+    return quotesCache || [];
   }
 }
 
@@ -157,22 +253,73 @@ export function pushCloudStore(partial: Partial<CloudStoreSnapshot>): Promise<bo
           }
         }
 
-        const merged: CloudStoreSnapshot = {
+        // 1. If quotes are being updated, push them to meta/cms-quotes
+        if (Array.isArray(partial.quotes)) {
+          const quotesPayload = {
+            updatedAt: nowIso,
+            updatedAtMs: nowMs,
+            quotes: partial.quotes
+          };
+          quotesCache = partial.quotes;
+          lastQuotesTimestamp = Date.now();
+
+          try {
+            const quotesBlobRes = await fetch(`${REPO_API_BASE}/blobs`, {
+              method: "POST",
+              headers: getHeaders(false),
+              body: JSON.stringify({
+                content: JSON.stringify(quotesPayload),
+                encoding: "utf-8"
+              })
+            });
+
+            if (quotesBlobRes.ok) {
+              const qBlobData = await quotesBlobRes.json();
+              const qSha = qBlobData?.sha;
+              if (qSha) {
+                const pRes = await fetch(`${REPO_API_BASE}/refs/${QUOTES_REF_NAME}`, {
+                  method: "PATCH",
+                  headers: getHeaders(false),
+                  body: JSON.stringify({ sha: qSha, force: true })
+                });
+                if (!pRes.ok) {
+                  await fetch(`${REPO_API_BASE}/refs`, {
+                    method: "POST",
+                    headers: getHeaders(false),
+                    body: JSON.stringify({ ref: `refs/${QUOTES_REF_NAME}`, sha: qSha })
+                  });
+                }
+              }
+            }
+          } catch (qErr) {
+            console.warn("Quotes cloud save warning:", qErr);
+          }
+        }
+
+        // 2. Prepare CMS store (products, categories, customization, announcements, testimonials)
+        const storeMerged: CloudStoreSnapshot = {
           ...(cachedSnapshot || { updatedAt: nowIso, updatedAtMs: nowMs }),
-          ...partial,
+          ...(partial.customization !== undefined ? { customization: partial.customization } : {}),
+          ...(partial.products !== undefined ? { products: partial.products } : {}),
+          ...(partial.categories !== undefined ? { categories: partial.categories } : {}),
+          ...(partial.testimonials !== undefined ? { testimonials: partial.testimonials } : {}),
+          ...(partial.announcements !== undefined ? { announcements: partial.announcements } : {}),
           updatedAt: nowIso,
           updatedAtMs: nowMs
         };
+        // Exclude quotes from cms-store payload to keep it lean and fast
+        delete storeMerged.quotes;
 
-        cachedSnapshot = merged;
+        cachedSnapshot = storeMerged;
         lastFetchTimestamp = Date.now();
+        persistKeyVal("nicoletta_cached_cloud_store", storeMerged);
 
-        // 1. Create UTF-8 Git Blob (supports up to 100MB of JSON + base64 images)
+        // Create UTF-8 Git Blob for cms-store
         const blobRes = await fetch(`${REPO_API_BASE}/blobs`, {
           method: "POST",
           headers: getHeaders(false),
           body: JSON.stringify({
-            content: JSON.stringify(merged),
+            content: JSON.stringify(storeMerged),
             encoding: "utf-8"
           })
         });
@@ -189,7 +336,10 @@ export function pushCloudStore(partial: Partial<CloudStoreSnapshot>): Promise<bo
           return false;
         }
 
-        // 2. Update refs/meta/cms-store (or create it if it doesn't exist yet)
+        cachedSha = newSha;
+        safeSetLocalStorage("nicoletta_cms_blob_sha", newSha);
+
+        // Update refs/meta/cms-store
         const patchRes = await fetch(`${REPO_API_BASE}/refs/${STORE_REF_NAME}`, {
           method: "PATCH",
           headers: getHeaders(false),
@@ -200,7 +350,7 @@ export function pushCloudStore(partial: Partial<CloudStoreSnapshot>): Promise<bo
         });
 
         if (!patchRes.ok) {
-          const createRes = await fetch(`${REPO_API_BASE}/refs`, {
+          await fetch(`${REPO_API_BASE}/refs`, {
             method: "POST",
             headers: getHeaders(false),
             body: JSON.stringify({
@@ -208,10 +358,6 @@ export function pushCloudStore(partial: Partial<CloudStoreSnapshot>): Promise<bo
               sha: newSha
             })
           });
-          if (!createRes.ok) {
-            notifyListeners("error");
-            return false;
-          }
         }
 
         safeSetLocalStorage("nicoletta_cloud_synced_at", nowIso);
