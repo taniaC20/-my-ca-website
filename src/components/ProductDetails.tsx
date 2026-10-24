@@ -886,6 +886,59 @@ export default function ProductDetails({
                   </div>
                 </div>
 
+                {/* Special instructions */}
+                <div className="flex flex-col gap-1.5 border-t border-brand-border/40 pt-4 mt-2">
+                  <label htmlFor="specialInstructions" className="text-[10px] font-bold text-brand-muted uppercase tracking-wider">
+                    {isSublimation ? "Additional Customization Preferences" : isPipeCleaner ? "Bouquet Wrapping & Packaging Preferences" : "Special Design Instructions"}
+                  </label>
+                  <textarea
+                    id="specialInstructions"
+                    name="specialInstructions"
+                    rows={2.5}
+                    value={formData.specialInstructions}
+                    onChange={handleInputChange}
+                    placeholder={isSublimation ? "Describe any background colors, placement of your image, or specific print details..." : isPipeCleaner ? "Request specific ribbon colors, wrapping paper styles, or card notes..." : "E.g., Please align the engraving in the lower right-hand corner. Wood oil coat finishes only..."}
+                    className="bg-white border border-brand-border rounded-[8px] py-2 px-3 text-brand-text text-xs focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                  />
+                </div>
+
+                {/* Similar or Alternative Craft Request Toggle - Located immediately below Special Design Instructions */}
+                {product.alternativeRequestText && product.alternativeRequestText.trim() && (
+                  <div className="bg-amber-50/60 border border-amber-200 p-4 rounded-[16px] space-y-3 mt-2">
+                    <label className="flex items-start gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        name="alternativeRequest"
+                        checked={formData.alternativeRequest}
+                        onChange={(e) => setFormData(prev => ({ ...prev, alternativeRequest: e.target.checked }))}
+                        className="rounded border-amber-300 text-amber-800 focus:ring-amber-500 h-4.5 w-4.5 cursor-pointer mt-0.5 shrink-0"
+                      />
+                      <div className="space-y-0.5">
+                        <span className="font-serif font-bold text-brand-dark text-sm block">Request a Similar or Alternative Item?</span>
+                        <span className="text-xs text-brand-muted leading-relaxed block font-light">
+                          {product.alternativeRequestText.trim()}
+                        </span>
+                      </div>
+                    </label>
+                    
+                    {formData.alternativeRequest && (
+                      <div className="space-y-2 pl-7 animate-fade-in">
+                        <label className="text-[10px] font-bold text-amber-900 uppercase tracking-wider block">
+                          Describe what you would like instead (and ask for a price quote):
+                        </label>
+                        <textarea
+                          name="alternativeDetails"
+                          rows={2}
+                          value={formData.alternativeDetails}
+                          onChange={(e) => setFormData(prev => ({ ...prev, alternativeDetails: e.target.value }))}
+                          placeholder={isPipeCleaner ? "e.g. Can I request a hand-made Lavender and Rose bouquet instead of the Sunflower? Please provide pricing for 3 stems..." : "e.g. Can I request this printed on an 11oz gloss porcelain mug instead of the ceramic one?"}
+                          className="w-full bg-white border border-amber-300 rounded-[8px] py-2 px-3 text-brand-text text-sm focus:outline-none focus:ring-1 focus:ring-amber-800 focus:border-amber-800"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Text to Engrave Input (Available for both: keep font or change font) */}
                 {hasEngravingText && (
                   <div className="flex flex-col gap-1.5 border-t border-brand-border/40 pt-4 mt-2">
@@ -1007,59 +1060,6 @@ export default function ProductDetails({
                         ▼
                       </div>
                     </div>
-                  </div>
-                )}
-
-                {/* Special instructions */}
-                <div className="flex flex-col gap-1.5 border-t border-brand-border/40 pt-4 mt-2">
-                  <label htmlFor="specialInstructions" className="text-[10px] font-bold text-brand-muted uppercase tracking-wider">
-                    {isSublimation ? "Additional Customization Preferences" : isPipeCleaner ? "Bouquet Wrapping & Packaging Preferences" : "Special Design Instructions"}
-                  </label>
-                  <textarea
-                    id="specialInstructions"
-                    name="specialInstructions"
-                    rows={2.5}
-                    value={formData.specialInstructions}
-                    onChange={handleInputChange}
-                    placeholder={isSublimation ? "Describe any background colors, placement of your image, or specific print details..." : isPipeCleaner ? "Request specific ribbon colors, wrapping paper styles, or card notes..." : "E.g., Please align the engraving in the lower right-hand corner. Wood oil coat finishes only..."}
-                    className="bg-white border border-brand-border rounded-[8px] py-2 px-3 text-brand-text text-xs focus:outline-none focus:ring-1 focus:ring-brand-primary"
-                  />
-                </div>
-
-                {/* Similar or Alternative Craft Request Toggle - Located immediately below Special Design Instructions */}
-                {product.alternativeRequestText && product.alternativeRequestText.trim() && (
-                  <div className="bg-amber-50/60 border border-amber-200 p-4 rounded-[16px] space-y-3 mt-2">
-                    <label className="flex items-start gap-2.5 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        name="alternativeRequest"
-                        checked={formData.alternativeRequest}
-                        onChange={(e) => setFormData(prev => ({ ...prev, alternativeRequest: e.target.checked }))}
-                        className="rounded border-amber-300 text-amber-800 focus:ring-amber-500 h-4.5 w-4.5 cursor-pointer mt-0.5 shrink-0"
-                      />
-                      <div className="space-y-0.5">
-                        <span className="font-serif font-bold text-brand-dark text-sm block">Request a Similar or Alternative Item?</span>
-                        <span className="text-xs text-brand-muted leading-relaxed block font-light">
-                          {product.alternativeRequestText.trim()}
-                        </span>
-                      </div>
-                    </label>
-                    
-                    {formData.alternativeRequest && (
-                      <div className="space-y-2 pl-7 animate-fade-in">
-                        <label className="text-[10px] font-bold text-amber-900 uppercase tracking-wider block">
-                          Describe what you would like instead (and ask for a price quote):
-                        </label>
-                        <textarea
-                          name="alternativeDetails"
-                          rows={2}
-                          value={formData.alternativeDetails}
-                          onChange={(e) => setFormData(prev => ({ ...prev, alternativeDetails: e.target.value }))}
-                          placeholder={isPipeCleaner ? "e.g. Can I request a hand-made Lavender and Rose bouquet instead of the Sunflower? Please provide pricing for 3 stems..." : "e.g. Can I request this printed on an 11oz gloss porcelain mug instead of the ceramic one?"}
-                          className="w-full bg-white border border-amber-300 rounded-[8px] py-2 px-3 text-brand-text text-sm focus:outline-none focus:ring-1 focus:ring-amber-800 focus:border-amber-800"
-                        />
-                      </div>
-                    )}
                   </div>
                 )}
 
