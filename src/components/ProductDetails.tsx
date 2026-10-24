@@ -715,24 +715,24 @@ export default function ProductDetails({
             </p>
           </div>
 
-          {/* Obvious Customization & Similar Item Request Notice */}
-          <div className="bg-gradient-to-r from-amber-50 via-amber-50/90 to-amber-100/60 border-2 border-amber-300 rounded-[22px] p-4.5 sm:p-5 shadow-xs space-y-2">
-            <div className="flex items-center gap-2 flex-wrap justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-full bg-amber-200 text-amber-900 shrink-0">
-                  <Sparkles className="h-4 w-4" />
-                </div>
-                <h4 className="font-serif font-bold text-amber-950 text-sm sm:text-base">
-                  Every Piece Can Be Fully Customized
-                </h4>
-              </div>
-              <span className="text-[9px] bg-amber-200/90 text-amber-900 font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full">
-                Custom Orders Welcome
-              </span>
+          {/* Subtle yet Attention-Catching Customization Note */}
+          <div className="bg-amber-50/50 border border-amber-200/80 rounded-2xl p-3.5 sm:px-4 sm:py-3 flex items-start gap-3 shadow-3xs transition-all">
+            <div className="p-1.5 rounded-full bg-amber-100/90 text-amber-800 shrink-0 mt-0.5">
+              <Sparkles className="h-3.5 w-3.5" />
             </div>
-            <p className="text-xs text-amber-950/90 leading-relaxed font-medium">
-              Don't see something you like or want a custom variation? Every craft can be tailored to your specifications. If you would like something similar, a custom size, or an alternative design, simply check the <strong className="text-amber-950 font-bold underline decoration-amber-500 underline-offset-2">"Request a Similar or Alternative Item?"</strong> box in the order form below!
-            </p>
+            <div className="space-y-0.5 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-serif font-bold text-stone-900 text-xs sm:text-sm">
+                  Every Piece Can Be Fully Customized
+                </span>
+                <span className="text-[9px] text-amber-800 font-semibold bg-amber-100/70 px-2 py-0.5 rounded-full">
+                  Custom Orders Welcome
+                </span>
+              </div>
+              <p className="text-[11px] text-stone-600 leading-relaxed font-light">
+                Don't see quite what you like or want something similar? Check the <strong className="font-semibold text-amber-900">"Request a Similar or Alternative Item?"</strong> box in the form below to let the crafter know what you'd like!
+              </p>
+            </div>
           </div>
 
           {/* Premium Direct Configurator Form Section */}
