@@ -5,6 +5,7 @@ import {
   FileText,
   Plus,
   Edit,
+  Copy,
   Trash2,
   Check,
   X,
@@ -1489,6 +1490,47 @@ export default function AdminDashboard({
       image: p.images[0] || "",
       additionalImages: p.images.slice(1),
       featured: p.featured,
+      inStock: p.inStock,
+      readyForPickup: Boolean(p.readyForPickup),
+      isEngravingProduct: Boolean(p.isEngravingProduct),
+      isHandmadeFlowers: Boolean(p.isHandmadeFlowers),
+      customOptions: p.customOptions ? p.customOptions.join(", ") : "",
+      hideCustomOptions: !!(p.hideCustomOptions || p.hideOptionsAvailable),
+      hasVisualizer: p.hasEngravingText !== undefined ? Boolean(p.hasEngravingText) : (p.hasVisualizer !== false),
+      hasEngravingText: p.hasEngravingText !== undefined ? Boolean(p.hasEngravingText) : (p.hasVisualizer !== false),
+      hasTypography: p.hasEngravingText !== undefined ? Boolean(p.hasEngravingText) : (p.hasVisualizer !== false),
+      leadTime: p.leadTime || "",
+      dimensions: p.dimensions || "",
+      badge: p.badge || "",
+      seal: p.seal || "",
+      includedNotes: p.includedNotes ? p.includedNotes.join(", ") : "",
+      giftOccasions: Array.isArray(p.giftOccasions) ? [...p.giftOccasions] : [],
+      materialDetails: p.materialDetails || "",
+      pricingNotice: p.pricingNotice || "",
+      alternativeRequestText: p.alternativeRequestText || ""
+    });
+  };
+
+  const handleDuplicateProduct = (p: Product) => {
+    // Scroll smoothly to top of products panel
+    const targetElement = document.getElementById("admin-tab-products-panel");
+    if (targetElement) {
+      targetElement.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    setEditingProduct(null); // Mode: Create new product copy
+    setIsAddingProduct(true);
+    setCustomOccasionInput("");
+    setProductForm({
+      name: `${p.name} (Copy)`,
+      description: p.description || "",
+      categoryId: p.categoryId || (categories[0]?.id || "wood"),
+      price: p.price || 0,
+      maxPrice: p.maxPrice ? String(p.maxPrice) : "",
+      promoPrice: p.promoPrice ? String(p.promoPrice) : "",
+      image: p.images[0] || "",
+      additionalImages: p.images.slice(1),
+      featured: false,
       inStock: p.inStock,
       readyForPickup: Boolean(p.readyForPickup),
       isEngravingProduct: Boolean(p.isEngravingProduct),
@@ -3780,8 +3822,17 @@ export default function AdminDashboard({
             {(isAddingProduct || editingProduct) && (
               <form onSubmit={handleSaveProduct} className="bg-stone-50 border border-stone-300 p-5 rounded-lg space-y-4 animate-fade-in">
                 <div className="flex justify-between items-center pb-2 border-b border-stone-200">
-                  <h4 className="font-serif font-bold text-stone-900 text-sm">
-                    {editingProduct ? `Edit Craft: ${editingProduct.name}` : "Create Bespoke Craft Template"}
+                  <h4 className="font-serif font-bold text-stone-900 text-sm flex items-center gap-2">
+                    {editingProduct
+                      ? `Edit Craft: ${editingProduct.name}`
+                      : productForm.name.endsWith("(Copy)")
+                      ? `Make a Copy & List Similar Craft: ${productForm.name}`
+                      : "Create Bespoke Craft Template"}
+                    {productForm.name.endsWith("(Copy)") && (
+                      <span className="bg-amber-100 text-amber-800 text-[9px] font-sans font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        Copy Template
+                      </span>
+                    )}
                   </h4>
                   <button
                     type="button"
@@ -3795,7 +3846,7 @@ export default function AdminDashboard({
                   </button>
                 </div>
 
-                {!editingProduct && (
+                {!editingProduct && !productForm.name.endsWith("(Copy)") && (
                   <div className="bg-amber-800/5 border border-amber-800/10 rounded-xl p-4.5 space-y-3">
                     <span className="text-[10px] text-amber-900 font-bold uppercase tracking-widest block">
                       💡 Choose a Starter Template (Pre-fills and fully customizable)
@@ -4811,24 +4862,39 @@ export default function AdminDashboard({
                   </label>
                 </div>
 
-                <div className="flex justify-end gap-2.5 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsAddingProduct(false);
-                      setEditingProduct(null);
-                    }}
-                    className="bg-stone-200 hover:bg-stone-300 text-stone-800 text-xs font-bold py-2 px-4 rounded-sm cursor-pointer transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    id="save-product-submit-btn"
-                    type="submit"
-                    className="bg-stone-900 hover:bg-amber-800 text-white text-xs font-bold py-2 px-4 rounded-sm cursor-pointer transition-colors"
-                  >
-                    Save Product Setup
-                  </button>
+                <div className="flex justify-between items-center pt-2">
+                  <div>
+                    {editingProduct && (
+                      <button
+                        type="button"
+                        onClick={() => handleDuplicateProduct(editingProduct)}
+                        className="bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold py-2 px-3.5 rounded-sm cursor-pointer transition-colors flex items-center gap-1.5"
+                        title="Duplicate this craft into a new product"
+                      >
+                        <Copy className="h-3.5 w-3.5 text-amber-800" /> Make a Copy of this Craft
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAddingProduct(false);
+                        setEditingProduct(null);
+                      }}
+                      className="bg-stone-200 hover:bg-stone-300 text-stone-800 text-xs font-bold py-2 px-4 rounded-sm cursor-pointer transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      id="save-product-submit-btn"
+                      type="submit"
+                      className="bg-stone-900 hover:bg-amber-800 text-white text-xs font-bold py-2 px-4 rounded-sm cursor-pointer transition-colors"
+                    >
+                      {editingProduct ? "Update Product" : "Save & Add Product"}
+                    </button>
+                  </div>
                 </div>
               </form>
             )}
@@ -4976,7 +5042,15 @@ export default function AdminDashboard({
                         </span>
                       </td>
                       <td className="p-3.5 text-right">
-                        <div className="flex gap-2 justify-end">
+                        <div className="flex gap-1.5 justify-end items-center">
+                          <button
+                            id={`duplicate-product-btn-${p.id}`}
+                            onClick={() => handleDuplicateProduct(p)}
+                            className="p-1.5 text-stone-600 hover:text-amber-800 hover:bg-amber-50 rounded cursor-pointer transition-colors"
+                            title="Make a Copy (List something similar)"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </button>
                           <button
                             id={`edit-product-btn-${p.id}`}
                             onClick={() => startEditProduct(p)}
