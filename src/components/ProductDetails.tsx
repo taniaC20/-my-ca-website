@@ -813,6 +813,37 @@ export default function ProductDetails({
                   </div>
                 </div>
 
+                {/* Text to Engrave Input (Available for both: keep font or change font) */}
+                {hasEngravingText && (
+                  <div className="flex flex-col gap-1.5 border-t border-brand-border/40 pt-4 mt-2">
+                    <div className="flex justify-between items-center">
+                      <label htmlFor="engravingText" className="text-[10px] font-bold text-brand-primary uppercase tracking-widest flex items-center gap-1">
+                        <PenTool className="h-3.5 w-3.5" /> {isSublimation ? "Custom Text to Print on Item" : "Text to Engrave"}
+                      </label>
+                      <span className="text-[9px] text-brand-muted font-mono font-medium">
+                        {formData.engravingText.length}/100 chars
+                      </span>
+                    </div>
+                    <input
+                      id="engravingText"
+                      name="engravingText"
+                      type="text"
+                      maxLength={100}
+                      value={formData.engravingText}
+                      onChange={handleInputChange}
+                      placeholder={isSublimation ? "e.g. Happy Birthday, Dad! / Family Photo 2026" : "The Vance Family, Est. 2026"}
+                      className="bg-white border border-brand-border rounded-[8px] py-2.5 px-3.5 text-brand-text text-xs focus:outline-none focus:ring-1 focus:ring-brand-primary font-medium"
+                    />
+                    {!isSublimation && (
+                      <span className="text-[9px] text-brand-muted font-light">
+                        {changeFont
+                          ? "*Type your phrase above. The simulation preview in the left column renders live."
+                          : "*Enter the custom phrase, name, or date to be engraved using the font style shown in the picture reference."}
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 {/* Font Preference Question */}
                 {hasEngravingText && (
                   <div className="space-y-3 border-t border-brand-border/40 pt-4 mt-2">
@@ -871,7 +902,7 @@ export default function ProductDetails({
                             Change font
                           </span>
                           <span className="text-[10px] text-stone-500 block leading-tight font-light">
-                            Customize text to engrave & font style with live visualizer
+                            Select custom typography style with live visualizer preview
                           </span>
                         </div>
                       </label>
@@ -879,37 +910,9 @@ export default function ProductDetails({
                   </div>
                 )}
 
-                {/* Custom Text/Typography Inputs (Displayed only when Change Font is selected) */}
-                {hasEngravingText && changeFont && (
-                  <div className="flex flex-col gap-1.5 border-t border-brand-border/40 pt-4 mt-2 animate-fade-in">
-                    <div className="flex justify-between items-center">
-                      <label htmlFor="engravingText" className="text-[10px] font-bold text-brand-primary uppercase tracking-widest flex items-center gap-1">
-                        <PenTool className="h-3.5 w-3.5" /> {isSublimation ? "Custom Text to Print on Item" : "Text to Engrave"}
-                      </label>
-                      <span className="text-[9px] text-brand-muted font-mono font-medium">
-                        {formData.engravingText.length}/100 chars
-                      </span>
-                    </div>
-                    <input
-                      id="engravingText"
-                      name="engravingText"
-                      type="text"
-                      maxLength={100}
-                      value={formData.engravingText}
-                      onChange={handleInputChange}
-                      placeholder={isSublimation ? "e.g. Happy Birthday, Dad! / Family Photo 2026" : "The Vance Family, Est. 2026"}
-                      className="bg-white border border-brand-border rounded-[8px] py-2.5 px-3.5 text-brand-text text-xs focus:outline-none focus:ring-1 focus:ring-brand-primary font-medium"
-                    />
-                    {!isSublimation && (
-                      <span className="text-[9px] text-brand-muted font-light">
-                        *Type your phrase above. The simulation preview in the left column will render live.
-                      </span>
-                    )}
-                  </div>
-                )}
-
+                {/* Typography Style Dropdown (Displayed when Change Font is selected) */}
                 {hasTypography && changeFont && (
-                  <div className="flex flex-col gap-1.5 animate-fade-in">
+                  <div className="flex flex-col gap-1.5 animate-fade-in border-t border-brand-border/40 pt-4 mt-2">
                     <label htmlFor="fontPreference" className="text-[10px] font-bold text-brand-muted uppercase tracking-wider block">
                       {isSublimation ? "Printed Font Style" : "Typography Style"}
                     </label>
