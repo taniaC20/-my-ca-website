@@ -79,9 +79,9 @@ export function getCloudSyncInfo(): { state: CloudSyncState; lastSyncedAt: strin
  * Uses conditional SHA caching: checks the 150-byte git ref first; if the SHA hasn't changed,
  * immediately serves the cached snapshot with 0 download latency.
  */
-export async function fetchCloudStore(force = false): Promise<CloudStoreSnapshot | null> {
+export async function fetchCloudStore(bypassCacheTtl = false, hardBypass = false): Promise<CloudStoreSnapshot | null> {
   const now = Date.now();
-  if (!force && cachedSnapshot && now - lastFetchTimestamp < CACHE_TTL_MS) {
+  if (!bypassCacheTtl && cachedSnapshot && now - lastFetchTimestamp < CACHE_TTL_MS) {
     return cachedSnapshot;
   }
 
@@ -131,7 +131,7 @@ export async function fetchCloudStore(force = false): Promise<CloudStoreSnapshot
     }
 
     // Fast-path: SHA matches what we already have cached!
-    if (!force && cachedSnapshot && blobSha === cachedSha) {
+    if (!hardBypass && cachedSnapshot && blobSha === cachedSha) {
       clearTimeout(timeoutId);
       lastFetchTimestamp = Date.now();
       notifyListeners("synced", cachedSnapshot.updatedAt || lastSyncedAt);

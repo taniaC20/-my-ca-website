@@ -522,7 +522,7 @@ export default function App() {
           }).catch(() => {});
         }
       } else {
-        // Cloud store exists: reconcile with local state preserving any freshly added crafts or quotes
+        // Authoritative cloud state: cloud data takes master precedence across all browsers and devices
         const cloudProds = Array.isArray(cloudData.products) ? cloudData.products : [];
         const cloudCats = Array.isArray(cloudData.categories) ? cloudData.categories : [];
         const cloudTests = Array.isArray(cloudData.testimonials) ? cloudData.testimonials : [];
@@ -533,64 +533,66 @@ export default function App() {
             ? cloudData.customization
             : null;
 
-        const localHasMoreData =
-          (!migrationDone || localUnsynced) &&
-          (isAdminBrowser || hasLocalUserWork) &&
-          (localStore.products.length > cloudProds.length ||
-            localStore.categories.length > cloudCats.length ||
-            localStore.testimonials.length > cloudTests.length ||
-            localStore.announcements.length > cloudAnns.length ||
-            scoreCustomizationRichness(localStore.customization) > scoreCustomizationRichness(cloudCust) ||
-            localUnsynced);
+        // Preserve only unsynced admin draft items that do not yet exist in the cloud
+        const localDraftProds = (isAdminBrowser && localUnsynced)
+          ? localStore.products.filter(lp => !cloudProds.some(cp => cp.id === lp.id))
+          : [];
+        const finalProds = cloudProds.length > 0 ? [...cloudProds, ...localDraftProds] : localStore.products;
 
-        if (localHasMoreData) {
-          const mergedProds = Array.from(new Map([...cloudProds, ...localStore.products].map(p => [p.id, p])).values());
-          const mergedCats = localStore.categories.length >= cloudCats.length ? localStore.categories : cloudCats;
-          const mergedTests = localStore.testimonials.length >= cloudTests.length ? localStore.testimonials : cloudTests;
-          const mergedAnns = localStore.announcements.length >= cloudAnns.length ? localStore.announcements : cloudAnns;
-          const mergedQuotes = Array.from(new Map([...cloudQuotesData, ...cloudQuotes, ...localStore.quotes].map(q => [q.id, q])).values());
-          const mergedCust =
-            (localUnsynced ||
-              scoreCustomizationRichness(localStore.customization) >= scoreCustomizationRichness(cloudCust)) &&
-            localStore.customization
-              ? localStore.customization
-              : cloudCust || localStore.customization || customization;
+        const localDraftCats = (isAdminBrowser && localUnsynced)
+          ? localStore.categories.filter(lc => !cloudCats.some(cc => cc.id === lc.id))
+          : [];
+        const finalCats = cloudCats.length > 0 ? [...cloudCats, ...localDraftCats] : (localStore.categories.length > 0 ? localStore.categories : INITIAL_CATEGORIES);
 
-          setProducts(mergedProds);
-          setCategories(mergedCats);
-          setTestimonials(mergedTests);
-          setAnnouncements(mergedAnns);
-          setQuotes(mergedQuotes);
-          if (mergedCust) setCustomization(ensureContactSection(mergedCust));
+        const localDraftTests = (isAdminBrowser && localUnsynced)
+          ? localStore.testimonials.filter(lt => !cloudTests.some(ct => ct.id === lt.id))
+          : [];
+        const finalTests = cloudTests.length > 0 ? [...cloudTests, ...localDraftTests] : (localStore.testimonials.length > 0 ? localStore.testimonials : INITIAL_TESTIMONIALS);
 
+        const localDraftAnns = (isAdminBrowser && localUnsynced)
+          ? localStore.announcements.filter(la => !cloudAnns.some(ca => ca.id === la.id))
+          : [];
+        const finalAnns = cloudAnns.length > 0 ? [...cloudAnns, ...localDraftAnns] : (localStore.announcements.length > 0 ? localStore.announcements : INITIAL_ANNOUNCEMENTS);
+
+        const finalCust = (cloudCust && !isStaleCustomization(cloudCust))
+          ? ensureContactSection(cloudCust)
+          : (localStore.customization && !isStaleCustomization(localStore.customization)
+              ? ensureContactSection(localStore.customization)
+              : customization);
+
+        const serverAdminQuotesList = resAdminQuotes.ok && Array.isArray(resAdminQuotes.data) ? resAdminQuotes.data : [];
+        const finalQuotes = Array.from(
+          new Map([...cloudQuotesData, ...serverAdminQuotesList, ...cloudQuotes, ...localStore.quotes].map((q) => [q.id, q])).values()
+        );
+
+        setProducts(finalProds);
+        setCategories(finalCats);
+        setTestimonials(finalTests);
+        setAnnouncements(finalAnns);
+        setQuotes(finalQuotes);
+        if (finalCust) setCustomization(finalCust);
+
+        // Immediately update persistent storage so subsequent visits load the latest data with 0ms delay
+        persistKeyVal("nicoletta_products", finalProds);
+        persistKeyVal("nicoletta_categories", finalCats);
+        persistKeyVal("nicoletta_testimonials", finalTests);
+        persistKeyVal("nicoletta_announcements", finalAnns);
+        persistKeyVal("nicoletta_quotes", finalQuotes);
+        if (finalCust) persistKeyVal("nicoletta_customization", finalCust);
+
+        // If admin had pending local drafts, push them to the cloud to reconcile
+        if (isAdminBrowser && localUnsynced && (localDraftProds.length > 0 || localDraftCats.length > 0)) {
           pushCloudStore({
-            customization: mergedCust ? ensureContactSection(mergedCust) : mergedCust,
-            products: mergedProds,
-            categories: mergedCats,
-            testimonials: mergedTests,
-            announcements: mergedAnns,
-            quotes: mergedQuotes
+            customization: finalCust,
+            products: finalProds,
+            categories: finalCats,
+            testimonials: finalTests,
+            announcements: finalAnns,
+            quotes: finalQuotes
           }).catch(() => {});
-        } else {
-          // Use authoritative cloud state, merging any locally pending items so newly added crafts never vanish
-          const preservedProds = Array.from(
-            new Map([...cloudProds, ...localStore.products].map((p) => [p.id, p])).values()
-          );
-          setProducts(preservedProds);
-          setCategories(cloudCats.length > 0 ? cloudCats : localStore.categories);
-          setTestimonials(cloudTests.length > 0 ? cloudTests : localStore.testimonials);
-          setAnnouncements(cloudAnns.length > 0 ? cloudAnns : localStore.announcements);
-          
-          const serverAdminQuotesList = resAdminQuotes.ok && Array.isArray(resAdminQuotes.data) ? resAdminQuotes.data : [];
-          const preservedQuotes = Array.from(
-            new Map([...cloudQuotesData, ...serverAdminQuotesList, ...cloudQuotes, ...localStore.quotes].map((q) => [q.id, q])).values()
-          );
-          setQuotes(preservedQuotes);
-          if (cloudCust) {
-            setCustomization(ensureContactSection(cloudCust));
-          }
-          safeSetLocalStorage("nicoletta_cloud_initial_migration_done", "true");
+          safeSetLocalStorage("nicoletta_customization_unsynced", "false");
         }
+        safeSetLocalStorage("nicoletta_cloud_initial_migration_done", "true");
       }
 
       // 2. Also check local Express /api endpoints when running local dev server
@@ -761,6 +763,96 @@ export default function App() {
     };
 
     verifySession();
+  }, []);
+
+  // Keep selectedProductDetail updated if products change (e.g. from cloud updates)
+  useEffect(() => {
+    if (selectedProductDetail) {
+      const updated = products.find(p => p.id === selectedProductDetail.id);
+      if (updated && (
+        updated.name !== selectedProductDetail.name ||
+        updated.price !== selectedProductDetail.price ||
+        updated.description !== selectedProductDetail.description ||
+        updated.images?.length !== selectedProductDetail.images?.length ||
+        JSON.stringify(updated.customOptions) !== JSON.stringify(selectedProductDetail.customOptions)
+      )) {
+        setSelectedProductDetail(updated);
+      }
+    }
+  }, [products]);
+
+  // Background live synchronizer for all browsers and open tabs
+  useEffect(() => {
+    let isCancelled = false;
+
+    const backgroundSync = async () => {
+      try {
+        const cloudData = await fetchCloudStore(true);
+        if (!cloudData || isCancelled) return;
+        const cloudProds = Array.isArray(cloudData.products) ? cloudData.products : [];
+        const cloudCats = Array.isArray(cloudData.categories) ? cloudData.categories : [];
+        const cloudTests = Array.isArray(cloudData.testimonials) ? cloudData.testimonials : [];
+        const cloudAnns = Array.isArray(cloudData.announcements) ? cloudData.announcements : [];
+        const cloudCust = cloudData.customization && Array.isArray(cloudData.customization.sections) ? cloudData.customization : null;
+
+        if (cloudProds.length > 0) {
+          setProducts(prev => {
+            if (JSON.stringify(prev) === JSON.stringify(cloudProds)) return prev;
+            persistKeyVal("nicoletta_products", cloudProds);
+            return cloudProds;
+          });
+        }
+        if (cloudCats.length > 0) {
+          setCategories(prev => {
+            if (JSON.stringify(prev) === JSON.stringify(cloudCats)) return prev;
+            persistKeyVal("nicoletta_categories", cloudCats);
+            return cloudCats;
+          });
+        }
+        if (cloudTests.length > 0) {
+          setTestimonials(prev => {
+            if (JSON.stringify(prev) === JSON.stringify(cloudTests)) return prev;
+            persistKeyVal("nicoletta_testimonials", cloudTests);
+            return cloudTests;
+          });
+        }
+        if (cloudAnns.length > 0) {
+          setAnnouncements(prev => {
+            if (JSON.stringify(prev) === JSON.stringify(cloudAnns)) return prev;
+            persistKeyVal("nicoletta_announcements", cloudAnns);
+            return cloudAnns;
+          });
+        }
+        if (cloudCust && !isStaleCustomization(cloudCust)) {
+          const finalCust = ensureContactSection(cloudCust);
+          setCustomization(prev => {
+            if (JSON.stringify(prev) === JSON.stringify(finalCust)) return prev;
+            persistKeyVal("nicoletta_customization", finalCust);
+            return finalCust;
+          });
+        }
+      } catch {
+        // Silently ignore background polling errors
+      }
+    };
+
+    const onFocus = () => backgroundSync();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        backgroundSync();
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    const interval = setInterval(backgroundSync, 20000);
+
+    return () => {
+      isCancelled = true;
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+      clearInterval(interval);
+    };
   }, []);
 
   // Navigation & Address Bar URL Synchronization
