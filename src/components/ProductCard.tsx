@@ -95,10 +95,10 @@ export default function ProductCard({ product, categoryName, onRequestQuote }: P
           </p>
 
           {/* Custom Options Display */}
-          {product.customOptions && product.customOptions.length > 0 && (
+          {!product.hideCustomOptions && !product.hideOptionsAvailable && product.customOptions && product.customOptions.length > 0 && (
             <div className="mb-3">
               <span className="text-[9px] text-brand-muted font-bold tracking-widest uppercase block mb-1">
-                Customizations:
+                Options Available:
               </span>
               <div className="flex flex-wrap gap-1">
                 {product.customOptions.map((opt, i) => (
