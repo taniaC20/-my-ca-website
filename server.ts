@@ -243,9 +243,9 @@ const DEFAULT_CUSTOMIZATION = {
     {
       id: "catalog-header",
       page: "catalog",
-      title: "Artisan Crafts Showcase",
+      title: "Explore Our Products",
       subtitle: "The Collection",
-      description: "Filter our signature collection categories. Select an item to submit your specific engraving guidelines.",
+      description: "Discover our collection of personalized gifts, crafts, and decor. Every item can be customized to your style, preferences, and special occasions.\n\nDon't see exactly what you're looking for? Send us a message with your idea, and we'll be happy to let you know if we can bring it to life!",
       visible: true,
       order: 1
     },

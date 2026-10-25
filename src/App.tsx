@@ -2290,14 +2290,39 @@ export default function App() {
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 pb-4 border-b border-brand-border">
                   {(() => {
                     const sec = customization.sections?.find(s => s.id === "catalog-header");
+                    const title = (sec?.title && sec.title !== "Artisan Crafts Showcase") ? sec.title : "Explore Our Products";
+                    const isOldDefaultDesc = !sec?.description || sec.description === "Filter our signature collection categories. Select an item to submit your specific engraving guidelines.";
+
                     return (
-                      <div>
+                      <div className="max-w-2xl space-y-2">
                         <h3 className="font-serif font-bold text-brand-dark text-2xl md:text-3xl">
-                          {sec?.title || "Artisan Crafts Showcase"}
+                          {title}
                         </h3>
-                        <p className="text-brand-muted text-xs md:text-sm">
-                          {sec?.description || "Filter our signature collection categories. Select an item to submit your specific engraving guidelines."}
-                        </p>
+                        {isOldDefaultDesc ? (
+                          <div className="text-brand-muted text-xs md:text-sm leading-relaxed space-y-1.5 font-light">
+                            <p>
+                              Discover our collection of personalized gifts, crafts, and decor. Every item can be customized to your style, preferences, and special occasions.
+                            </p>
+                            <p>
+                              Don't see exactly what you're looking for?{" "}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActivePage("contact");
+                                  window.scrollTo({ top: 0, behavior: "smooth" });
+                                }}
+                                className="text-brand-primary font-medium underline underline-offset-2 hover:text-brand-dark transition-colors cursor-pointer inline"
+                              >
+                                Send us a message
+                              </button>{" "}
+                              with your idea, and we'll be happy to let you know if we can bring it to life!
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-brand-muted text-xs md:text-sm leading-relaxed whitespace-pre-line font-light">
+                            {sec?.description}
+                          </p>
+                        )}
                       </div>
                     );
                   })()}
