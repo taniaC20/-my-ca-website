@@ -245,7 +245,7 @@ const DEFAULT_CUSTOMIZATION = {
       page: "catalog",
       title: "Explore Our Products",
       subtitle: "The Collection",
-      description: "Discover our collection of personalized gifts, crafts, and decor. Every item can be customized to your style, preferences, and special occasions.\n\nDon't see exactly what you're looking for? Send us a message with your idea, and we'll be happy to let you know if we can bring it to life!",
+      description: "Discover our collection of personalized gifts, crafts, and decor. Every item can be customized to your style, preferences, and special occasions.",
       visible: true,
       order: 1
     },

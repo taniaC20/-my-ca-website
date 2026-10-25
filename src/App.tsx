@@ -2287,37 +2287,24 @@ export default function App() {
             {/* 2. ARTISAN CATALOG VIEW */}
             {activePage === "catalog" && (
               <div className="space-y-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 pb-4 border-b border-brand-border">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-5 pb-5 border-b border-brand-border">
                   {(() => {
                     const sec = customization.sections?.find(s => s.id === "catalog-header");
                     const title = (sec?.title && sec.title !== "Artisan Crafts Showcase") ? sec.title : "Explore Our Products";
-                    const isOldDefaultDesc = !sec?.description || sec.description === "Filter our signature collection categories. Select an item to submit your specific engraving guidelines.";
+                    const isOldDefaultDesc = !sec?.description ||
+                      sec.description === "Filter our signature collection categories. Select an item to submit your specific engraving guidelines." ||
+                      sec.description.includes("Don't see exactly what you're looking for?") ||
+                      sec.description.includes("bring it to life");
 
                     return (
-                      <div className="max-w-2xl space-y-2">
+                      <div className="max-w-xl space-y-1.5">
                         <h3 className="font-serif font-bold text-brand-dark text-2xl md:text-3xl">
                           {title}
                         </h3>
                         {isOldDefaultDesc ? (
-                          <div className="text-brand-muted text-xs md:text-sm leading-relaxed space-y-1.5 font-light">
-                            <p>
-                              Discover our collection of personalized gifts, crafts, and decor. Every item can be customized to your style, preferences, and special occasions.
-                            </p>
-                            <p>
-                              Don't see exactly what you're looking for?{" "}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActivePage("contact");
-                                  window.scrollTo({ top: 0, behavior: "smooth" });
-                                }}
-                                className="text-brand-primary font-medium underline underline-offset-2 hover:text-brand-dark transition-colors cursor-pointer inline"
-                              >
-                                Send us a message
-                              </button>{" "}
-                              with your idea, and we'll be happy to let you know if we can bring it to life!
-                            </p>
-                          </div>
+                          <p className="text-brand-muted text-xs md:text-sm leading-relaxed font-light">
+                            Discover our collection of personalized gifts, crafts, and decor. Every item can be customized to your style, preferences, and special occasions.
+                          </p>
                         ) : (
                           <p className="text-brand-muted text-xs md:text-sm leading-relaxed whitespace-pre-line font-light">
                             {sec?.description}
@@ -2327,18 +2314,40 @@ export default function App() {
                     );
                   })()}
 
-                  {/* Search Bar */}
-                  <div className="relative w-full md:w-64">
-                    <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-brand-muted">
-                      <Search className="h-4 w-4" />
-                    </span>
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search wood, leather..."
-                      className="w-full bg-white border border-brand-border rounded-full py-2 pl-10 pr-4 text-xs text-brand-text focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary"
-                    />
+                  {/* Right Column: Custom Request Bubble on top + Search Bar */}
+                  <div className="flex flex-col items-start md:items-end gap-2.5 w-full md:w-auto">
+                    {/* Subtle Custom Idea Bubble */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActivePage("contact");
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                      className="group flex items-center gap-2 bg-brand-highlight/35 hover:bg-brand-highlight/65 border border-brand-border/60 hover:border-brand-primary/40 rounded-full py-1.5 px-3.5 text-left transition-all duration-200 cursor-pointer shadow-2xs"
+                    >
+                      <MessageSquare className="h-3.5 w-3.5 text-brand-primary shrink-0 transition-transform group-hover:scale-110" />
+                      <span className="text-[11px] md:text-xs text-brand-text/90 font-light leading-snug">
+                        Don't see what you need?{" "}
+                        <span className="text-brand-primary font-medium underline underline-offset-2 group-hover:text-brand-dark">
+                          Send us a message
+                        </span>{" "}
+                        with your idea!
+                      </span>
+                    </button>
+
+                    {/* Search Bar */}
+                    <div className="relative w-full md:w-64">
+                      <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-brand-muted">
+                        <Search className="h-4 w-4" />
+                      </span>
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search wood, leather..."
+                        className="w-full bg-white border border-brand-border rounded-full py-2 pl-10 pr-4 text-xs text-brand-text focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary shadow-2xs"
+                      />
+                    </div>
                   </div>
                 </div>
 
