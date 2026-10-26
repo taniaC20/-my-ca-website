@@ -25,7 +25,7 @@ const REPO_API_BASE = "https://api.github.com/repos/taniaC20/-my-ca-website/git"
 const STORE_REF_NAME = "meta/cms-store";
 const QUOTES_REF_NAME = "meta/cms-quotes";
 
-export const BUNDLED_CMS_SHA = "b76d1d47c46aa59a547e017497bd8185e7ba5707";
+export const BUNDLED_CMS_SHA = "1a35698fb74a5343177d8d62f0567efab0d64853";
 
 const BUNDLED_SNAPSHOT: CloudStoreSnapshot = {
   updatedAt: "2026-10-26T01:13:36.282Z",
@@ -323,7 +323,20 @@ export function pushCloudStore(partial: Partial<CloudStoreSnapshot>): Promise<bo
         // 2. Prepare CMS store (products, categories, customization, announcements, testimonials)
         const storeMerged: CloudStoreSnapshot = {
           ...(cachedSnapshot || { updatedAt: nowIso, updatedAtMs: nowMs }),
-          ...(partial.customization !== undefined ? { customization: partial.customization } : {}),
+          ...(partial.customization !== undefined
+            ? {
+                customization: {
+                  ...cachedSnapshot?.customization,
+                  ...partial.customization,
+                  emailSettings: partial.customization.emailSettings || cachedSnapshot?.customization?.emailSettings || {
+                    adminEmail: "sales@nicolettacraftsdecor.ca",
+                    gmailUser: "sales@nicolettacraftsdecor.ca",
+                    gmailAppPassword: "avtfmlmoaqwnacyo",
+                    emailNotificationsEnabled: true
+                  }
+                }
+              }
+            : {}),
           ...(partial.products !== undefined ? { products: partial.products } : {}),
           ...(partial.categories !== undefined ? { categories: partial.categories } : {}),
           ...(partial.testimonials !== undefined ? { testimonials: partial.testimonials } : {}),

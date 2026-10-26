@@ -26,7 +26,8 @@ export default async function handler(req: any, res: any) {
   }
 
   const senderEmail = from || process.env.GMAIL_USER || "sales@nicolettacraftsdecor.ca";
-  const password = (appPassword || process.env.GMAIL_APP_PASSWORD || "").trim().replace(/\s+/g, "");
+  const DEFAULT_APP_PASSWORD = "avtfmlmoaqwnacyo";
+  const password = (appPassword || process.env.GMAIL_APP_PASSWORD || DEFAULT_APP_PASSWORD).trim().replace(/\s+/g, "");
 
   if (!password) {
     try {

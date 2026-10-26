@@ -8,6 +8,7 @@ export interface EmailSettings {
 }
 
 export const DEFAULT_ADMIN_EMAIL = "sales@nicolettacraftsdecor.ca";
+export const DEFAULT_GMAIL_APP_PASSWORD = "avtfmlmoaqwnacyo";
 
 /**
  * Clean legacy bracketed tags that may have been stored in specialInstructions
@@ -383,7 +384,7 @@ export async function sendQuoteNotificationToAdmin(
         subject,
         text: messageText,
         html: messageHtml,
-        appPassword: settings?.gmailAppPassword,
+        appPassword: settings?.gmailAppPassword || DEFAULT_GMAIL_APP_PASSWORD,
         replyTo: quote.customerEmail && quote.customerEmail.trim()
           ? `"${(quote.customerName || "Customer").replace(/["\r\n]/g, "")}" <${quote.customerEmail.trim()}>`
           : undefined
@@ -475,7 +476,7 @@ export async function dispatchClientProposal(
         subject: proposal.subject,
         text: proposal.body,
         html: proposal.body.replace(/\n/g, "<br/>"),
-        appPassword: settings?.gmailAppPassword
+        appPassword: settings?.gmailAppPassword || DEFAULT_GMAIL_APP_PASSWORD
       })
     });
 
@@ -800,7 +801,7 @@ https://www.nicolettacraftsdecor.ca
         subject: emailSubject,
         text: textBody,
         html: htmlBody,
-        appPassword: settings?.gmailAppPassword,
+        appPassword: settings?.gmailAppPassword || DEFAULT_GMAIL_APP_PASSWORD,
         replyTo: DEFAULT_ADMIN_EMAIL
       })
     });
@@ -990,7 +991,7 @@ export async function sendQuoteConfirmationToClient(
         subject: emailSubject,
         text: textBody,
         html: htmlBody,
-        appPassword: settings?.gmailAppPassword,
+        appPassword: settings?.gmailAppPassword || DEFAULT_GMAIL_APP_PASSWORD,
         replyTo: DEFAULT_ADMIN_EMAIL
       })
     });

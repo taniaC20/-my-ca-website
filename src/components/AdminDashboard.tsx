@@ -524,6 +524,9 @@ export default function AdminDashboard({
         sectionsRef.current = nextSecs;
         setSections(nextSecs);
       }
+      if (customization.emailSettings?.gmailAppPassword) {
+        setGmailPasswordInput(customization.emailSettings.gmailAppPassword);
+      }
     }
   }, [customization]);
 
@@ -584,6 +587,7 @@ export default function AdminDashboard({
     const targetLogoUrl = logoUrlOverride !== undefined ? logoUrlOverride : logoImageUrl;
     const targetOccasionFilters = occasionFiltersOverride !== undefined ? occasionFiltersOverride : giftOccasionFilters;
     const payload: CustomizationSettings = {
+      ...customization,
       logoText: logoText || "Nicoletta",
       logoSubtext: logoSubtext || "Crafts & Decor",
       logoImageUrl: targetLogoUrl || "",
@@ -593,7 +597,13 @@ export default function AdminDashboard({
       philosophyQuote,
       philosophyAuthor,
       giftOccasionFilters: targetOccasionFilters,
-      sections: targetSections
+      sections: targetSections,
+      emailSettings: customization.emailSettings || {
+        adminEmail: "sales@nicolettacraftsdecor.ca",
+        gmailUser: "sales@nicolettacraftsdecor.ca",
+        gmailAppPassword: gmailPasswordInput.trim().replace(/\s+/g, "") || "avtfmlmoaqwnacyo",
+        emailNotificationsEnabled: true
+      }
     };
 
     // Always persist locally (both localStorage and IndexedDB) & update live app state immediately
@@ -1111,17 +1121,19 @@ export default function AdminDashboard({
   };
 
   const handleSaveGmailConfig = () => {
+    const passwordToSave = gmailPasswordInput.trim().replace(/\s+/g, "") || "avtfmlmoaqwnacyo";
     const updatedCustomization: CustomizationSettings = {
       ...customization,
       emailSettings: {
         ...customization.emailSettings,
         adminEmail: "sales@nicolettacraftsdecor.ca",
         gmailUser: "sales@nicolettacraftsdecor.ca",
-        gmailAppPassword: gmailPasswordInput.trim().replace(/\s+/g, ""),
+        gmailAppPassword: passwordToSave,
         emailNotificationsEnabled: true
       }
     };
     onUpdateCustomization(updatedCustomization);
+    persistKeyVal("nicoletta_customization", updatedCustomization);
     pushCloudStore({ customization: updatedCustomization }).catch(() => {});
     setEmailConfigSaved(true);
     setTimeout(() => setEmailConfigSaved(false), 3000);

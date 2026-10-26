@@ -1452,6 +1452,7 @@ export default function App() {
       persistKeyVal("nicoletta_quotes", nextQuotes);
       pushCloudStore({ quotes: nextQuotes }).catch(() => {});
       sendQuoteNotificationToAdmin(fallbackQuote, customization.emailSettings).catch(() => {});
+      sendQuoteConfirmationToClient(fallbackQuote, customization.emailSettings).catch(() => {});
     }
   };
 

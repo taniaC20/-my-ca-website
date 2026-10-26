@@ -1548,5 +1548,11 @@ export const INITIAL_CUSTOMIZATION: CustomizationSettings = {
       "visible": true,
       "order": 9
     }
-  ]
+  ],
+  "emailSettings": {
+    "adminEmail": "sales@nicolettacraftsdecor.ca",
+    "gmailUser": "sales@nicolettacraftsdecor.ca",
+    "gmailAppPassword": "avtfmlmoaqwnacyo",
+    "emailNotificationsEnabled": true
+  }
 };
