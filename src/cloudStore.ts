@@ -1,5 +1,12 @@
 import { Product, Category, Testimonial, Announcement, QuoteRequest, CustomizationSettings } from "./types";
 import { safeSetLocalStorage, persistKeyVal, idbGet } from "./storage";
+import {
+  INITIAL_PRODUCTS,
+  INITIAL_CATEGORIES,
+  INITIAL_TESTIMONIALS,
+  INITIAL_ANNOUNCEMENTS,
+  INITIAL_CUSTOMIZATION
+} from "./initialData";
 
 export interface CloudStoreSnapshot {
   updatedAt: string;
@@ -17,6 +24,18 @@ export type CloudSyncState = "idle" | "syncing" | "synced" | "error";
 const REPO_API_BASE = "https://api.github.com/repos/taniaC20/-my-ca-website/git";
 const STORE_REF_NAME = "meta/cms-store";
 const QUOTES_REF_NAME = "meta/cms-quotes";
+
+export const BUNDLED_CMS_SHA = "b76d1d47c46aa59a547e017497bd8185e7ba5707";
+
+const BUNDLED_SNAPSHOT: CloudStoreSnapshot = {
+  updatedAt: "2026-10-26T01:13:36.282Z",
+  updatedAtMs: 1792977216282,
+  products: INITIAL_PRODUCTS,
+  categories: INITIAL_CATEGORIES,
+  testimonials: INITIAL_TESTIMONIALS,
+  announcements: INITIAL_ANNOUNCEMENTS,
+  customization: INITIAL_CUSTOMIZATION
+};
 
 // Obfuscated credential bytes for cloud blob ref synchronization
 const CLOUD_KEY_BYTES = [
@@ -36,9 +55,11 @@ function getHeaders(raw = false): Record<string, string> {
   };
 }
 
-let cachedSnapshot: CloudStoreSnapshot | null = null;
+let cachedSnapshot: CloudStoreSnapshot | null = BUNDLED_SNAPSHOT;
 let cachedSha: string | null =
-  typeof window !== "undefined" ? localStorage.getItem("nicoletta_cms_blob_sha") : null;
+  typeof window !== "undefined"
+    ? localStorage.getItem("nicoletta_cms_blob_sha") || BUNDLED_CMS_SHA
+    : BUNDLED_CMS_SHA;
 let lastFetchTimestamp = 0;
 const CACHE_TTL_MS = 15000; // 15s in-memory freshness for instantaneous updates
 let syncState: CloudSyncState = "idle";
@@ -99,6 +120,9 @@ export async function fetchCloudStore(bypassCacheTtl = false, hardBypass = false
       }
     } catch {
       // Continue to network fetch
+    }
+    if (!cachedSnapshot) {
+      cachedSnapshot = BUNDLED_SNAPSHOT;
     }
   }
 

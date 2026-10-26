@@ -29,9 +29,27 @@ export default async function handler(req: any, res: any) {
   const password = (appPassword || process.env.GMAIL_APP_PASSWORD || "").trim().replace(/\s+/g, "");
 
   if (!password) {
-    return res.status(400).json({
-      error: "Gmail App Password is not configured yet. Please enter your 16-character Google App Password in Admin Settings or set GMAIL_APP_PASSWORD in environment variables.",
-      needsPassword: true
+    try {
+      const fbRes = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(to)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          _subject: subject,
+          _replyto: replyTo || undefined,
+          message: text || html
+        })
+      });
+      if (fbRes.ok) {
+        return res.status(200).json({ success: true, method: "fallback" });
+      }
+    } catch {
+      // Continue to fallback response
+    }
+
+    return res.status(200).json({
+      success: false,
+      needsPassword: true,
+      error: "Gmail App Password is not configured yet."
     });
   }
 

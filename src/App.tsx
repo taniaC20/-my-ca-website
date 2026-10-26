@@ -244,27 +244,10 @@ export default function App() {
     return null;
   });
 
-  // Global In-Page Loading States (top progress bar removed per design)
-  const [isPageLoading, setIsPageLoading] = useState<boolean>(true);
-  const [isSlowLoading, setIsSlowLoading] = useState<boolean>(false);
-  const slowLoadingTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  const startLoadingBar = () => {
-    setIsPageLoading(true);
-    setIsSlowLoading(false);
-    if (slowLoadingTimerRef.current) clearTimeout(slowLoadingTimerRef.current);
-
-    // If initial loading takes longer than 1.1s, display polite in-page notification
-    slowLoadingTimerRef.current = setTimeout(() => {
-      setIsSlowLoading(true);
-    }, 1100);
-  };
-
-  const finishLoadingBar = () => {
-    if (slowLoadingTimerRef.current) clearTimeout(slowLoadingTimerRef.current);
-    setIsPageLoading(false);
-    setIsSlowLoading(false);
-  };
+  // Global In-Page Loading States
+  const [, setIsPageLoading] = useState<boolean>(false);
+  const startLoadingBar = () => { setIsPageLoading(true); };
+  const finishLoadingBar = () => { setIsPageLoading(false); };
 
   const [contactSubmitted, setContactSubmitted] = useState(false);
   const [contactData, setContactData] = useState({
@@ -473,21 +456,23 @@ export default function App() {
       if (localStore.quotes.length > 0) setQuotes(localStore.quotes);
       finishLoadingBar(); // Release UI immediately so the user never sees "takes too long to load"
 
-      // Concurrently fetch Cloud Store snapshot and local Express endpoints in parallel
+      // Concurrently fetch Cloud Store snapshot and local Express endpoints (only in local dev)
+      const isLocalhost = typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+
       const [cloudData, cloudQuotesData, resProds, resCats, resTests, resAnns, resCust, resAdminQuotes, resAdminTests] = await Promise.all([
         fetchCloudStore(),
         adminToken ? fetchCloudQuotes() : Promise.resolve([]),
-        safeFetchJson("/api/products"),
-        safeFetchJson("/api/categories"),
-        safeFetchJson("/api/testimonials"),
-        safeFetchJson("/api/announcements"),
-        safeFetchJson("/api/customization"),
-        adminToken
+        isLocalhost ? safeFetchJson("/api/products") : Promise.resolve({ ok: false, data: null }),
+        isLocalhost ? safeFetchJson("/api/categories") : Promise.resolve({ ok: false, data: null }),
+        isLocalhost ? safeFetchJson("/api/testimonials") : Promise.resolve({ ok: false, data: null }),
+        isLocalhost ? safeFetchJson("/api/announcements") : Promise.resolve({ ok: false, data: null }),
+        isLocalhost ? safeFetchJson("/api/customization") : Promise.resolve({ ok: false, data: null }),
+        adminToken && isLocalhost
           ? safeFetchJson("/api/admin/quotes", {
               headers: { "Authorization": `Bearer ${adminToken}` }
             })
           : Promise.resolve({ ok: false, data: null }),
-        adminToken
+        adminToken && isLocalhost
           ? safeFetchJson("/api/admin/testimonials", {
               headers: { "Authorization": `Bearer ${adminToken}` }
             })
@@ -1567,21 +1552,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-brand-bg flex flex-col font-sans selection:bg-brand-primary selection:text-white relative">
-      {/* In-page friendly message if loading takes long */}
-      {isSlowLoading && (
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 animate-fade-in pointer-events-none px-4">
-          <div className="bg-white/95 text-stone-900 border border-amber-300/90 shadow-2xl px-6 py-3 rounded-full flex items-center gap-3 backdrop-blur-md">
-            <span className="h-4 w-4 border-2 border-amber-700 border-t-transparent rounded-full animate-spin shrink-0" />
-            <span className="font-serif font-bold text-stone-900 text-sm">
-              Nicoletta is loading...
-            </span>
-            <span className="text-[10px] text-amber-900 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full font-sans font-medium">
-              Almost there!
-            </span>
-          </div>
-        </div>
-      )}
-
       {/* Top Announcement Banner */}
       <AnnouncementBar announcements={announcements} />
 
