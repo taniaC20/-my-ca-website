@@ -2045,6 +2045,8 @@ export default function App() {
                                         <img
                                           src={p.images[0]}
                                           alt={p.name}
+                                          loading="lazy"
+                                          decoding="async"
                                           className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300"
                                           referrerPolicy="no-referrer"
                                         />

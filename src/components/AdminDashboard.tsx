@@ -4305,7 +4305,7 @@ export default function AdminDashboard({
                           <input
                             id="pForm-image-custom"
                             type="text"
-                            value={productForm.image.startsWith("data:") ? "[Uploaded Craft Photo]" : productForm.image}
+                            value={productForm.image.startsWith("data:") || productForm.image.startsWith("/cms-images/") ? "[Uploaded Craft Photo]" : productForm.image}
                             onChange={(e) => {
                               if (e.target.value !== "[Uploaded Craft Photo]") {
                                 setProductForm({ ...productForm, image: e.target.value });
@@ -4332,7 +4332,7 @@ export default function AdminDashboard({
                               <div className="text-[10px] overflow-hidden flex-1">
                                 <p className="font-bold text-stone-800 truncate">Selected Visual Asset</p>
                                 <p className="text-stone-400 truncate font-mono text-[9px]">
-                                  {productForm.image.startsWith("data:") ? "Uploaded Studio Image" : productForm.image}
+                                  {productForm.image.startsWith("data:") || productForm.image.startsWith("/cms-images/") ? "Uploaded Studio Image" : productForm.image}
                                 </p>
                               </div>
                             </>
@@ -5391,7 +5391,7 @@ export default function AdminDashboard({
                     <input
                       id="catForm-image"
                       type="text"
-                      value={categoryForm.image.startsWith("data:") ? "[Uploaded Category Photo]" : categoryForm.image}
+                      value={categoryForm.image.startsWith("data:") || categoryForm.image.startsWith("/cms-images/") ? "[Uploaded Category Photo]" : categoryForm.image}
                       onChange={(e) => {
                         if (e.target.value !== "[Uploaded Category Photo]") {
                           setCategoryForm({ ...categoryForm, image: e.target.value });
@@ -6234,7 +6234,7 @@ export default function AdminDashboard({
                         <div className="flex gap-2">
                           <input
                             type="text"
-                            value={logoImageUrl.startsWith("data:") ? "[Uploaded Custom Logo Image]" : logoImageUrl}
+                            value={logoImageUrl.startsWith("data:") || logoImageUrl.startsWith("/cms-images/") ? "[Uploaded Custom Logo Image]" : logoImageUrl}
                             onChange={(e) => {
                               if (e.target.value !== "[Uploaded Custom Logo Image]") {
                                 setLogoImageUrl(e.target.value);
@@ -7228,8 +7228,8 @@ export default function AdminDashboard({
                                                       <div className="flex-1 min-w-0">
                                                         <input
                                                           type="text"
-                                                          value={url.startsWith("data:") ? `[Uploaded Photo ${imgInSlideIdx + 1}]` : url}
-                                                          readOnly={url.startsWith("data:")}
+                                                          value={url.startsWith("data:") || url.startsWith("/cms-images/") ? `[Uploaded Photo ${imgInSlideIdx + 1}]` : url}
+                                                          readOnly={url.startsWith("data:") || url.startsWith("/cms-images/")}
                                                           onChange={(e) => {
                                                             if (e.target.value.startsWith("[Uploaded Photo")) return;
                                                             const updatedUrls = [...currentUrls];
@@ -7347,7 +7347,7 @@ export default function AdminDashboard({
                                       <div className="min-w-0 flex-1">
                                         <p className="text-[10px] font-bold text-stone-700 truncate">Current Image Asset</p>
                                         <p className="text-[9px] text-stone-400 truncate font-mono">
-                                          {sec.imageUrl.startsWith("data:") ? "[Uploaded Section Photo]" : sec.imageUrl}
+                                          {sec.imageUrl.startsWith("data:") || sec.imageUrl.startsWith("/cms-images/") ? "[Uploaded Section Photo]" : sec.imageUrl}
                                         </p>
                                       </div>
                                       <button 
@@ -7371,8 +7371,8 @@ export default function AdminDashboard({
 
                                   <input
                                     type="text"
-                                    value={(sec.imageUrl || "").startsWith("data:") ? "[Uploaded Section Photo]" : (sec.imageUrl || "")}
-                                    readOnly={(sec.imageUrl || "").startsWith("data:")}
+                                    value={(sec.imageUrl || "").startsWith("data:") || (sec.imageUrl || "").startsWith("/cms-images/") ? "[Uploaded Section Photo]" : (sec.imageUrl || "")}
+                                    readOnly={(sec.imageUrl || "").startsWith("data:") || (sec.imageUrl || "").startsWith("/cms-images/")}
                                     onChange={(e) => {
                                       if (e.target.value !== "[Uploaded Section Photo]") {
                                         updateSectionText(sec.id, "imageUrl", e.target.value);

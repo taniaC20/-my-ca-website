@@ -23,6 +23,8 @@ export default function ProductCard({ product, categoryName, onRequestQuote }: P
         <img
           src={product.images[0] || "https://images.unsplash.com/photo-1544982503-9f984c14501a?auto=format&fit=crop&q=80&w=600"}
           alt={product.name}
+          loading="lazy"
+          decoding="async"
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           referrerPolicy="no-referrer"
         />
