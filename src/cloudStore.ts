@@ -27,11 +27,11 @@ const REPO_API_BASE = "https://api.github.com/repos/taniaC20/-my-ca-website/git"
 const STORE_REF_NAME = "meta/cms-store";
 const QUOTES_REF_NAME = "meta/cms-quotes";
 
-export const BUNDLED_CMS_SHA = "1a35698fb74a5343177d8d62f0567efab0d64853";
+export const BUNDLED_CMS_SHA = "26a333ca65e8cd43363a3a756be3a0adcb04fc14";
 
 const BUNDLED_SNAPSHOT: CloudStoreSnapshot = {
-  updatedAt: "2026-10-26T01:13:36.282Z",
-  updatedAtMs: 1792977216282,
+  updatedAt: "2025-01-01T00:00:00.000Z",
+  updatedAtMs: 0,
   products: INITIAL_PRODUCTS,
   categories: INITIAL_CATEGORIES,
   testimonials: INITIAL_TESTIMONIALS,
@@ -63,6 +63,8 @@ let cachedSha: string | null =
     ? localStorage.getItem("nicoletta_cms_blob_sha") || BUNDLED_CMS_SHA
     : BUNDLED_CMS_SHA;
 let lastFetchTimestamp = 0;
+let activeSavesCount = 0;
+let lastLocalSaveMs = 0;
 const CACHE_TTL_MS = 15000; // 15s in-memory freshness for instantaneous updates
 let syncState: CloudSyncState = "idle";
 let lastSyncedAt: string | null =
@@ -104,12 +106,16 @@ export function getCloudSyncInfo(): { state: CloudSyncState; lastSyncedAt: strin
  */
 export async function fetchCloudStore(bypassCacheTtl = false, hardBypass = false): Promise<CloudStoreSnapshot | null> {
   const now = Date.now();
+  // Never overwrite in-flight or very recent Admin saves with a stale network response
+  if (activeSavesCount > 0 || (lastLocalSaveMs > 0 && now - lastLocalSaveMs < 15000)) {
+    return cachedSnapshot;
+  }
   if (!bypassCacheTtl && cachedSnapshot && now - lastFetchTimestamp < CACHE_TTL_MS) {
     return cachedSnapshot;
   }
 
-  // Attempt to restore from IndexedDB if in-memory cache is empty
-  if (!cachedSnapshot) {
+  // Attempt to restore from IndexedDB if in-memory cache is empty or still on bundled default
+  if (!cachedSnapshot || cachedSnapshot.updatedAtMs === 0) {
     try {
       const idbSnapshot = await idbGet<CloudStoreSnapshot>("nicoletta_cached_cloud_store");
       if (
@@ -128,36 +134,6 @@ export async function fetchCloudStore(bypassCacheTtl = false, hardBypass = false
     }
   }
 
-  // Check Firestore /settings/cms_snapshot_meta first for any newer snapshot
-  try {
-    const metaSnap = await getDoc(doc(db, "settings", "cms_snapshot_meta"));
-    if (metaSnap.exists()) {
-      const meta = metaSnap.data();
-      const fsUpdatedAtMs = Number(meta?.updatedAtMs || 0);
-      const totalChunks = Number(meta?.totalChunks || 0);
-      if (totalChunks > 0 && fsUpdatedAtMs > (cachedSnapshot?.updatedAtMs || 0)) {
-        const chunkPromises = [];
-        for (let i = 0; i < totalChunks; i++) {
-          chunkPromises.push(getDoc(doc(db, "settings", `cms_chunk_${i}`)));
-        }
-        const chunkSnaps = await Promise.all(chunkPromises);
-        if (chunkSnaps.every((s) => s.exists())) {
-          const joined = chunkSnaps.map((s) => s.data()?.data || "").join("");
-          const fsParsed = JSON.parse(joined) as CloudStoreSnapshot;
-          if (fsParsed && Array.isArray(fsParsed.products)) {
-            cachedSnapshot = fsParsed;
-            lastFetchTimestamp = Date.now();
-            persistKeyVal("nicoletta_cached_cloud_store", fsParsed);
-            notifyListeners("synced", fsParsed.updatedAt || lastSyncedAt);
-            return fsParsed;
-          }
-        }
-      }
-    }
-  } catch {
-    // Fall through to secondary cloud ref check
-  }
-
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout
@@ -170,60 +146,89 @@ export async function fetchCloudStore(bypassCacheTtl = false, hardBypass = false
       signal: controller.signal
     });
 
-    if (refRes.status === 404) {
-      clearTimeout(timeoutId);
-      return cachedSnapshot;
-    }
-    if (!refRes.ok) {
-      clearTimeout(timeoutId);
-      return cachedSnapshot;
-    }
+    if (refRes.ok) {
+      const refData = await refRes.json();
+      const blobSha: string | undefined = refData?.object?.sha;
+      if (blobSha) {
+        // Fast-path: SHA matches what we already have cached (and cache has real data)!
+        if (!hardBypass && cachedSnapshot && cachedSnapshot.updatedAtMs > 0 && blobSha === cachedSha) {
+          clearTimeout(timeoutId);
+          lastFetchTimestamp = Date.now();
+          notifyListeners("synced", cachedSnapshot.updatedAt || lastSyncedAt);
+          return cachedSnapshot;
+        }
 
-    const refData = await refRes.json();
-    const blobSha: string | undefined = refData?.object?.sha;
-    if (!blobSha) {
-      clearTimeout(timeoutId);
-      return cachedSnapshot;
+        // Step 2: Fetch updated blob content
+        const blobRes = await fetch(`${REPO_API_BASE}/blobs/${blobSha}`, {
+          method: "GET",
+          headers: getHeaders(true),
+          cache: "no-store",
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (blobRes.ok) {
+          const text = await blobRes.text();
+          const parsed = JSON.parse(text) as CloudStoreSnapshot;
+          if (parsed && typeof parsed === "object" && Array.isArray(parsed.products)) {
+            if (activeSavesCount > 0 || (lastLocalSaveMs > 0 && (parsed.updatedAtMs || 0) < lastLocalSaveMs)) {
+              return cachedSnapshot;
+            }
+            cachedSnapshot = parsed;
+            cachedSha = blobSha;
+            lastFetchTimestamp = Date.now();
+            safeSetLocalStorage("nicoletta_cms_blob_sha", blobSha);
+            persistKeyVal("nicoletta_cached_cloud_store", parsed);
+            notifyListeners("synced", parsed.updatedAt || lastSyncedAt);
+            return parsed;
+          }
+        }
+      }
     }
-
-    // Fast-path: SHA matches what we already have cached!
-    if (!hardBypass && cachedSnapshot && blobSha === cachedSha) {
-      clearTimeout(timeoutId);
-      lastFetchTimestamp = Date.now();
-      notifyListeners("synced", cachedSnapshot.updatedAt || lastSyncedAt);
-      return cachedSnapshot;
-    }
-
-    // Step 2: Fetch updated blob content
-    const blobRes = await fetch(`${REPO_API_BASE}/blobs/${blobSha}`, {
-      method: "GET",
-      headers: getHeaders(true),
-      cache: "no-store",
-      signal: controller.signal
-    });
-
     clearTimeout(timeoutId);
-
-    if (!blobRes.ok) {
-      return cachedSnapshot;
-    }
-
-    const text = await blobRes.text();
-    const parsed = JSON.parse(text) as CloudStoreSnapshot;
-    if (parsed && typeof parsed === "object") {
-      cachedSnapshot = parsed;
-      cachedSha = blobSha;
-      lastFetchTimestamp = Date.now();
-      safeSetLocalStorage("nicoletta_cms_blob_sha", blobSha);
-      persistKeyVal("nicoletta_cached_cloud_store", parsed);
-      notifyListeners("synced", parsed.updatedAt || lastSyncedAt);
-      return parsed;
-    }
-    return cachedSnapshot;
   } catch (err) {
     console.warn("Cloud store fetch warning:", err);
-    return cachedSnapshot;
   }
+
+  // Fallback: Check Firestore /settings/cms_snapshot_meta if primary ref was unreachable
+  try {
+    const metaSnap = await getDoc(doc(db, "settings", "cms_snapshot_meta"));
+    if (metaSnap.exists()) {
+      const meta = metaSnap.data();
+      const fsUpdatedAtMs = Number(meta?.updatedAtMs || 0);
+      const totalChunks = Number(meta?.totalChunks || 0);
+      const currentMs = cachedSnapshot?.updatedAtMs || 0;
+      if (
+        totalChunks > 0 &&
+        fsUpdatedAtMs > 0 &&
+        fsUpdatedAtMs >= lastLocalSaveMs &&
+        (hardBypass || fsUpdatedAtMs > currentMs || currentMs === 0)
+      ) {
+        const chunkPromises = [];
+        for (let i = 0; i < totalChunks; i++) {
+          chunkPromises.push(getDoc(doc(db, "settings", `cms_chunk_${i}`)));
+        }
+        const chunkSnaps = await Promise.all(chunkPromises);
+        if (chunkSnaps.every((s) => s.exists())) {
+          const joined = chunkSnaps.map((s) => s.data()?.data || "").join("");
+          const fsParsed = JSON.parse(joined) as CloudStoreSnapshot;
+          if (fsParsed && Array.isArray(fsParsed.products) && fsParsed.products.length > 0) {
+            fsParsed.updatedAtMs = fsUpdatedAtMs;
+            cachedSnapshot = fsParsed;
+            lastFetchTimestamp = Date.now();
+            persistKeyVal("nicoletta_cached_cloud_store", fsParsed);
+            notifyListeners("synced", fsParsed.updatedAt || lastSyncedAt);
+            return fsParsed;
+          }
+        }
+      }
+    }
+  } catch {
+    // Ignore fallback error
+  }
+
+  return cachedSnapshot;
 }
 
 let quotesCache: QuoteRequest[] | null = null;
@@ -313,7 +318,51 @@ let saveQueue: Promise<boolean> = Promise.resolve(true);
 export function pushCloudStore(partial: Partial<CloudStoreSnapshot>): Promise<boolean> {
   const nowIso = new Date().toISOString();
   const nowMs = Date.now();
-  safeSetLocalStorage("nicoletta_local_updated_at", String(nowMs));
+  const hasCmsChanges =
+    partial.products !== undefined ||
+    partial.categories !== undefined ||
+    partial.customization !== undefined ||
+    partial.testimonials !== undefined ||
+    partial.announcements !== undefined;
+
+  if (hasCmsChanges) {
+    lastLocalSaveMs = nowMs;
+    safeSetLocalStorage("nicoletta_local_updated_at", String(nowMs));
+    safeSetLocalStorage("nicoletta_customization_unsynced", "true");
+
+    // Optimistically update in-memory and IndexedDB snapshot immediately so UI & concurrent fetches see the new craft right away
+    const immediateMerged: CloudStoreSnapshot = {
+      ...(cachedSnapshot || BUNDLED_SNAPSHOT),
+      ...(partial.customization !== undefined
+        ? {
+            customization: {
+              ...cachedSnapshot?.customization,
+              ...partial.customization,
+              emailSettings:
+                partial.customization.emailSettings ||
+                cachedSnapshot?.customization?.emailSettings || {
+                  adminEmail: "sales@nicolettacraftsdecor.ca",
+                  gmailUser: "sales@nicolettacraftsdecor.ca",
+                  gmailAppPassword: "avtfmlmoaqwnacyo",
+                  emailNotificationsEnabled: true
+                }
+            }
+          }
+        : {}),
+      ...(partial.products !== undefined ? { products: partial.products } : {}),
+      ...(partial.categories !== undefined ? { categories: partial.categories } : {}),
+      ...(partial.testimonials !== undefined ? { testimonials: partial.testimonials } : {}),
+      ...(partial.announcements !== undefined ? { announcements: partial.announcements } : {}),
+      updatedAt: nowIso,
+      updatedAtMs: nowMs
+    };
+    delete immediateMerged.quotes;
+    cachedSnapshot = immediateMerged;
+    lastFetchTimestamp = nowMs;
+    persistKeyVal("nicoletta_cached_cloud_store", immediateMerged);
+  }
+
+  activeSavesCount++;
   notifyListeners("syncing");
 
   saveQueue = saveQueue
@@ -395,6 +444,12 @@ export function pushCloudStore(partial: Partial<CloudStoreSnapshot>): Promise<bo
           }
         }
 
+        // If only quotes were updated, do not overwrite the CMS catalog snapshot
+        if (!hasCmsChanges) {
+          notifyListeners("synced", nowIso);
+          return true;
+        }
+
         // 2. Prepare CMS store (products, categories, customization, announcements, testimonials)
         const storeMerged: CloudStoreSnapshot = {
           ...(cachedSnapshot || { updatedAt: nowIso, updatedAtMs: nowMs }),
@@ -426,114 +481,129 @@ export function pushCloudStore(partial: Partial<CloudStoreSnapshot>): Promise<bo
         lastFetchTimestamp = Date.now();
         persistKeyVal("nicoletta_cached_cloud_store", storeMerged);
 
-        // Sync updated collections directly to Firestore (chunk-safe < 900KB per doc)
-        (async () => {
-          try {
-            if (Array.isArray(partial.products)) {
-              for (const p of partial.products) {
-                if (p?.id && JSON.stringify(p).length < 900000) {
-                  await setDoc(doc(db, "products", String(p.id)), p, { merge: true }).catch(() => {});
-                }
-              }
-            }
-            if (Array.isArray(partial.categories)) {
-              for (const c of partial.categories) {
-                if (c?.id && JSON.stringify(c).length < 900000) {
-                  await setDoc(doc(db, "categories", String(c.id)), c, { merge: true }).catch(() => {});
-                }
-              }
-            }
-            if (Array.isArray(partial.testimonials)) {
-              for (const t of partial.testimonials) {
-                if (t?.id && JSON.stringify(t).length < 900000) {
-                  await setDoc(doc(db, "testimonials", String(t.id)), t, { merge: true }).catch(() => {});
-                }
-              }
-            }
-            if (Array.isArray(partial.announcements)) {
-              for (const a of partial.announcements) {
-                if (a?.id && JSON.stringify(a).length < 900000) {
-                  await setDoc(doc(db, "announcements", String(a.id)), a, { merge: true }).catch(() => {});
-                }
-              }
-            }
-            // Also store chunked full snapshot in /settings for Firestore backup regardless of image size
-            const serialized = JSON.stringify(storeMerged);
-            const chunkSize = 700000; // 700KB per chunk (well below 1MB Firestore limit)
-            const totalChunks = Math.ceil(serialized.length / chunkSize);
-            for (let i = 0; i < totalChunks; i++) {
-              const slice = serialized.slice(i * chunkSize, (i + 1) * chunkSize);
-              await setDoc(doc(db, "settings", `cms_chunk_${i}`), { index: i, data: slice, updatedAtMs: nowMs }).catch(() => {});
-            }
-            await setDoc(
-              doc(db, "settings", "cms_snapshot_meta"),
-              { updatedAt: nowIso, updatedAtMs: nowMs, totalChunks },
-              { merge: true }
-            ).catch(() => {});
-          } catch {
-            // Non-blocking background Firestore sync
-          }
-        })();
-
-        // Create UTF-8 Git Blob for cms-store
-        const blobRes = await fetch(`${REPO_API_BASE}/blobs`, {
-          method: "POST",
-          headers: getHeaders(false),
-          body: JSON.stringify({
-            content: JSON.stringify(storeMerged),
-            encoding: "utf-8"
-          })
-        });
-
-        if (!blobRes.ok) {
-          notifyListeners("error");
-          return false;
-        }
-
-        const blobData = await blobRes.json();
-        const newSha: string | undefined = blobData?.sha;
-        if (!newSha) {
-          notifyListeners("error");
-          return false;
-        }
-
-        cachedSha = newSha;
-        safeSetLocalStorage("nicoletta_cms_blob_sha", newSha);
-
-        // Update refs/meta/cms-store
-        const patchRes = await fetch(`${REPO_API_BASE}/refs/${STORE_REF_NAME}`, {
-          method: "PATCH",
-          headers: getHeaders(false),
-          body: JSON.stringify({
-            sha: newSha,
-            force: true
-          })
-        });
-
-        if (!patchRes.ok) {
-          await fetch(`${REPO_API_BASE}/refs`, {
+        // Update primary Git Blob for cms-store immediately so all browsers see the new SHA in <2s
+        let gitSynced = false;
+        try {
+          const blobRes = await fetch(`${REPO_API_BASE}/blobs`, {
             method: "POST",
             headers: getHeaders(false),
             body: JSON.stringify({
-              ref: `refs/${STORE_REF_NAME}`,
-              sha: newSha
+              content: JSON.stringify(storeMerged),
+              encoding: "utf-8"
             })
           });
+
+          if (blobRes.ok) {
+            const blobData = await blobRes.json();
+            const newSha: string | undefined = blobData?.sha;
+            if (newSha) {
+              cachedSha = newSha;
+              safeSetLocalStorage("nicoletta_cms_blob_sha", newSha);
+
+              const patchRes = await fetch(`${REPO_API_BASE}/refs/${STORE_REF_NAME}`, {
+                method: "PATCH",
+                headers: getHeaders(false),
+                body: JSON.stringify({
+                  sha: newSha,
+                  force: true
+                })
+              });
+
+              if (!patchRes.ok) {
+                await fetch(`${REPO_API_BASE}/refs`, {
+                  method: "POST",
+                  headers: getHeaders(false),
+                  body: JSON.stringify({
+                    ref: `refs/${STORE_REF_NAME}`,
+                    sha: newSha
+                  })
+                });
+              }
+              gitSynced = true;
+            }
+          }
+        } catch (gitErr) {
+          console.warn("Cloud git blob sync warning:", gitErr);
         }
 
-        safeSetLocalStorage("nicoletta_cloud_synced_at", nowIso);
-        safeSetLocalStorage("nicoletta_cloud_initial_migration_done", "true");
+        // Sync updated collections + chunked snapshot directly to Firestore (< 900KB per doc)
+        let firestoreSynced = false;
         try {
-          localStorage.removeItem("nicoletta_customization_unsynced");
-        } catch {
-          // Ignore
+          const serialized = JSON.stringify(storeMerged);
+          const chunkSize = 700000; // 700KB per chunk (well below 1MB Firestore limit)
+          const totalChunks = Math.ceil(serialized.length / chunkSize);
+          const chunkWrites: Promise<any>[] = [];
+          for (let i = 0; i < totalChunks; i++) {
+            const slice = serialized.slice(i * chunkSize, (i + 1) * chunkSize);
+            chunkWrites.push(
+              setDoc(doc(db, "settings", `cms_chunk_${i}`), { index: i, data: slice, updatedAtMs: nowMs })
+            );
+          }
+          await Promise.all(chunkWrites);
+          await setDoc(
+            doc(db, "settings", "cms_snapshot_meta"),
+            { updatedAt: nowIso, updatedAtMs: nowMs, totalChunks, blobSha: cachedSha || "" },
+            { merge: true }
+          );
+          firestoreSynced = true;
+
+          // Also sync individual collection documents in background
+          (async () => {
+            try {
+              if (Array.isArray(partial.products)) {
+                for (const p of partial.products) {
+                  if (p?.id && JSON.stringify(p).length < 900000) {
+                    await setDoc(doc(db, "products", String(p.id)), p, { merge: true }).catch(() => {});
+                  }
+                }
+              }
+              if (Array.isArray(partial.categories)) {
+                for (const c of partial.categories) {
+                  if (c?.id && JSON.stringify(c).length < 900000) {
+                    await setDoc(doc(db, "categories", String(c.id)), c, { merge: true }).catch(() => {});
+                  }
+                }
+              }
+              if (Array.isArray(partial.testimonials)) {
+                for (const t of partial.testimonials) {
+                  if (t?.id && JSON.stringify(t).length < 900000) {
+                    await setDoc(doc(db, "testimonials", String(t.id)), t, { merge: true }).catch(() => {});
+                  }
+                }
+              }
+              if (Array.isArray(partial.announcements)) {
+                for (const a of partial.announcements) {
+                  if (a?.id && JSON.stringify(a).length < 900000) {
+                    await setDoc(doc(db, "announcements", String(a.id)), a, { merge: true }).catch(() => {});
+                  }
+                }
+              }
+            } catch {}
+          })();
+        } catch (fsErr) {
+          console.warn("Firestore snapshot sync warning:", fsErr);
         }
-        notifyListeners("synced", nowIso);
-        return true;
+
+        if (firestoreSynced || gitSynced) {
+          safeSetLocalStorage("nicoletta_cloud_synced_at", nowIso);
+          safeSetLocalStorage("nicoletta_cloud_initial_migration_done", "true");
+          try {
+            localStorage.removeItem("nicoletta_customization_unsynced");
+          } catch {
+            // Ignore
+          }
+          notifyListeners("synced", nowIso);
+          return true;
+        }
+
+        notifyListeners("error");
+        return false;
       } catch (err) {
         console.warn("Cloud store save error:", err);
         notifyListeners("error");
         return false;
+      } finally {
+        activeSavesCount = Math.max(0, activeSavesCount - 1);
       }
     });
 

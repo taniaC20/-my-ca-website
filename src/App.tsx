@@ -267,6 +267,7 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(initialRoute.categoryId);
   const [searchQuery, setSearchQuery] = useState("");
+  const [featuredFirst, setFeaturedFirst] = useState<boolean>(false);
   const [selectedProductForQuote, setSelectedProductForQuote] = useState<Product | null>(null);
   const [selectedProductDetail, setSelectedProductDetail] = useState<Product | null>(() => {
     if (initialRoute.productId) {
@@ -1601,32 +1602,37 @@ export default function App() {
     ? customization.giftOccasionFilters
     : GIFT_OCCASION_PRESETS;
 
-  const filteredProducts = products.filter((p) => {
-    const matchCategory = selectedCategoryId === "all" || p.categoryId === selectedCategoryId;
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return matchCategory;
+  const filteredProducts = products
+    .filter((p) => {
+      const matchCategory = selectedCategoryId === "all" || p.categoryId === selectedCategoryId;
+      const q = searchQuery.trim().toLowerCase();
+      if (!q) return matchCategory;
 
-    const matchNameOrDesc =
-      p.name.toLowerCase().includes(q) ||
-      p.description.toLowerCase().includes(q) ||
-      (p.badge || "").toLowerCase().includes(q) ||
-      (p.includedNotes || []).some((note) => note.toLowerCase().includes(q));
+      const matchNameOrDesc =
+        p.name.toLowerCase().includes(q) ||
+        p.description.toLowerCase().includes(q) ||
+        (p.badge || "").toLowerCase().includes(q) ||
+        (p.includedNotes || []).some((note) => note.toLowerCase().includes(q));
 
-    const allKnownFilters = [...configuredOccasionFilters, ...GIFT_OCCASION_PRESETS];
-    const matchGiftOccasion = (p.giftOccasions || []).some((occ) => {
-      const occLower = occ.toLowerCase();
-      if (occLower === q || occLower.includes(q)) return true;
-      const preset = allKnownFilters.find(
-        (pr) => pr.name.toLowerCase() === occLower || pr.term.toLowerCase() === occLower
-      );
-      if (preset && (preset.term.toLowerCase() === q || preset.name.toLowerCase().includes(q))) {
-        return true;
-      }
-      return false;
+      const allKnownFilters = [...configuredOccasionFilters, ...GIFT_OCCASION_PRESETS];
+      const matchGiftOccasion = (p.giftOccasions || []).some((occ) => {
+        const occLower = occ.toLowerCase();
+        if (occLower === q || occLower.includes(q)) return true;
+        const preset = allKnownFilters.find(
+          (pr) => pr.name.toLowerCase() === occLower || pr.term.toLowerCase() === occLower
+        );
+        if (preset && (preset.term.toLowerCase() === q || preset.name.toLowerCase().includes(q))) {
+          return true;
+        }
+        return false;
+      });
+
+      return matchCategory && (matchNameOrDesc || matchGiftOccasion);
+    })
+    .sort((a, b) => {
+      if (!featuredFirst) return 0;
+      return (b.featured ? 1 : 0) - (a.featured ? 1 : 0);
     });
-
-    return matchCategory && (matchNameOrDesc || matchGiftOccasion);
-  });
 
   return (
     <div className="min-h-screen bg-brand-bg flex flex-col font-sans selection:bg-brand-primary selection:text-white relative">
@@ -1997,7 +2003,7 @@ export default function App() {
                               </div>
                             ) : (
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                {products.filter(p => p.featured).slice(0, 3).map((p) => (
+                                {products.filter(p => p.featured).slice(0, 6).map((p) => (
                                   <div
                                     key={p.id}
                                     onClick={() => handleViewProductDetails(p)}
@@ -2362,18 +2368,34 @@ export default function App() {
                     );
                   })()}
 
-                  {/* Search Bar */}
-                  <div className="relative w-full md:w-64">
-                    <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-brand-muted">
-                      <Search className="h-4 w-4" />
-                    </span>
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search wood, leather..."
-                      className="w-full bg-white border border-brand-border rounded-full py-2 pl-10 pr-4 text-xs text-brand-text focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary shadow-2xs"
-                    />
+                  {/* Search Bar & Featured First Sort Option */}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
+                    <button
+                      type="button"
+                      id="catalog-featured-first-btn"
+                      onClick={() => setFeaturedFirst((prev) => !prev)}
+                      className={`px-4 py-2 text-[10px] font-bold rounded-full transition-all cursor-pointer uppercase tracking-wider border inline-flex items-center justify-center gap-1.5 shrink-0 ${
+                        featuredFirst
+                          ? "bg-brand-primary text-white border-brand-primary shadow-xs"
+                          : "bg-white hover:bg-brand-highlight text-brand-dark border-brand-border shadow-2xs"
+                      }`}
+                    >
+                      <Star className={`h-3.5 w-3.5 ${featuredFirst ? "fill-white text-white" : "text-brand-primary"}`} />
+                      {featuredFirst ? "Featured First: On" : "Featured Items First"}
+                    </button>
+
+                    <div className="relative w-full md:w-64">
+                      <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-brand-muted">
+                        <Search className="h-4 w-4" />
+                      </span>
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search wood, leather..."
+                        className="w-full bg-white border border-brand-border rounded-full py-2 pl-10 pr-4 text-xs text-brand-text focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary shadow-2xs"
+                      />
+                    </div>
                   </div>
                 </div>
 
