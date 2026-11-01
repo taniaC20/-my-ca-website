@@ -28,7 +28,7 @@ const REPO_API_BASE = "https://api.github.com/repos/taniaC20/-my-ca-website/git"
 const STORE_REF_NAME = "meta/cms-store";
 const QUOTES_REF_NAME = "meta/cms-quotes";
 
-export const BUNDLED_CMS_SHA = "6b9a3803bfb9469c1f3d0382cbcbe7f72ff18ab4";
+export const BUNDLED_CMS_SHA = "d499993e97ee493d6fb03baa8277fc4cf144f447";
 
 const BUNDLED_SNAPSHOT: CloudStoreSnapshot = {
   _sha: BUNDLED_CMS_SHA,
