@@ -199,9 +199,17 @@ export default function App() {
     return false;
   };
 
-  const [products, setProducts] = useState<Product[]>(() =>
-    safeParseLocal<Product[]>("nicoletta_products", INITIAL_PRODUCTS, (v) => Array.isArray(v) && v.length > 0)
-  );
+  const [products, setProducts] = useState<Product[]>(() => {
+    if (typeof window !== "undefined" && localStorage.getItem("nicoletta_cms_cache_v3") !== "true") {
+      try {
+        localStorage.removeItem("nicoletta_products");
+        localStorage.removeItem("nicoletta_cms_blob_sha");
+        persistKeyVal("nicoletta_products", INITIAL_PRODUCTS);
+      } catch {}
+      return INITIAL_PRODUCTS;
+    }
+    return safeParseLocal<Product[]>("nicoletta_products", INITIAL_PRODUCTS, (v) => Array.isArray(v) && v.length > 0);
+  });
   const [categories, setCategories] = useState<Category[]>(() =>
     safeParseLocal<Category[]>("nicoletta_categories", INITIAL_CATEGORIES, (v) => Array.isArray(v) && v.length > 0)
   );
@@ -454,7 +462,12 @@ export default function App() {
         ? validIdbCust
         : lsCust || validIdbCust;
 
-    const bestProds = Array.isArray(idbProds) && idbProds.length >= lsProds.length ? idbProds : lsProds;
+    let bestProds = Array.isArray(idbProds) && idbProds.length >= lsProds.length ? idbProds : lsProds;
+    if (typeof window !== "undefined" && localStorage.getItem("nicoletta_cms_cache_v3") !== "true") {
+      localStorage.setItem("nicoletta_cms_cache_v3", "true");
+      bestProds = INITIAL_PRODUCTS;
+      persistKeyVal("nicoletta_products", INITIAL_PRODUCTS);
+    }
     const bestCats = Array.isArray(idbCats) && idbCats.length >= lsCats.length ? idbCats : lsCats;
     const bestTests = Array.isArray(idbTests) && idbTests.length >= lsTests.length ? idbTests : lsTests;
     const bestAnns = Array.isArray(idbAnns) && idbAnns.length >= lsAnns.length ? idbAnns : lsAnns;
@@ -1999,7 +2012,7 @@ export default function App() {
                               </div>
                             ) : (
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                {products.filter(p => p.featured).slice(0, 6).map((p) => (
+                                {products.filter(p => p.featured).slice(0, 9).map((p) => (
                                   <div
                                     key={p.id}
                                     onClick={() => handleViewProductDetails(p)}

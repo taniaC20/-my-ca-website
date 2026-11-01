@@ -11,6 +11,7 @@ import { db } from "./lib/firebase";
 import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, orderBy } from "firebase/firestore";
 
 export interface CloudStoreSnapshot {
+  _sha?: string;
   updatedAt: string;
   updatedAtMs: number;
   customization?: CustomizationSettings;
@@ -27,11 +28,12 @@ const REPO_API_BASE = "https://api.github.com/repos/taniaC20/-my-ca-website/git"
 const STORE_REF_NAME = "meta/cms-store";
 const QUOTES_REF_NAME = "meta/cms-quotes";
 
-export const BUNDLED_CMS_SHA = "26a333ca65e8cd43363a3a756be3a0adcb04fc14";
+export const BUNDLED_CMS_SHA = "866c178f536205753fcdb7abc7925702fd6b12fa";
 
 const BUNDLED_SNAPSHOT: CloudStoreSnapshot = {
-  updatedAt: "2025-01-01T00:00:00.000Z",
-  updatedAtMs: 0,
+  _sha: BUNDLED_CMS_SHA,
+  updatedAt: "2026-11-01T17:43:00.000Z",
+  updatedAtMs: 1793554980000,
   products: INITIAL_PRODUCTS,
   categories: INITIAL_CATEGORIES,
   testimonials: INITIAL_TESTIMONIALS,
@@ -114,15 +116,16 @@ export async function fetchCloudStore(bypassCacheTtl = false, hardBypass = false
     return cachedSnapshot;
   }
 
-  // Attempt to restore from IndexedDB if in-memory cache is empty or still on bundled default
-  if (!cachedSnapshot || cachedSnapshot.updatedAtMs === 0) {
+  // Attempt to restore from IndexedDB if in-memory cache is empty
+  if (!cachedSnapshot) {
     try {
       const idbSnapshot = await idbGet<CloudStoreSnapshot>("nicoletta_cached_cloud_store");
       if (
         idbSnapshot &&
         typeof idbSnapshot === "object" &&
         Array.isArray(idbSnapshot.products) &&
-        idbSnapshot.products.length > 0
+        idbSnapshot.products.length > 0 &&
+        (idbSnapshot.updatedAtMs || 0) >= BUNDLED_SNAPSHOT.updatedAtMs
       ) {
         cachedSnapshot = idbSnapshot;
       }
@@ -150,8 +153,19 @@ export async function fetchCloudStore(bypassCacheTtl = false, hardBypass = false
       const refData = await refRes.json();
       const blobSha: string | undefined = refData?.object?.sha;
       if (blobSha) {
-        // Fast-path: SHA matches what we already have cached (and cache has real data)!
-        if (!hardBypass && cachedSnapshot && cachedSnapshot.updatedAtMs > 0 && blobSha === cachedSha) {
+        // If remote SHA matches the bundled build SHA, immediately serve BUNDLED_SNAPSHOT (0ms download)
+        if (!hardBypass && blobSha === BUNDLED_CMS_SHA) {
+          clearTimeout(timeoutId);
+          cachedSnapshot = BUNDLED_SNAPSHOT;
+          cachedSha = blobSha;
+          lastFetchTimestamp = Date.now();
+          safeSetLocalStorage("nicoletta_cms_blob_sha", blobSha);
+          notifyListeners("synced", BUNDLED_SNAPSHOT.updatedAt || lastSyncedAt);
+          return BUNDLED_SNAPSHOT;
+        }
+
+        // Fast-path: SHA matches what we already have cached AND the cached snapshot carries that exact SHA
+        if (!hardBypass && cachedSnapshot && cachedSnapshot._sha === blobSha && blobSha === cachedSha) {
           clearTimeout(timeoutId);
           lastFetchTimestamp = Date.now();
           notifyListeners("synced", cachedSnapshot.updatedAt || lastSyncedAt);
@@ -175,6 +189,7 @@ export async function fetchCloudStore(bypassCacheTtl = false, hardBypass = false
             if (activeSavesCount > 0 || (lastLocalSaveMs > 0 && (parsed.updatedAtMs || 0) < lastLocalSaveMs)) {
               return cachedSnapshot;
             }
+            parsed._sha = blobSha;
             cachedSnapshot = parsed;
             cachedSha = blobSha;
             lastFetchTimestamp = Date.now();
@@ -497,8 +512,11 @@ export function pushCloudStore(partial: Partial<CloudStoreSnapshot>): Promise<bo
             const blobData = await blobRes.json();
             const newSha: string | undefined = blobData?.sha;
             if (newSha) {
+              storeMerged._sha = newSha;
+              cachedSnapshot = storeMerged;
               cachedSha = newSha;
               safeSetLocalStorage("nicoletta_cms_blob_sha", newSha);
+              persistKeyVal("nicoletta_cached_cloud_store", storeMerged);
 
               const patchRes = await fetch(`${REPO_API_BASE}/refs/${STORE_REF_NAME}`, {
                 method: "PATCH",

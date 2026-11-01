@@ -1460,7 +1460,7 @@ export default function AdminDashboard({
         alternativeRequestText: (productForm.alternativeRequestText || "").trim(),
         videoUrl: (productForm.videoUrl || "").trim() || undefined
       };
-      onUpdateProducts([...products, newProduct]);
+      onUpdateProducts([newProduct, ...products]);
       setIsAddingProduct(false);
     }
 
