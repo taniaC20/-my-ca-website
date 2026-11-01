@@ -210,9 +210,17 @@ export default function App() {
   const [announcements, setAnnouncements] = useState<Announcement[]>(() =>
     safeParseLocal<Announcement[]>("nicoletta_announcements", INITIAL_ANNOUNCEMENTS, (v) => Array.isArray(v))
   );
-  const [quotes, setQuotes] = useState<QuoteRequest[]>(() =>
-    safeParseLocal<QuoteRequest[]>("nicoletta_quotes", [], Array.isArray)
-  );
+  const [quotes, setQuotes] = useState<QuoteRequest[]>(() => {
+    if (typeof window !== "undefined" && localStorage.getItem("nicoletta_quotes_purged_v1") !== "true") {
+      try {
+        localStorage.removeItem("nicoletta_quotes");
+        localStorage.setItem("nicoletta_quotes_purged_v1", "true");
+        persistKeyVal("nicoletta_quotes", []);
+      } catch {}
+      return [];
+    }
+    return safeParseLocal<QuoteRequest[]>("nicoletta_quotes", [], Array.isArray);
+  });
   const [customization, setCustomization] = useState<CustomizationSettings>(() => {
     const parsed = safeParseLocal<CustomizationSettings>(
       "nicoletta_customization",
@@ -449,7 +457,10 @@ export default function App() {
     const bestCats = Array.isArray(idbCats) && idbCats.length >= lsCats.length ? idbCats : lsCats;
     const bestTests = Array.isArray(idbTests) && idbTests.length >= lsTests.length ? idbTests : lsTests;
     const bestAnns = Array.isArray(idbAnns) && idbAnns.length >= lsAnns.length ? idbAnns : lsAnns;
-    const bestQuotes = Array.isArray(idbQuotes) && idbQuotes.length >= lsQuotes.length ? idbQuotes : lsQuotes;
+    const bestQuotes =
+      typeof window !== "undefined" && localStorage.getItem("nicoletta_quotes_purged_v1") === "true"
+        ? (Array.isArray(lsQuotes) ? lsQuotes : [])
+        : [];
 
     return {
       customization: bestCust,
@@ -568,9 +579,11 @@ export default function App() {
               : customization);
 
         const serverAdminQuotesList = resAdminQuotes.ok && Array.isArray(resAdminQuotes.data) ? resAdminQuotes.data : [];
-        const finalQuotes = Array.from(
-          new Map([...cloudQuotesData, ...serverAdminQuotesList, ...cloudQuotes, ...localStore.quotes].map((q) => [q.id, q])).values()
-        );
+        const finalQuotes = adminToken
+          ? Array.from(
+              new Map([...cloudQuotesData, ...serverAdminQuotesList, ...cloudQuotes].map((q) => [q.id, q])).values()
+            )
+          : localStore.quotes;
 
         setProducts(finalProds);
         setCategories(finalCats);

@@ -337,9 +337,16 @@ export function pushCloudStore(partial: Partial<CloudStoreSnapshot>): Promise<bo
           quotesCache = partial.quotes;
           lastQuotesTimestamp = Date.now();
 
-          // Sync latest quote items to Firestore `/quoteRequests/{id}`
+          // Sync latest quote items to Firestore `/quoteRequests/{id}` and remove deleted quotes
           try {
-            const latestQuotes = partial.quotes.slice(0, 15);
+            const snap = await getDocs(collection(db, "quoteRequests"));
+            const keepIds = new Set(partial.quotes.map((q) => q.id));
+            await Promise.all(
+              snap.docs
+                .filter((d) => !keepIds.has(d.id))
+                .map((d) => deleteDoc(doc(db, "quoteRequests", d.id)).catch(() => {}))
+            );
+            const latestQuotes = partial.quotes.slice(0, 25);
             await Promise.all(
               latestQuotes.map((qItem) =>
                 qItem.id
