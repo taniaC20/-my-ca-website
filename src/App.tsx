@@ -48,7 +48,7 @@ import {
   deleteQuoteFromFirestore
 } from "./lib/firebase";
 import { safeSetLocalStorage, safeParseLocal, persistKeyVal, idbGet } from "./storage";
-import { fetchCloudStore, fetchCloudQuotes, pushCloudStore, scoreCustomizationRichness } from "./cloudStore";
+import { fetchCloudStore, fetchCloudQuotes, pushCloudStore, scoreCustomizationRichness, isCloudSaveBusy } from "./cloudStore";
 import {
   INITIAL_CATEGORIES,
   INITIAL_PRODUCTS,
@@ -199,17 +199,9 @@ export default function App() {
     return false;
   };
 
-  const [products, setProducts] = useState<Product[]>(() => {
-    if (typeof window !== "undefined" && localStorage.getItem("nicoletta_cms_cache_v4") !== "true") {
-      try {
-        localStorage.removeItem("nicoletta_products");
-        localStorage.removeItem("nicoletta_cms_blob_sha");
-        persistKeyVal("nicoletta_products", INITIAL_PRODUCTS);
-      } catch {}
-      return INITIAL_PRODUCTS;
-    }
-    return safeParseLocal<Product[]>("nicoletta_products", INITIAL_PRODUCTS, (v) => Array.isArray(v) && v.length > 0);
-  });
+  const [products, setProducts] = useState<Product[]>(() =>
+    safeParseLocal<Product[]>("nicoletta_products", INITIAL_PRODUCTS, (v) => Array.isArray(v) && v.length > 0)
+  );
   const [categories, setCategories] = useState<Category[]>(() =>
     safeParseLocal<Category[]>("nicoletta_categories", INITIAL_CATEGORIES, (v) => Array.isArray(v) && v.length > 0)
   );
@@ -462,12 +454,7 @@ export default function App() {
         ? validIdbCust
         : lsCust || validIdbCust;
 
-    let bestProds = Array.isArray(idbProds) && idbProds.length >= lsProds.length ? idbProds : lsProds;
-    if (typeof window !== "undefined" && localStorage.getItem("nicoletta_cms_cache_v4") !== "true") {
-      localStorage.setItem("nicoletta_cms_cache_v4", "true");
-      bestProds = INITIAL_PRODUCTS;
-      persistKeyVal("nicoletta_products", INITIAL_PRODUCTS);
-    }
+    const bestProds = Array.isArray(idbProds) && idbProds.length >= lsProds.length ? idbProds : lsProds;
     const bestCats = Array.isArray(idbCats) && idbCats.length >= lsCats.length ? idbCats : lsCats;
     const bestTests = Array.isArray(idbTests) && idbTests.length >= lsTests.length ? idbTests : lsTests;
     const bestAnns = Array.isArray(idbAnns) && idbAnns.length >= lsAnns.length ? idbAnns : lsAnns;
@@ -565,32 +552,54 @@ export default function App() {
             ? cloudData.customization
             : null;
 
-        // Preserve only unsynced admin draft items that do not yet exist in the cloud
-        const localDraftProds = (isAdminBrowser && localUnsynced)
-          ? localStore.products.filter(lp => !cloudProds.some(cp => cp.id === lp.id))
-          : [];
-        const finalProds = cloudProds.length > 0 ? [...cloudProds, ...localDraftProds] : localStore.products;
+        // If this Admin browser has unsynced or strictly newer local edits/reorders, preserve localStore and finish pushing to cloud!
+        const localUpdatedAtMs = Number(localStorage.getItem("nicoletta_local_updated_at") || 0);
+        const hasNewerLocalAdminWork =
+          isAdminBrowser &&
+          (localUnsynced || (localUpdatedAtMs > 0 && localUpdatedAtMs > (cloudData.updatedAtMs || 0)));
 
-        const localDraftCats = (isAdminBrowser && localUnsynced)
-          ? localStore.categories.filter(lc => !cloudCats.some(cc => cc.id === lc.id))
-          : [];
-        const finalCats = cloudCats.length > 0 ? [...cloudCats, ...localDraftCats] : (localStore.categories.length > 0 ? localStore.categories : INITIAL_CATEGORIES);
+        const finalProds =
+          hasNewerLocalAdminWork && localStore.products.length > 0
+            ? localStore.products
+            : cloudProds.length > 0
+            ? cloudProds
+            : localStore.products;
 
-        const localDraftTests = (isAdminBrowser && localUnsynced)
-          ? localStore.testimonials.filter(lt => !cloudTests.some(ct => ct.id === lt.id))
-          : [];
-        const finalTests = cloudTests.length > 0 ? [...cloudTests, ...localDraftTests] : (localStore.testimonials.length > 0 ? localStore.testimonials : INITIAL_TESTIMONIALS);
+        const finalCats =
+          hasNewerLocalAdminWork && localStore.categories.length > 0
+            ? localStore.categories
+            : cloudCats.length > 0
+            ? cloudCats
+            : localStore.categories.length > 0
+            ? localStore.categories
+            : INITIAL_CATEGORIES;
 
-        const localDraftAnns = (isAdminBrowser && localUnsynced)
-          ? localStore.announcements.filter(la => !cloudAnns.some(ca => ca.id === la.id))
-          : [];
-        const finalAnns = cloudAnns.length > 0 ? [...cloudAnns, ...localDraftAnns] : (localStore.announcements.length > 0 ? localStore.announcements : INITIAL_ANNOUNCEMENTS);
+        const finalTests =
+          hasNewerLocalAdminWork && localStore.testimonials.length > 0
+            ? localStore.testimonials
+            : cloudTests.length > 0
+            ? cloudTests
+            : localStore.testimonials.length > 0
+            ? localStore.testimonials
+            : INITIAL_TESTIMONIALS;
 
-        const finalCust = (cloudCust && !isStaleCustomization(cloudCust))
-          ? ensureContactSection(cloudCust)
-          : (localStore.customization && !isStaleCustomization(localStore.customization)
-              ? ensureContactSection(localStore.customization)
-              : customization);
+        const finalAnns =
+          hasNewerLocalAdminWork && localStore.announcements.length > 0
+            ? localStore.announcements
+            : cloudAnns.length > 0
+            ? cloudAnns
+            : localStore.announcements.length > 0
+            ? localStore.announcements
+            : INITIAL_ANNOUNCEMENTS;
+
+        const finalCust =
+          hasNewerLocalAdminWork && localStore.customization && !isStaleCustomization(localStore.customization)
+            ? ensureContactSection(localStore.customization)
+            : cloudCust && !isStaleCustomization(cloudCust)
+            ? ensureContactSection(cloudCust)
+            : localStore.customization && !isStaleCustomization(localStore.customization)
+            ? ensureContactSection(localStore.customization)
+            : customization;
 
         const serverAdminQuotesList = resAdminQuotes.ok && Array.isArray(resAdminQuotes.data) ? resAdminQuotes.data : [];
         const finalQuotes = adminToken
@@ -614,17 +623,15 @@ export default function App() {
         persistKeyVal("nicoletta_quotes", finalQuotes);
         if (finalCust) persistKeyVal("nicoletta_customization", finalCust);
 
-        // If admin had pending local drafts, push them to the cloud to reconcile
-        if (isAdminBrowser && localUnsynced && (localDraftProds.length > 0 || localDraftCats.length > 0)) {
+        // If admin had pending local changes (including reorders or edits), push them to the cloud to reconcile
+        if (hasNewerLocalAdminWork) {
           pushCloudStore({
             customization: finalCust,
             products: finalProds,
             categories: finalCats,
             testimonials: finalTests,
-            announcements: finalAnns,
-            quotes: finalQuotes
+            announcements: finalAnns
           }).catch(() => {});
-          safeSetLocalStorage("nicoletta_customization_unsynced", "false");
         }
         safeSetLocalStorage("nicoletta_cloud_initial_migration_done", "true");
       }
@@ -815,14 +822,29 @@ export default function App() {
     }
   }, [products]);
 
+  const isAdminModeRef = useRef(isAdminMode);
+  isAdminModeRef.current = isAdminMode;
+
   // Background live synchronizer for all browsers and open tabs
   useEffect(() => {
     let isCancelled = false;
 
     const backgroundSync = async () => {
       try {
+        // Never overwrite Admin edits/reorders while inside the Artisan Portal or while a cloud save is active
+        if (
+          isAdminModeRef.current ||
+          isCloudSaveBusy() ||
+          localStorage.getItem("nicoletta_customization_unsynced") === "true"
+        ) {
+          return;
+        }
         const cloudData = await fetchCloudStore(true);
-        if (!cloudData || isCancelled) return;
+        if (!cloudData || isCancelled || isAdminModeRef.current || isCloudSaveBusy()) return;
+        const localUpdatedAtMs = Number(localStorage.getItem("nicoletta_local_updated_at") || 0);
+        if (localUpdatedAtMs > 0 && (cloudData.updatedAtMs || 0) < localUpdatedAtMs) {
+          return;
+        }
         const cloudProds = Array.isArray(cloudData.products) ? cloudData.products : [];
         const cloudCats = Array.isArray(cloudData.categories) ? cloudData.categories : [];
         const cloudTests = Array.isArray(cloudData.testimonials) ? cloudData.testimonials : [];
@@ -985,7 +1007,7 @@ export default function App() {
       window.removeEventListener("popstate", syncStateFromUrl);
       window.removeEventListener("hashchange", syncStateFromUrl);
     };
-  }, [products]);
+  }, []);
 
   // Update browser address bar when user clicks buttons / navigates in page
   useEffect(() => {
