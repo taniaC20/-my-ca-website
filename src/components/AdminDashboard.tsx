@@ -435,7 +435,7 @@ export default function AdminDashboard({
   const [logoShowText, setLogoShowText] = useState(customization?.logoShowText !== false);
   const [logoSize, setLogoSize] = useState(customization?.logoSize || 48);
   const [logoHideBorder, setLogoHideBorder] = useState(customization?.logoHideBorder !== false);
-  const [philosophyQuote, setPhilosophyQuote] = useState(customization?.philosophyQuote || "I believe it's the little details that make a gift truly special. A name, a memory, a personal touch — something that shows how much you know and care about someone. That's what inspires me to create pieces that are as unique as the people they're made for.");
+  const [philosophyQuote, setPhilosophyQuote] = useState(customization?.philosophyQuote || "I believe it's the little details that make a gift truly special. A name, a memory, a personal touch, something that shows how much you know and care about someone. That's what inspires me to create pieces that are as unique as the people they're made for.");
   const [philosophyAuthor, setPhilosophyAuthor] = useState(customization?.philosophyAuthor || "Nicole, Founder & Crafter");
   const [giftOccasionFilters, setGiftOccasionFilters] = useState<GiftOccasionFilter[]>(() => {
     return Array.isArray(customization?.giftOccasionFilters)
@@ -525,7 +525,7 @@ export default function AdminDashboard({
       setLogoShowText(customization.logoShowText !== false);
       setLogoSize(customization.logoSize || 48);
       setLogoHideBorder(customization.logoHideBorder !== false);
-      setPhilosophyQuote(customization.philosophyQuote || "I believe it's the little details that make a gift truly special. A name, a memory, a personal touch — something that shows how much you know and care about someone. That's what inspires me to create pieces that are as unique as the people they're made for.");
+      setPhilosophyQuote(customization.philosophyQuote || "I believe it's the little details that make a gift truly special. A name, a memory, a personal touch, something that shows how much you know and care about someone. That's what inspires me to create pieces that are as unique as the people they're made for.");
       setPhilosophyAuthor(customization.philosophyAuthor || "Nicole, Founder & Crafter");
       if (Array.isArray(customization.giftOccasionFilters)) {
         setGiftOccasionFilters([...customization.giftOccasionFilters]);

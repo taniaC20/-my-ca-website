@@ -127,7 +127,8 @@ export const ensureContactSection = (cust: CustomizationSettings): Customization
   }
   const isOldQuote =
     !cust.philosophyQuote ||
-    cust.philosophyQuote.startsWith("An engraving isn't just marks");
+    cust.philosophyQuote.startsWith("An engraving isn't just marks") ||
+    cust.philosophyQuote.includes("a personal touch — something");
   const isOldAuthor =
     !cust.philosophyAuthor ||
     cust.philosophyAuthor.startsWith("Nicoletta, Founder") ||
@@ -135,7 +136,7 @@ export const ensureContactSection = (cust: CustomizationSettings): Customization
   return {
     ...cust,
     philosophyQuote: isOldQuote
-      ? "I believe it's the little details that make a gift truly special. A name, a memory, a personal touch — something that shows how much you know and care about someone. That's what inspires me to create pieces that are as unique as the people they're made for."
+      ? "I believe it's the little details that make a gift truly special. A name, a memory, a personal touch, something that shows how much you know and care about someone. That's what inspires me to create pieces that are as unique as the people they're made for."
       : cust.philosophyQuote,
     philosophyAuthor: isOldAuthor
       ? "Nicole, Founder & Crafter"
@@ -3483,7 +3484,7 @@ export default function App() {
           <div className="space-y-2">
             <span className="text-brand-highlight font-bold uppercase tracking-widest block text-[11px]">Our Philosophy</span>
             <p className="leading-relaxed italic">
-              &ldquo;{customization.philosophyQuote || "I believe it's the little details that make a gift truly special. A name, a memory, a personal touch — something that shows how much you know and care about someone. That's what inspires me to create pieces that are as unique as the people they're made for."}&rdquo;
+              &ldquo;{customization.philosophyQuote || "I believe it's the little details that make a gift truly special. A name, a memory, a personal touch, something that shows how much you know and care about someone. That's what inspires me to create pieces that are as unique as the people they're made for."}&rdquo;
             </p>
             <span className="text-[10px] text-brand-primary font-semibold block">&mdash; {(customization.philosophyAuthor || "Nicole, Founder & Crafter").replace(/^[—–-]\s*/, "")}</span>
           </div>
