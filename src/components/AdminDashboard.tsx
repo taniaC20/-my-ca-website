@@ -4679,13 +4679,22 @@ export default function AdminDashboard({
                   {/* Preset & Active Gift Occasion Pills with Delete Button */}
                   <div className="flex flex-wrap gap-2">
                     {(() => {
-                      const presetNames = giftOccasionFilters.map((o) => o.name);
+                      const cleanGiftFilters = giftOccasionFilters.filter((o) => o?.name && !o.name.includes("\uFFFD"));
+                      const presetNames = cleanGiftFilters.map((o) => o.name);
+                      const stripAlpha = (s: string) => s.replace(/[^a-z0-9]+/gi, "").toLowerCase();
+                      const presetAlpha = new Set(presetNames.map(stripAlpha));
                       const existingCustom = Array.from(
                         new Set<string>(
                           [
                             ...products.flatMap((p) => p.giftOccasions || []),
                             ...(productForm.giftOccasions || [])
-                          ].filter((name): name is string => Boolean(name) && !presetNames.includes(name))
+                          ].filter(
+                            (name): name is string =>
+                              Boolean(name) &&
+                              !name.includes("\uFFFD") &&
+                              !presetNames.includes(name) &&
+                              !presetAlpha.has(stripAlpha(name))
+                          )
                         )
                       );
                       const allOccasionNames = [...presetNames, ...existingCustom];

@@ -394,7 +394,7 @@ export const INITIAL_PRODUCTS: Product[] = [
     ],
     "giftOccasions": [
       "🏡 Housewarming Gifts",
-      "�� Wedding",
+      "💍 Wedding",
       "💝 Anniversary Gifts",
       "💼 Teacher's Gifts",
       "💼 Father's Day",
@@ -973,7 +973,7 @@ export const INITIAL_PRODUCTS: Product[] = [
       "Stainless Steel"
     ],
     "giftOccasions": [
-      "�� Wedding",
+      "💍 Wedding",
       "💝 Anniversary Gifts",
       "❤️ Valentine's Day",
       "🎄 Christmas Gifts",

@@ -200,7 +200,7 @@ export default function App() {
   };
 
   const [products, setProducts] = useState<Product[]>(() => {
-    if (typeof window !== "undefined" && localStorage.getItem("nicoletta_cms_cache_v3") !== "true") {
+    if (typeof window !== "undefined" && localStorage.getItem("nicoletta_cms_cache_v4") !== "true") {
       try {
         localStorage.removeItem("nicoletta_products");
         localStorage.removeItem("nicoletta_cms_blob_sha");
@@ -463,8 +463,8 @@ export default function App() {
         : lsCust || validIdbCust;
 
     let bestProds = Array.isArray(idbProds) && idbProds.length >= lsProds.length ? idbProds : lsProds;
-    if (typeof window !== "undefined" && localStorage.getItem("nicoletta_cms_cache_v3") !== "true") {
-      localStorage.setItem("nicoletta_cms_cache_v3", "true");
+    if (typeof window !== "undefined" && localStorage.getItem("nicoletta_cms_cache_v4") !== "true") {
+      localStorage.setItem("nicoletta_cms_cache_v4", "true");
       bestProds = INITIAL_PRODUCTS;
       persistKeyVal("nicoletta_products", INITIAL_PRODUCTS);
     }
@@ -2424,16 +2424,25 @@ export default function App() {
                   <span className="text-[10px] text-brand-muted font-bold uppercase tracking-widest block">Gift Occasion Quick Filters:</span>
                   <div className="flex flex-wrap gap-2">
                     {(() => {
-                      const presetNames = configuredOccasionFilters.map((o) => o.name as string);
+                      const cleanConfigured = configuredOccasionFilters.filter((o) => o?.name && !o.name.includes("\uFFFD"));
+                      const presetNames = cleanConfigured.map((o) => o.name as string);
+                      const stripAlpha = (s: string) => s.replace(/[^a-z0-9]+/gi, "").toLowerCase();
+                      const presetAlpha = new Set(presetNames.map(stripAlpha));
                       const customOccasions = Array.from(
                         new Set<string>(
                           products
                             .flatMap((p) => p.giftOccasions || [])
-                            .filter((occ): occ is string => Boolean(occ) && !presetNames.includes(occ))
+                            .filter(
+                              (occ): occ is string =>
+                                Boolean(occ) &&
+                                !occ.includes("\uFFFD") &&
+                                !presetNames.includes(occ) &&
+                                !presetAlpha.has(stripAlpha(occ))
+                            )
                         )
                       ).map((occ) => ({ name: occ, term: occ }));
 
-                      const allOccasions = [...configuredOccasionFilters, ...customOccasions];
+                      const allOccasions = [...cleanConfigured, ...customOccasions];
 
                       return allOccasions.map((occ) => {
                         const isActive =
