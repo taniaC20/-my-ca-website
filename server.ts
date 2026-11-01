@@ -297,7 +297,7 @@ const DEFAULT_CUSTOMIZATION = {
       extraText1: "Nicoletta Crafts & Decor",
       extraText2: "Close to Village Mall",
       extraText3: "+1(709)7631315",
-      extraText: "sales@nicolettacraftsdecor.ca",
+      extraText: "orders@nicolettacraftsdecor.ca",
       visible: true,
       order: 1
     }
@@ -844,7 +844,15 @@ app.post("/api/send-email", async (req, res) => {
     return res.status(400).json({ error: "Missing required fields (to, subject, text/html)." });
   }
 
-  const senderEmail = from || process.env.GMAIL_USER || "sales@nicolettacraftsdecor.ca";
+  const normalizeEmail = (addr?: string) =>
+    !addr || addr.trim().toLowerCase() === "sales@nicolettacraftsdecor.ca"
+      ? "orders@nicolettacraftsdecor.ca"
+      : addr.trim();
+  const recipientEmail = normalizeEmail(to);
+  const senderEmail = normalizeEmail(from || process.env.GMAIL_USER || "orders@nicolettacraftsdecor.ca");
+  const cleanReplyTo = replyTo
+    ? replyTo.replace(/sales@nicolettacraftsdecor\.ca/gi, "orders@nicolettacraftsdecor.ca")
+    : senderEmail;
   const DEFAULT_APP_PASSWORD = "avtfmlmoaqwnacyo";
   const password = (appPassword || process.env.GMAIL_APP_PASSWORD || (dbState.customization as any)?.emailSettings?.gmailAppPassword || DEFAULT_APP_PASSWORD).trim().replace(/\s+/g, "");
 
@@ -868,8 +876,8 @@ app.post("/api/send-email", async (req, res) => {
 
     const info = await transporter.sendMail({
       from: `"Nicoletta Crafts & Decor" <${senderEmail}>`,
-      to,
-      replyTo: replyTo || senderEmail,
+      to: recipientEmail,
+      replyTo: cleanReplyTo,
       subject,
       text,
       html: html || (text ? text.replace(/\n/g, "<br/>") : ""),

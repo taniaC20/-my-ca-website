@@ -1639,14 +1639,14 @@ export const INITIAL_CUSTOMIZATION: CustomizationSettings = {
       "extraText1": "Nicoletta Crafts & Decor",
       "extraText2": "St. John's, Newfoundland",
       "extraText3": "+1(709)7631315",
-      "extraText": "sales@nicolettacraftsdecor.ca",
+      "extraText": "orders@nicolettacraftsdecor.ca",
       "visible": true,
       "order": 9
     }
   ],
   "emailSettings": {
-    "adminEmail": "sales@nicolettacraftsdecor.ca",
-    "gmailUser": "sales@nicolettacraftsdecor.ca",
+    "adminEmail": "orders@nicolettacraftsdecor.ca",
+    "gmailUser": "orders@nicolettacraftsdecor.ca",
     "gmailAppPassword": "avtfmlmoaqwnacyo",
     "emailNotificationsEnabled": true
   }

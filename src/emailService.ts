@@ -7,8 +7,16 @@ export interface EmailSettings {
   emailNotificationsEnabled?: boolean;
 }
 
-export const DEFAULT_ADMIN_EMAIL = "sales@nicolettacraftsdecor.ca";
+export const DEFAULT_ADMIN_EMAIL = "orders@nicolettacraftsdecor.ca";
 export const DEFAULT_GMAIL_APP_PASSWORD = "avtfmlmoaqwnacyo";
+
+function resolveAdminEmail(addr?: string): string {
+  const trimmed = (addr || "").trim();
+  if (!trimmed || trimmed.toLowerCase() === "sales@nicolettacraftsdecor.ca") {
+    return DEFAULT_ADMIN_EMAIL;
+  }
+  return trimmed;
+}
 
 /**
  * Clean legacy bracketed tags that may have been stored in specialInstructions
@@ -48,7 +56,7 @@ export async function sendQuoteNotificationToAdmin(
   quote: QuoteRequest,
   settings?: EmailSettings
 ): Promise<{ success: boolean; message: string }> {
-  const recipient = settings?.adminEmail || DEFAULT_ADMIN_EMAIL;
+  const recipient = resolveAdminEmail(settings?.adminEmail);
   const isContact =
     quote.type === "contact" ||
     (quote.productName && quote.productName.toLowerCase().startsWith("contact"));
@@ -359,7 +367,7 @@ export async function sendQuoteNotificationToAdmin(
           <tr>
             <td style="background-color: #faf8f5; border-top: 1px solid #ebe5dc; padding: 18px 32px; font-size: 11px; color: #8c7f73; text-align: center; line-height: 1.5;">
               Nicoletta Crafts &amp; Decor &bull; St. John&rsquo;s, NL, Canada &bull; <a href="https://www.nicolettacraftsdecor.ca" style="color: #936037; text-decoration: none;">www.nicolettacraftsdecor.ca</a><br>
-              Direct studio inquiries to <a href="mailto:sales@nicolettacraftsdecor.ca" style="color: #936037; text-decoration: none;">sales@nicolettacraftsdecor.ca</a>
+              Direct studio inquiries to <a href="mailto:orders@nicolettacraftsdecor.ca" style="color: #936037; text-decoration: none;">orders@nicolettacraftsdecor.ca</a>
             </td>
           </tr>
 
@@ -380,7 +388,7 @@ export async function sendQuoteNotificationToAdmin(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         to: recipient,
-        from: settings?.gmailUser || DEFAULT_ADMIN_EMAIL,
+        from: resolveAdminEmail(settings?.gmailUser),
         subject,
         text: messageText,
         html: messageHtml,
@@ -401,7 +409,7 @@ export async function sendQuoteNotificationToAdmin(
   }
 
   // 2. High-reliability fallback via FormSubmit:
-  // Delivers the full structured table to sales@nicolettacraftsdecor.ca AND
+  // Delivers the full structured table to orders@nicolettacraftsdecor.ca AND
   // automatically triggers an instant confirmation to the customer's email via _autoresponse.
   if (!apiSuccess) {
     try {
@@ -429,8 +437,8 @@ export async function sendQuoteNotificationToAdmin(
       if (quote.customerEmail && quote.customerEmail.trim()) {
         formPayload["_replyto"] = quote.customerEmail.trim();
         formPayload["_autoresponse"] = isContact
-          ? `Thank you for reaching out to Nicoletta Crafts & Decor!\n\nWe have safely received your message regarding "${cleanTopic}" (Reference #${refCode}). Tannia personally reviews every inquiry and will get back to you within 1 business day.\n\nIf you requested phone contact, we will reach out directly from +1 (709) 763-1315.\n\nWarm regards,\nTannia & the Studio Team\nNicoletta Crafts & Decor\nsales@nicolettacraftsdecor.ca\nhttps://www.nicolettacraftsdecor.ca`
-          : `Thank you for your custom quote request with Nicoletta Crafts & Decor!\n\nWe have safely received your specifications for "${cleanTopic}" (Reference #${refCode}). Tannia will review your project details and prepare your bespoke proposal within 1 business day.\n\nIf you requested phone contact, we will reach out directly from +1 (709) 763-1315.\n\nWarm regards,\nTannia & the Studio Team\nNicoletta Crafts & Decor\nsales@nicolettacraftsdecor.ca\nhttps://www.nicolettacraftsdecor.ca`;
+          ? `Thank you for reaching out to Nicoletta Crafts & Decor!\n\nWe have safely received your message regarding "${cleanTopic}" (Reference #${refCode}). Tannia personally reviews every inquiry and will get back to you within 1 business day.\n\nIf you requested phone contact, we will reach out directly from +1 (709) 763-1315.\n\nWarm regards,\nTannia & the Studio Team\nNicoletta Crafts & Decor\norders@nicolettacraftsdecor.ca\nhttps://www.nicolettacraftsdecor.ca`
+          : `Thank you for your custom quote request with Nicoletta Crafts & Decor!\n\nWe have safely received your specifications for "${cleanTopic}" (Reference #${refCode}). Tannia will review your project details and prepare your bespoke proposal within 1 business day.\n\nIf you requested phone contact, we will reach out directly from +1 (709) 763-1315.\n\nWarm regards,\nTannia & the Studio Team\nNicoletta Crafts & Decor\norders@nicolettacraftsdecor.ca\nhttps://www.nicolettacraftsdecor.ca`;
       }
 
       const fbRes = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(recipient)}`, {
@@ -450,7 +458,7 @@ export async function sendQuoteNotificationToAdmin(
 }
 
 /**
- * Dispatches proposal email to client from sales@nicolettacraftsdecor.ca.
+ * Dispatches proposal email to client from orders@nicolettacraftsdecor.ca.
  */
 export async function dispatchClientProposal(
   proposal: {
@@ -463,7 +471,7 @@ export async function dispatchClientProposal(
   },
   settings?: EmailSettings
 ): Promise<{ success: boolean; method: "smtp" | "gmail_web" | "fallback"; error?: string }> {
-  const fromEmail = settings?.gmailUser || DEFAULT_ADMIN_EMAIL;
+  const fromEmail = resolveAdminEmail(settings?.gmailUser);
 
   // Attempt direct SMTP / API dispatch
   try {
@@ -639,7 +647,7 @@ export async function sendContactConfirmationToClient(
   },
   settings?: EmailSettings
 ): Promise<{ success: boolean; message: string }> {
-  const senderEmail = settings?.gmailUser || DEFAULT_ADMIN_EMAIL;
+  const senderEmail = resolveAdminEmail(settings?.gmailUser);
   const refCode = contact.refCode || Math.random().toString(36).substring(2, 8).toUpperCase();
   const inquirySubject = contact.subject?.trim() || "General Studio Inquiry";
   const emailSubject = `Thank you for your message - Nicoletta Crafts & Decor [#${refCode}]`;
@@ -672,7 +680,7 @@ Warm regards,
 Tannia & the Studio Team
 Nicoletta Crafts & Decor
 St. John's, NL, Canada
-sales@nicolettacraftsdecor.ca
+orders@nicolettacraftsdecor.ca
 https://www.nicolettacraftsdecor.ca
 `.trim();
 
@@ -773,7 +781,7 @@ https://www.nicolettacraftsdecor.ca
           <tr>
             <td style="background-color: #faf8f5; border-top: 1px solid #ebe5dc; padding: 18px 32px; font-size: 11px; color: #8c7f73; text-align: center; line-height: 1.5;">
               Nicoletta Crafts &amp; Decor &bull; St. John&rsquo;s, NL, Canada &bull; <a href="https://www.nicolettacraftsdecor.ca" style="color: #936037; text-decoration: none;">www.nicolettacraftsdecor.ca</a><br>
-              Inquiries: <a href="mailto:sales@nicolettacraftsdecor.ca" style="color: #936037; text-decoration: none;">sales@nicolettacraftsdecor.ca</a>
+              Inquiries: <a href="mailto:orders@nicolettacraftsdecor.ca" style="color: #936037; text-decoration: none;">orders@nicolettacraftsdecor.ca</a>
             </td>
           </tr>
 
@@ -836,7 +844,7 @@ export async function sendQuoteConfirmationToClient(
     return { success: true, message: "Client requested contact by phone only (no email provided)" };
   }
 
-  const senderEmail = settings?.gmailUser || DEFAULT_ADMIN_EMAIL;
+  const senderEmail = resolveAdminEmail(settings?.gmailUser);
   const rawId = quote.id || `q-${Date.now()}`;
   const refCode = rawId.replace(/^q-/, "").slice(-6).toUpperCase();
   const projectName = (quote.productName || "Custom Craft Project").trim();
@@ -883,7 +891,7 @@ export async function sendQuoteConfirmationToClient(
   }
 
   textSections.push(
-    `WHAT HAPPENS NEXT:\nTannia personally reviews every quote request and will prepare your proposal within one business day.\n\nINFORMATION CORRECTION:\nIf your information needs a correction, please reply directly to this email or visit our website at https://www.nicolettacraftsdecor.ca.\n\nWarm regards,\nTannia & the Studio Team\nNicoletta Crafts & Decor\nSt. John's, NL, Canada\nsales@nicolettacraftsdecor.ca\nhttps://www.nicolettacraftsdecor.ca`
+    `WHAT HAPPENS NEXT:\nTannia personally reviews every quote request and will prepare your proposal within one business day.\n\nINFORMATION CORRECTION:\nIf your information needs a correction, please reply directly to this email or visit our website at https://www.nicolettacraftsdecor.ca.\n\nWarm regards,\nTannia & the Studio Team\nNicoletta Crafts & Decor\nSt. John's, NL, Canada\norders@nicolettacraftsdecor.ca\nhttps://www.nicolettacraftsdecor.ca`
   );
 
   const textBody = textSections.join("\n\n");
@@ -968,7 +976,7 @@ export async function sendQuoteConfirmationToClient(
           <tr>
             <td style="background-color: #faf8f5; border-top: 1px solid #ebe5dc; padding: 18px 32px; font-size: 11px; color: #8c7f73; text-align: center; line-height: 1.5;">
               Nicoletta Crafts &amp; Decor &bull; St. John&rsquo;s, NL, Canada &bull; <a href="https://www.nicolettacraftsdecor.ca" style="color: #936037; text-decoration: none;">www.nicolettacraftsdecor.ca</a><br>
-              Inquiries: <a href="mailto:sales@nicolettacraftsdecor.ca" style="color: #936037; text-decoration: none;">sales@nicolettacraftsdecor.ca</a>
+              Inquiries: <a href="mailto:orders@nicolettacraftsdecor.ca" style="color: #936037; text-decoration: none;">orders@nicolettacraftsdecor.ca</a>
             </td>
           </tr>
         </table>

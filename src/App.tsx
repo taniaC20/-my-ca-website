@@ -88,7 +88,7 @@ export const DEFAULT_CONTACT_SECTION: CustomSection = {
   extraText1: "Nicoletta Crafts & Decor",
   extraText2: "Close to Village Mall",
   extraText3: "+1(709)7631315",
-  extraText: "sales@nicolettacraftsdecor.ca",
+  extraText: "orders@nicolettacraftsdecor.ca",
   visible: true,
   order: 9
 };
@@ -122,7 +122,13 @@ export const ensureContactSection = (cust: CustomizationSettings): Customization
       extraText1: !s.extraText1 || s.extraText1 === "Nicoletta Crafts Workshop" ? "Nicoletta Crafts & Decor" : s.extraText1,
       extraText2: !s.extraText2 || s.extraText2 === "305 Water St, St. John's, NL, Canada" ? "Close to Village Mall" : s.extraText2,
       extraText3: !s.extraText3 || s.extraText3 === "(709) 555-0182" ? "+1(709)7631315" : s.extraText3,
-      extraText: !s.extraText || s.extraText === "crafts@nicolettadecor.com" || s.extraText === "tnchevez@mun.ca" ? "sales@nicolettacraftsdecor.ca" : s.extraText,
+      extraText:
+        !s.extraText ||
+        s.extraText === "crafts@nicolettadecor.com" ||
+        s.extraText === "tnchevez@mun.ca" ||
+        s.extraText === "sales@nicolettacraftsdecor.ca"
+          ? "orders@nicolettacraftsdecor.ca"
+          : s.extraText,
     };
   }
   const isOldQuote =
@@ -133,8 +139,25 @@ export const ensureContactSection = (cust: CustomizationSettings): Customization
     !cust.philosophyAuthor ||
     cust.philosophyAuthor.startsWith("Nicoletta, Founder") ||
     cust.philosophyAuthor.startsWith("Tannia, Founder");
+  const existingEmailSettings = cust.emailSettings;
+  const migratedEmailSettings = existingEmailSettings
+    ? {
+        ...existingEmailSettings,
+        adminEmail:
+          !existingEmailSettings.adminEmail ||
+          existingEmailSettings.adminEmail === "sales@nicolettacraftsdecor.ca"
+            ? "orders@nicolettacraftsdecor.ca"
+            : existingEmailSettings.adminEmail,
+        gmailUser:
+          !existingEmailSettings.gmailUser ||
+          existingEmailSettings.gmailUser === "sales@nicolettacraftsdecor.ca"
+            ? "orders@nicolettacraftsdecor.ca"
+            : existingEmailSettings.gmailUser,
+      }
+    : undefined;
   return {
     ...cust,
+    ...(migratedEmailSettings ? { emailSettings: migratedEmailSettings } : {}),
     philosophyQuote: isOldQuote
       ? "I believe it's the little details that make a gift truly special. A name, a memory, a personal touch, something that shows how much you know and care about someone. That's what inspires me to create pieces that are as unique as the people they're made for."
       : cust.philosophyQuote,
@@ -2778,7 +2801,7 @@ export default function App() {
                       const workshopTitle = sec?.extraText1 && sec.extraText1 !== "Nicoletta Crafts Workshop" ? sec.extraText1 : "Nicoletta Crafts & Decor";
                       const pickupAddress = sec?.extraText2 && sec.extraText2 !== "305 Water St, St. John's, NL, Canada" ? sec.extraText2 : "Close to Village Mall";
                       const voiceContact = sec?.extraText3 && sec.extraText3 !== "(709) 555-0182" ? sec.extraText3 : "+1(709)7631315";
-                      const emailInquiry = sec?.extraText && sec.extraText !== "crafts@nicolettadecor.com" && sec.extraText !== "tnchevez@mun.ca" ? sec.extraText : "sales@nicolettacraftsdecor.ca";
+                      const emailInquiry = sec?.extraText && sec.extraText !== "crafts@nicolettadecor.com" && sec.extraText !== "tnchevez@mun.ca" && sec.extraText !== "sales@nicolettacraftsdecor.ca" ? sec.extraText : "orders@nicolettacraftsdecor.ca";
                       return (
                         <div className="bg-brand-highlight/40 border border-brand-border/60 rounded-[24px] p-6 space-y-4">
                           <h4 className="font-serif font-bold text-brand-dark text-lg border-b border-brand-border pb-2.5">
@@ -3452,7 +3475,7 @@ export default function App() {
             const workshopTitle = sec?.extraText1 && sec.extraText1 !== "Nicoletta Crafts Workshop" ? sec.extraText1 : "Nicoletta Crafts & Decor";
             const pickupAddress = sec?.extraText2 && sec.extraText2 !== "305 Water St, St. John's, NL, Canada" ? sec.extraText2 : "Close to Village Mall";
             const phoneContact = sec?.extraText3 && sec.extraText3 !== "(709) 555-0182" ? sec.extraText3 : "+1(709)7631315";
-            const emailContact = sec?.extraText && sec.extraText !== "crafts@nicolettadecor.com" && sec.extraText !== "tnchevez@mun.ca" ? sec.extraText : "sales@nicolettacraftsdecor.ca";
+            const emailContact = sec?.extraText && sec.extraText !== "crafts@nicolettadecor.com" && sec.extraText !== "tnchevez@mun.ca" && sec.extraText !== "sales@nicolettacraftsdecor.ca" ? sec.extraText : "orders@nicolettacraftsdecor.ca";
             return (
               <div className="space-y-2.5">
                 <span className="text-brand-highlight font-bold uppercase tracking-widest block text-[11px]">{workshopTitle}</span>

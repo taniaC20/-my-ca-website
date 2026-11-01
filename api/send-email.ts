@@ -25,18 +25,27 @@ export default async function handler(req: any, res: any) {
     return res.status(400).json({ error: "Missing required fields (to, subject, text/html)." });
   }
 
-  const senderEmail = from || process.env.GMAIL_USER || "sales@nicolettacraftsdecor.ca";
+  const normalizeEmail = (addr?: string) =>
+    !addr || addr.trim().toLowerCase() === "sales@nicolettacraftsdecor.ca"
+      ? "orders@nicolettacraftsdecor.ca"
+      : addr.trim();
+
+  const recipientEmail = normalizeEmail(to);
+  const senderEmail = normalizeEmail(from || process.env.GMAIL_USER || "orders@nicolettacraftsdecor.ca");
+  const cleanReplyTo = replyTo
+    ? replyTo.replace(/sales@nicolettacraftsdecor\.ca/gi, "orders@nicolettacraftsdecor.ca")
+    : senderEmail;
   const DEFAULT_APP_PASSWORD = "avtfmlmoaqwnacyo";
   const password = (appPassword || process.env.GMAIL_APP_PASSWORD || DEFAULT_APP_PASSWORD).trim().replace(/\s+/g, "");
 
   if (!password) {
     try {
-      const fbRes = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(to)}`, {
+      const fbRes = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(recipientEmail)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
           _subject: subject,
-          _replyto: replyTo || undefined,
+          _replyto: cleanReplyTo || undefined,
           message: text || html
         })
       });
@@ -67,8 +76,8 @@ export default async function handler(req: any, res: any) {
 
     const info = await transporter.sendMail({
       from: `"Nicoletta Crafts & Decor" <${senderEmail}>`,
-      to,
-      replyTo: replyTo || senderEmail,
+      to: recipientEmail,
+      replyTo: cleanReplyTo,
       subject,
       text,
       html: html || (text ? text.replace(/\n/g, "<br/>") : ""),
@@ -82,7 +91,7 @@ export default async function handler(req: any, res: any) {
       success: true,
       messageId: info.messageId,
       sentFrom: senderEmail,
-      sentTo: to
+      sentTo: recipientEmail
     });
   } catch (error: any) {
     console.error("Nodemailer send error:", error);

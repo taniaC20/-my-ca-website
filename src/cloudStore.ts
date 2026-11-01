@@ -603,8 +603,8 @@ export function pushCloudStore(partial: Partial<CloudStoreSnapshot>): Promise<bo
             emailSettings:
               partial.customization.emailSettings ||
               baseSnapshot?.customization?.emailSettings || {
-                adminEmail: "sales@nicolettacraftsdecor.ca",
-                gmailUser: "sales@nicolettacraftsdecor.ca",
+                adminEmail: "orders@nicolettacraftsdecor.ca",
+                gmailUser: "orders@nicolettacraftsdecor.ca",
                 gmailAppPassword: "avtfmlmoaqwnacyo",
                 emailNotificationsEnabled: true
               }

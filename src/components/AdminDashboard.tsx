@@ -390,7 +390,7 @@ export default function AdminDashboard({
     extraText1: "Nicoletta Crafts & Decor",
     extraText2: "Close to Village Mall",
     extraText3: "+1(709)7631315",
-    extraText: "sales@nicolettacraftsdecor.ca",
+    extraText: "orders@nicolettacraftsdecor.ca",
     visible: true,
     order: 9
   };
@@ -410,7 +410,7 @@ export default function AdminDashboard({
       extraText1: !existing.extraText1 || existing.extraText1 === "Nicoletta Crafts Workshop" ? "Nicoletta Crafts & Decor" : existing.extraText1,
       extraText2: !existing.extraText2 || existing.extraText2 === "305 Water St, St. John's, NL, Canada" ? "Close to Village Mall" : existing.extraText2,
       extraText3: !existing.extraText3 || existing.extraText3 === "(709) 555-0182" ? "+1(709)7631315" : existing.extraText3,
-      extraText: !existing.extraText || existing.extraText === "crafts@nicolettadecor.com" ? "sales@nicolettacraftsdecor.ca" : existing.extraText,
+      extraText: !existing.extraText || existing.extraText === "crafts@nicolettadecor.com" || existing.extraText === "sales@nicolettacraftsdecor.ca" ? "orders@nicolettacraftsdecor.ca" : existing.extraText,
     };
     const copy = [...safe];
     const heroIdx = copy.findIndex((s) => s.id === "home-hero");
@@ -609,10 +609,10 @@ export default function AdminDashboard({
       philosophyAuthor,
       giftOccasionFilters: targetOccasionFilters,
       sections: targetSections,
-      emailSettings: customization.emailSettings || {
-        adminEmail: "sales@nicolettacraftsdecor.ca",
-        gmailUser: "sales@nicolettacraftsdecor.ca",
-        gmailAppPassword: gmailPasswordInput.trim().replace(/\s+/g, "") || "avtfmlmoaqwnacyo",
+      emailSettings: {
+        adminEmail: "orders@nicolettacraftsdecor.ca",
+        gmailUser: "orders@nicolettacraftsdecor.ca",
+        gmailAppPassword: gmailPasswordInput.trim().replace(/\s+/g, "") || customization.emailSettings?.gmailAppPassword || "avtfmlmoaqwnacyo",
         emailNotificationsEnabled: true
       }
     };
@@ -1069,7 +1069,7 @@ export default function AdminDashboard({
   const handleOpenEmailCompose = (q: QuoteRequest) => {
     const currentPrice = q.quoteAmount || quotePrice || (q.productId ? products.find((p) => p.id === q.productId)?.price || 85 : 85);
     const defaultSubject = `Custom Craft Quote & Preview - ${q.productName} [Nicoletta Crafts & Decor]`;
-    const defaultBody = `Hi ${q.customerName},\n\nThank you for reaching out to Nicoletta Crafts & Decor! We have reviewed your request for the "${q.productName}".\n\nBased on your details:\n${q.engravingText ? `- Custom Personalization: "${q.engravingText}"\n` : ""}${q.fontPreference ? `- Typography Preference: ${q.fontPreference}\n` : ""}- Quantity: ${q.quantity} unit(s)\n${q.deadline ? `- Target Deadline: ${q.deadline}\n` : ""}${q.specialInstructions ? `- Notes & Instructions: ${q.specialInstructions}\n` : ""}\nWe are delighted to provide your custom quote estimate:\n👉 Total Quote Estimate: $${currentPrice} CAD\n\nIf you have any questions or would like to confirm your order, simply reply to this email (sales@nicolettacraftsdecor.ca). Once your order is confirmed, we'll send you a design preview for approval before bringing your idea to life!\n\nWarm regards,\nTannia\nNicoletta Crafts & Decor\nsales@nicolettacraftsdecor.ca\nhttps://www.nicolettacraftsdecor.ca`;
+    const defaultBody = `Hi ${q.customerName},\n\nThank you for reaching out to Nicoletta Crafts & Decor! We have reviewed your request for the "${q.productName}".\n\nBased on your details:\n${q.engravingText ? `- Custom Personalization: "${q.engravingText}"\n` : ""}${q.fontPreference ? `- Typography Preference: ${q.fontPreference}\n` : ""}- Quantity: ${q.quantity} unit(s)\n${q.deadline ? `- Target Deadline: ${q.deadline}\n` : ""}${q.specialInstructions ? `- Notes & Instructions: ${q.specialInstructions}\n` : ""}\nWe are delighted to provide your custom quote estimate:\n👉 Total Quote Estimate: $${currentPrice} CAD\n\nIf you have any questions or would like to confirm your order, simply reply to this email (orders@nicolettacraftsdecor.ca). Once your order is confirmed, we'll send you a design preview for approval before bringing your idea to life!\n\nWarm regards,\nTannia\nNicoletta Crafts & Decor\norders@nicolettacraftsdecor.ca\nhttps://www.nicolettacraftsdecor.ca`;
     
     setEmailQuote(q);
     setEmailSubject(defaultSubject);
@@ -1103,7 +1103,7 @@ export default function AdminDashboard({
             ...q,
             status: "quoted" as const,
             quoteAmount: Number(currentPrice),
-            adminNotes: `${q.adminNotes || ""}\n[System: Sent customized email quote proposal via ${result.method === "smtp" ? "Gmail SMTP (sales@nicolettacraftsdecor.ca)" : "Gmail Web"} on ${new Date().toLocaleDateString()}]`.trim(),
+            adminNotes: `${q.adminNotes || ""}\n[System: Sent customized email quote proposal via ${result.method === "smtp" ? "Gmail SMTP (orders@nicolettacraftsdecor.ca)" : "Gmail Web"} on ${new Date().toLocaleDateString()}]`.trim(),
             updatedAt: new Date().toISOString()
           }
         : q
@@ -1137,8 +1137,8 @@ export default function AdminDashboard({
       ...customization,
       emailSettings: {
         ...customization.emailSettings,
-        adminEmail: "sales@nicolettacraftsdecor.ca",
-        gmailUser: "sales@nicolettacraftsdecor.ca",
+        adminEmail: "orders@nicolettacraftsdecor.ca",
+        gmailUser: "orders@nicolettacraftsdecor.ca",
         gmailAppPassword: passwordToSave,
         emailNotificationsEnabled: true
       }
@@ -1158,17 +1158,17 @@ export default function AdminDashboard({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          to: "sales@nicolettacraftsdecor.ca",
-          from: "sales@nicolettacraftsdecor.ca",
+          to: "orders@nicolettacraftsdecor.ca",
+          from: "orders@nicolettacraftsdecor.ca",
           subject: "[Nicoletta Portal] Gmail Automation Engine Test Email",
-          text: "Congratulations! Your Gmail automation engine for sales@nicolettacraftsdecor.ca is successfully connected and operational.",
+          text: "Congratulations! Your Gmail automation engine for orders@nicolettacraftsdecor.ca is successfully connected and operational.",
           appPassword: gmailPasswordInput.trim().replace(/\s+/g, "")
         })
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.success) {
         setTestEmailStatus("success");
-        setTestEmailMsg("Test email delivered successfully to sales@nicolettacraftsdecor.ca!");
+        setTestEmailMsg("Test email delivered successfully to orders@nicolettacraftsdecor.ca!");
       } else {
         setTestEmailStatus("error");
         setTestEmailMsg(data.error || "Could not connect to Gmail SMTP. Please verify your 16-character App Password.");
@@ -3269,7 +3269,7 @@ export default function AdminDashboard({
                       </div>
                       <div className="space-y-1">
                         <h5 className="font-serif font-bold text-stone-900 text-lg">Email Dispatched Successfully!</h5>
-                        <p className="text-stone-500 text-xs">A customized quote of <strong>${emailQuote.quoteAmount || quotePrice} CAD</strong> was sent from sales@nicolettacraftsdecor.ca to {emailQuote.customerName}.</p>
+                        <p className="text-stone-500 text-xs">A customized quote of <strong>${emailQuote.quoteAmount || quotePrice} CAD</strong> was sent from orders@nicolettacraftsdecor.ca to {emailQuote.customerName}.</p>
                       </div>
                       <p className="text-[10px] text-stone-400 font-mono">Status updated to: "quoted" | Logged in workshop dashboard.</p>
                     </div>
@@ -3284,7 +3284,7 @@ export default function AdminDashboard({
                         <div className="flex items-center gap-1.5 text-stone-600 border-t border-stone-200/60 pt-2">
                           <span className="font-bold w-12 text-stone-400">From:</span>
                           <span className="font-mono text-emerald-800 font-bold flex items-center gap-1">
-                            <Mail className="h-3 w-3" /> Nicoletta Crafts &amp; Decor &lt;sales@nicolettacraftsdecor.ca&gt;
+                            <Mail className="h-3 w-3" /> Nicoletta Crafts &amp; Decor &lt;orders@nicolettacraftsdecor.ca&gt;
                           </span>
                         </div>
                         <div className="flex items-center gap-1.5 text-stone-600 border-t border-stone-200/60 pt-2">
@@ -3320,7 +3320,7 @@ export default function AdminDashboard({
                       )}
 
                       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-2">
-                        <span className="text-[10px] text-stone-400 italic">Dispatches from your verified Gmail address (sales@nicolettacraftsdecor.ca).</span>
+                        <span className="text-[10px] text-stone-400 italic">Dispatches from your verified Gmail address (orders@nicolettacraftsdecor.ca).</span>
                         <div className="flex flex-wrap items-center gap-2">
                           <button
                             type="button"
@@ -6835,9 +6835,9 @@ export default function AdminDashboard({
                                       </label>
                                       <input
                                         type="text"
-                                        value={sec.extraText ?? "sales@nicolettacraftsdecor.ca"}
+                                        value={sec.extraText ?? "orders@nicolettacraftsdecor.ca"}
                                         onChange={(e) => updateSectionText(sec.id, "extraText", e.target.value)}
-                                        placeholder="sales@nicolettacraftsdecor.ca"
+                                        placeholder="orders@nicolettacraftsdecor.ca"
                                         className="w-full text-xs p-2.5 rounded-lg border border-stone-200 focus:outline-none focus:border-brand-primary bg-white font-medium"
                                       />
                                       <span className="text-[9px] text-stone-400 mt-0.5 block">Store inquiry and contact email address</span>
@@ -6865,7 +6865,7 @@ export default function AdminDashboard({
                                         </p>
                                         <p className="text-stone-600 flex items-center gap-1">
                                           <Mail className="h-3 w-3 text-brand-primary shrink-0" />
-                                          {sec.extraText || "sales@nicolettacraftsdecor.ca"}
+                                          {sec.extraText || "orders@nicolettacraftsdecor.ca"}
                                         </p>
                                         <p className="text-[10px] text-stone-500 italic pt-1 border-t border-brand-border/40 mt-1">
                                           Exact address will be shared once order is confirmed
@@ -6887,7 +6887,7 @@ export default function AdminDashboard({
                                         </p>
                                         <p className="text-stone-400 text-[10px] flex items-center gap-1">
                                           <Mail className="h-3 w-3 text-brand-primary shrink-0" />
-                                          {sec.extraText || "sales@nicolettacraftsdecor.ca"}
+                                          {sec.extraText || "orders@nicolettacraftsdecor.ca"}
                                         </p>
                                         <p className="text-[10px] text-stone-400 italic pt-1 border-t border-stone-800 mt-1">
                                           Exact address will be shared once order is confirmed
@@ -7745,11 +7745,11 @@ export default function AdminDashboard({
                     <h3 className="font-serif font-bold text-stone-900 text-lg">Gmail Automation Engine</h3>
                   </div>
                   <p className="text-stone-500 text-xs mt-0.5">
-                    Integrated directly with <strong>sales@nicolettacraftsdecor.ca</strong> for client proposals and inbound quote notifications.
+                    Integrated directly with <strong>orders@nicolettacraftsdecor.ca</strong> for client proposals and inbound quote notifications.
                   </p>
                 </div>
                 <span className="self-start sm:self-auto text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-1 rounded-full font-mono font-bold uppercase tracking-wider flex items-center gap-1.5">
-                  <Mail className="h-3 w-3 text-emerald-600" /> sales@nicolettacraftsdecor.ca
+                  <Mail className="h-3 w-3 text-emerald-600" /> orders@nicolettacraftsdecor.ca
                 </span>
               </div>
 
@@ -7759,7 +7759,7 @@ export default function AdminDashboard({
                 <div className="text-xs space-y-1">
                   <h4 className="font-bold text-emerald-950">Inbound Client Alerts are Active</h4>
                   <p className="text-emerald-900/90 leading-relaxed font-light">
-                    Every time a customer submits a bespoke quote, requests a handmade bouquet, or sends a contact message, an email alert with all client details is sent to <strong>sales@nicolettacraftsdecor.ca</strong>.
+                    Every time a customer submits a bespoke quote, requests a handmade bouquet, or sends a contact message, an email alert with all client details is sent to <strong>orders@nicolettacraftsdecor.ca</strong>.
                   </p>
                 </div>
               </div>
@@ -7813,7 +7813,7 @@ export default function AdminDashboard({
                 <div className="bg-stone-50 border border-stone-200 p-4 rounded-xl space-y-2 text-xs text-stone-700">
                   <span className="font-bold text-stone-900 block">How to get your 16-character Google App Password:</span>
                   <ol className="list-decimal pl-5 space-y-1 text-[11px] text-stone-600 leading-relaxed font-light">
-                    <li>Sign in to your Google Account at <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer" className="text-emerald-700 font-bold underline">myaccount.google.com/apppasswords</a> with <strong>sales@nicolettacraftsdecor.ca</strong>.</li>
+                    <li>Sign in to your Google Account at <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer" className="text-emerald-700 font-bold underline">myaccount.google.com/apppasswords</a> with <strong>orders@nicolettacraftsdecor.ca</strong>.</li>
                     <li>Ensure <strong>2-Step Verification</strong> is enabled for your account.</li>
                     <li>Under App Passwords, name it "Nicoletta Portal" and click <strong>Create</strong>.</li>
                     <li>Copy the 16-letter code generated by Google and paste it above, then click <strong>Save Password</strong>.</li>
@@ -7837,7 +7837,7 @@ export default function AdminDashboard({
                     ) : (
                       <>
                         <Send className="h-3.5 w-3.5" />
-                        <span>Send Test Email to sales@nicolettacraftsdecor.ca</span>
+                        <span>Send Test Email to orders@nicolettacraftsdecor.ca</span>
                       </>
                     )}
                   </button>
