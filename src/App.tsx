@@ -96,6 +96,21 @@ export const DEFAULT_CONTACT_SECTION: CustomSection = {
 export const ensureContactSection = (cust: CustomizationSettings): CustomizationSettings => {
   if (!cust || typeof cust !== "object") return cust;
   const sections = Array.isArray(cust.sections) ? [...cust.sections] : [];
+  const heroIdx = sections.findIndex(s => s && s.id === "home-hero");
+  if (heroIdx !== -1 && sections[heroIdx]) {
+    const h = sections[heroIdx];
+    const isOldDesc =
+      !h.description ||
+      h.description.startsWith("The best gifts are the ones that tell a story") ||
+      h.description.startsWith("We create luxury heirlooms");
+    sections[heroIdx] = {
+      ...h,
+      title: !h.title || h.title.includes("Handcrafted Wood") ? "Turn Moments Into Memories" : h.title,
+      description: isOldDesc
+        ? "At Nicoletta, we turn your ideas and cherished memories into personalized gifts and handmade creations. Thoughtfully crafted to celebrate the people and moments that matter most."
+        : h.description
+    };
+  }
   const idx = sections.findIndex(s => s && s.id === "contact-header");
   if (idx === -1) {
     sections.push({ ...DEFAULT_CONTACT_SECTION });
@@ -1925,11 +1940,11 @@ export default function App() {
 
 
                               <h2 className="font-serif font-medium text-3xl md:text-5xl lg:text-6xl text-white leading-tight tracking-tight drop-shadow-sm">
-                                {sec.title || "Handcrafted Wood. Fire-Etched Memories."}
+                                {sec.title || "Turn Moments Into Memories"}
                               </h2>
 
                               <p className="text-stone-200 text-xs md:text-sm leading-relaxed max-w-2xl mx-auto font-light drop-shadow-xs">
-                                {sec.description || "We create luxury heirlooms and custom gifts..."}
+                                {sec.description || "At Nicoletta, we turn your ideas and cherished memories into personalized gifts and handmade creations. Thoughtfully crafted to celebrate the people and moments that matter most."}
                               </p>
 
                               <div className="pt-6 flex flex-col sm:flex-row justify-center gap-4">
@@ -1948,7 +1963,7 @@ export default function App() {
                                     setActivePage("quote-request");
                                     window.scrollTo({ top: 0, behavior: "smooth" });
                                   }}
-                                  className="bg-white/10 hover:bg-white/20 text-white border border-white/25 backdrop-blur-xs font-sans font-bold text-[10px] uppercase tracking-widest py-3.5 px-8 rounded-full cursor-pointer transition-all shadow-xs"
+                                  className="bg-white hover:bg-brand-highlight text-brand-dark border-2 border-white font-sans font-bold text-[10px] uppercase tracking-widest py-3.5 px-8 rounded-full cursor-pointer transition-all shadow-md"
                                 >
                                   {sec.extraText || sec.buttonText2 || "Request Custom Quote"}
                                 </button>

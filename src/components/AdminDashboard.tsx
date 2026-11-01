@@ -413,6 +413,17 @@ export default function AdminDashboard({
       extraText: !existing.extraText || existing.extraText === "crafts@nicolettadecor.com" ? "sales@nicolettacraftsdecor.ca" : existing.extraText,
     };
     const copy = [...safe];
+    const heroIdx = copy.findIndex((s) => s.id === "home-hero");
+    if (heroIdx !== -1 && copy[heroIdx]) {
+      const h = copy[heroIdx];
+      if (!h.description || h.description.startsWith("The best gifts are the ones that tell a story")) {
+        copy[heroIdx] = {
+          ...h,
+          title: h.title || "Turn Moments Into Memories",
+          description: "At Nicoletta, we turn your ideas and cherished memories into personalized gifts and handmade creations. Thoughtfully crafted to celebrate the people and moments that matter most."
+        };
+      }
+    }
     copy[idx] = merged;
     return copy;
   };

@@ -1526,7 +1526,7 @@ export const INITIAL_CUSTOMIZATION: CustomizationSettings = {
       "page": "home",
       "title": "  Turn Moments Into Memories",
       "subtitle": "",
-      "description": "The best gifts are the ones that tell a story. At Nicoletta, we create personalized keepsakes and custom designs made around your ideas, your memories, and the people you love. From engraved pieces to unique handmade creations, every item is crafted with love to make your special moments unforgettable.",
+      "description": "At Nicoletta, we turn your ideas and cherished memories into personalized gifts and handmade creations. Thoughtfully crafted to celebrate the people and moments that matter most.",
       "visible": true,
       "order": 0,
       "buttonText1": "Browse Collections",
