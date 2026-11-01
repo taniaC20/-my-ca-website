@@ -1480,8 +1480,8 @@ export const INITIAL_CUSTOMIZATION: CustomizationSettings = {
   "logoShowText": true,
   "logoSize": 120,
   "logoHideBorder": true,
-  "philosophyQuote": "An engraving isn't just marks burnt into surface; it's the transfer of a family signature across generations.",
-  "philosophyAuthor": "Nicoletta, Founder & Creative Director",
+  "philosophyQuote": "I believe it's the little details that make a gift truly special. A name, a memory, a personal touch — something that shows how much you know and care about someone. That's what inspires me to create pieces that are as unique as the people they're made for.",
+  "philosophyAuthor": "Nicole, Founder & Crafter",
   "giftOccasionFilters": [
     {
       "name": "🏡 Housewarming Gifts",

@@ -125,7 +125,23 @@ export const ensureContactSection = (cust: CustomizationSettings): Customization
       extraText: !s.extraText || s.extraText === "crafts@nicolettadecor.com" || s.extraText === "tnchevez@mun.ca" ? "sales@nicolettacraftsdecor.ca" : s.extraText,
     };
   }
-  return { ...cust, sections };
+  const isOldQuote =
+    !cust.philosophyQuote ||
+    cust.philosophyQuote.startsWith("An engraving isn't just marks");
+  const isOldAuthor =
+    !cust.philosophyAuthor ||
+    cust.philosophyAuthor.startsWith("Nicoletta, Founder") ||
+    cust.philosophyAuthor.startsWith("Tannia, Founder");
+  return {
+    ...cust,
+    philosophyQuote: isOldQuote
+      ? "I believe it's the little details that make a gift truly special. A name, a memory, a personal touch — something that shows how much you know and care about someone. That's what inspires me to create pieces that are as unique as the people they're made for."
+      : cust.philosophyQuote,
+    philosophyAuthor: isOldAuthor
+      ? "Nicole, Founder & Crafter"
+      : cust.philosophyAuthor,
+    sections
+  };
 };
 
 export function getInitialRouteFromUrl(): {
@@ -3467,9 +3483,9 @@ export default function App() {
           <div className="space-y-2">
             <span className="text-brand-highlight font-bold uppercase tracking-widest block text-[11px]">Our Philosophy</span>
             <p className="leading-relaxed italic">
-              &ldquo;{customization.philosophyQuote || "An engraving isn't just marks burnt into surface; it's the transfer of a family signature across generations."}&rdquo;
+              &ldquo;{customization.philosophyQuote || "I believe it's the little details that make a gift truly special. A name, a memory, a personal touch — something that shows how much you know and care about someone. That's what inspires me to create pieces that are as unique as the people they're made for."}&rdquo;
             </p>
-            <span className="text-[10px] text-brand-primary font-semibold block">- {customization.philosophyAuthor || "Tannia, Founder & Creative Director"}</span>
+            <span className="text-[10px] text-brand-primary font-semibold block">&mdash; {(customization.philosophyAuthor || "Nicole, Founder & Crafter").replace(/^[—–-]\s*/, "")}</span>
           </div>
         </div>
       </footer>
