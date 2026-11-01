@@ -7,6 +7,8 @@ import {
   INITIAL_ANNOUNCEMENTS,
   INITIAL_CUSTOMIZATION
 } from "./initialData";
+import { db } from "./lib/firebase";
+import { collection, doc, getDoc, getDocs, setDoc, query, orderBy } from "firebase/firestore";
 
 export interface CloudStoreSnapshot {
   updatedAt: string;
@@ -198,13 +200,23 @@ let quotesCache: QuoteRequest[] | null = null;
 let lastQuotesTimestamp = 0;
 
 /**
- * Fetches quotes from meta/cms-quotes.
+ * Fetches quotes from Firestore `/quoteRequests` and meta/cms-quotes.
  * Exclusively used by Admin Dashboard so regular users never download quotes.
  */
 export async function fetchCloudQuotes(force = false): Promise<QuoteRequest[]> {
   const now = Date.now();
   if (!force && quotesCache && now - lastQuotesTimestamp < CACHE_TTL_MS) {
     return quotesCache;
+  }
+
+  let firestoreQuotes: QuoteRequest[] = [];
+  try {
+    const qCol = collection(db, "quoteRequests");
+    const q = query(qCol, orderBy("createdAt", "desc"));
+    const snap = await getDocs(q);
+    firestoreQuotes = snap.docs.map((d) => ({ ...(d.data() as QuoteRequest), id: d.id }));
+  } catch {
+    // Fallback if Firestore rules or indexes are not yet active
   }
 
   try {
@@ -220,6 +232,11 @@ export async function fetchCloudQuotes(force = false): Promise<QuoteRequest[]> {
 
     if (!refRes.ok) {
       clearTimeout(timeoutId);
+      if (firestoreQuotes.length > 0) {
+        quotesCache = firestoreQuotes;
+        lastQuotesTimestamp = Date.now();
+        return firestoreQuotes;
+      }
       return quotesCache || [];
     }
 
@@ -227,7 +244,7 @@ export async function fetchCloudQuotes(force = false): Promise<QuoteRequest[]> {
     const blobSha: string | undefined = refData?.object?.sha;
     if (!blobSha) {
       clearTimeout(timeoutId);
-      return quotesCache || [];
+      return firestoreQuotes.length > 0 ? firestoreQuotes : (quotesCache || []);
     }
 
     const blobRes = await fetch(`${REPO_API_BASE}/blobs/${blobSha}`, {
@@ -239,19 +256,22 @@ export async function fetchCloudQuotes(force = false): Promise<QuoteRequest[]> {
 
     clearTimeout(timeoutId);
 
-    if (!blobRes.ok) return quotesCache || [];
+    if (!blobRes.ok) return firestoreQuotes.length > 0 ? firestoreQuotes : (quotesCache || []);
 
     const text = await blobRes.text();
     const parsed = JSON.parse(text);
     if (parsed && Array.isArray(parsed.quotes)) {
-      quotesCache = parsed.quotes;
+      const merged = Array.from(
+        new Map([...firestoreQuotes, ...parsed.quotes].map((item: QuoteRequest) => [item.id, item])).values()
+      );
+      quotesCache = merged;
       lastQuotesTimestamp = Date.now();
-      return parsed.quotes;
+      return merged;
     }
-    return quotesCache || [];
+    return firestoreQuotes.length > 0 ? firestoreQuotes : (quotesCache || []);
   } catch (err) {
     console.warn("Cloud quotes fetch warning:", err);
-    return quotesCache || [];
+    return firestoreQuotes.length > 0 ? firestoreQuotes : (quotesCache || []);
   }
 }
 
@@ -277,7 +297,7 @@ export function pushCloudStore(partial: Partial<CloudStoreSnapshot>): Promise<bo
           }
         }
 
-        // 1. If quotes are being updated, push them to meta/cms-quotes
+        // 1. If quotes are being updated, push them to Firestore `/quoteRequests` and meta/cms-quotes
         if (Array.isArray(partial.quotes)) {
           const quotesPayload = {
             updatedAt: nowIso,
@@ -286,6 +306,24 @@ export function pushCloudStore(partial: Partial<CloudStoreSnapshot>): Promise<bo
           };
           quotesCache = partial.quotes;
           lastQuotesTimestamp = Date.now();
+
+          // Sync latest quote items to Firestore `/quoteRequests/{id}`
+          try {
+            const latestQuotes = partial.quotes.slice(0, 15);
+            await Promise.all(
+              latestQuotes.map((qItem) =>
+                qItem.id
+                  ? setDoc(
+                      doc(db, "quoteRequests", qItem.id),
+                      { ...qItem, customerEmail: (qItem.customerEmail || "").toLowerCase() },
+                      { merge: true }
+                    ).catch(() => {})
+                  : Promise.resolve()
+              )
+            );
+          } catch {
+            // Non-blocking Firestore sync
+          }
 
           try {
             const quotesBlobRes = await fetch(`${REPO_API_BASE}/blobs`, {

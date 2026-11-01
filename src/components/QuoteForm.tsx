@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { MessageSquare, Calendar, PenTool, Hash, Send, Sparkles, Upload, Trash2, Paperclip, CheckCircle, Mail, Phone } from "lucide-react";
 import { Product, QuoteRequest } from "../types";
 import { validateEmailAddress, validatePhoneNumber, formatPhoneInput } from "../emailService";
-import { getStoredCustomerSession } from "../supabaseClient";
+import { getStoredCustomerSession } from "../lib/firebase";
 
 interface QuoteFormProps {
   products: Product[];

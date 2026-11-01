@@ -39,7 +39,13 @@ import { HeroSlideshow } from "./components/HeroSlideshow";
 import { NicolettaLogo } from "./components/NicolettaLogo";
 import ProductDetails from "./components/ProductDetails";
 import CustomerAuthPortal from "./components/CustomerAuthPortal";
-import { CustomerProfile, getStoredCustomerSession } from "./supabaseClient";
+import {
+  CustomerProfile,
+  getStoredCustomerSession,
+  subscribeToAuthChanges,
+  trackFirebaseEvent,
+  saveQuoteRequestToFirestore
+} from "./lib/firebase";
 import { safeSetLocalStorage, safeParseLocal, persistKeyVal, idbGet } from "./storage";
 import { fetchCloudStore, fetchCloudQuotes, pushCloudStore, scoreCustomizationRichness } from "./cloudStore";
 import {
@@ -233,6 +239,22 @@ export default function App() {
   const [isAdminMode, setIsAdminMode] = useState(initialRoute.admin);
   const [activePage, setActivePage] = useState<"home" | "catalog" | "product-detail" | "quote-request" | "testimonials" | "contact" | "account">(initialRoute.page);
   const [customer, setCustomer] = useState<CustomerProfile | null>(() => getStoredCustomerSession());
+
+  // Subscribe to Firebase Auth state changes
+  useEffect(() => {
+    const unsubscribe = subscribeToAuthChanges((firebaseCustomer) => {
+      setCustomer(firebaseCustomer);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Track page_view in Firebase Analytics when activePage changes
+  useEffect(() => {
+    trackFirebaseEvent("page_view", {
+      page_title: isAdminMode ? "admin" : activePage,
+      page_location: typeof window !== "undefined" ? window.location.href : ""
+    });
+  }, [activePage, isAdminMode]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(initialRoute.categoryId);
   const [searchQuery, setSearchQuery] = useState("");
@@ -1391,6 +1413,7 @@ export default function App() {
   useEffect(() => {
     if (!searchQuery.trim()) return;
     const timer = setTimeout(() => {
+      trackFirebaseEvent("search", { search_term: searchQuery });
       fetch("/api/analytics/event", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1405,6 +1428,7 @@ export default function App() {
     if (selectedCategoryId && selectedCategoryId !== "all" && categories.length > 0) {
       const cat = categories.find(c => c.id === selectedCategoryId);
       if (cat) {
+        trackFirebaseEvent("select_content", { content_type: "category", item_id: cat.id, item_name: cat.name });
         fetch("/api/analytics/event", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1423,6 +1447,11 @@ export default function App() {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
+    trackFirebaseEvent("generate_lead", {
+      product_id: payload.productId || "custom",
+      product_name: payload.productName || "Custom Quote",
+      quantity: payload.quantity || 1
+    });
     try {
       const response = await fetch("/api/quotes", {
         method: "POST",
@@ -1435,6 +1464,7 @@ export default function App() {
         setQuotes(nextQuotes);
         persistKeyVal("nicoletta_quotes", nextQuotes);
         pushCloudStore({ quotes: nextQuotes }).catch(() => {});
+        saveQuoteRequestToFirestore(savedQuote).catch(() => {});
         sendQuoteNotificationToAdmin(savedQuote, customization.emailSettings).catch(() => {});
         sendQuoteConfirmationToClient(savedQuote, customization.emailSettings).catch(() => {});
         // Instant update without blocking on fetchAllData
@@ -1443,6 +1473,7 @@ export default function App() {
         setQuotes(nextQuotes);
         persistKeyVal("nicoletta_quotes", nextQuotes);
         pushCloudStore({ quotes: nextQuotes }).catch(() => {});
+        saveQuoteRequestToFirestore(fallbackQuote).catch(() => {});
         sendQuoteNotificationToAdmin(fallbackQuote, customization.emailSettings).catch(() => {});
         sendQuoteConfirmationToClient(fallbackQuote, customization.emailSettings).catch(() => {});
       }
@@ -1451,6 +1482,7 @@ export default function App() {
       setQuotes(nextQuotes);
       persistKeyVal("nicoletta_quotes", nextQuotes);
       pushCloudStore({ quotes: nextQuotes }).catch(() => {});
+      saveQuoteRequestToFirestore(fallbackQuote).catch(() => {});
       sendQuoteNotificationToAdmin(fallbackQuote, customization.emailSettings).catch(() => {});
       sendQuoteConfirmationToClient(fallbackQuote, customization.emailSettings).catch(() => {});
     }
@@ -1502,6 +1534,12 @@ export default function App() {
     setSelectedProductDetail(product);
     setActivePage("product-detail");
     window.scrollTo({ top: 0, behavior: "smooth" });
+
+    trackFirebaseEvent("view_item", {
+      item_id: product.id,
+      item_name: product.name,
+      price: product.promoPrice ?? product.price
+    });
 
     // Track product view & potential promo view events
     fetch("/api/analytics/event", {
@@ -3242,7 +3280,7 @@ export default function App() {
               </div>
             )}
 
-            {/* ================= PAGE 6: CUSTOMER ACCOUNT (SUPABASE SIGN UP / LOG IN) ================= */}
+            {/* ================= PAGE 6: CUSTOMER ACCOUNT (FIREBASE SIGN UP / LOG IN) ================= */}
             {activePage === "account" && (
               <CustomerAuthPortal
                 customer={customer}

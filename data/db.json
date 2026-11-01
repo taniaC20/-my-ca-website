@@ -2024,5 +2024,16 @@
       "createdAt": "2026-10-22T22:07:56.693Z",
       "updatedAt": "2026-10-22T22:07:56.693Z"
     }
-  ]
+  ],
+  "analytics": {
+    "totalViews": 0,
+    "productViews": {},
+    "searches": {},
+    "promoViews": {},
+    "announcementClicks": {}
+  },
+  "adminCredentials": {
+    "salt": "e6ebaa64254a7b8713e0c7c9b526f394",
+    "hash": "8308b59bdd73f2666e4eaf8ec47d93cc7b3870e3221612324d543b2c96a9ddee3291be39da897901d26651f9474846051684926ef7710a74cd3240b75e401502"
+  }
 }

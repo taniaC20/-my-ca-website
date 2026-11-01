@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   User,
   Mail,
@@ -17,8 +17,9 @@ import {
   registerCustomer,
   loginCustomer,
   logoutCustomer,
-  SUPABASE_PROJECT_URL
-} from "../supabaseClient";
+  fetchCustomerQuotesFromFirestore,
+  FIREBASE_PROJECT_ID
+} from "../lib/firebase";
 import { QuoteRequest } from "../types";
 
 interface CustomerAuthPortalProps {
@@ -75,7 +76,7 @@ export default function CustomerAuthPortal({
         return;
       }
 
-      setStatusBanner(res.message || "Account registered with Supabase!");
+      setStatusBanner(res.message || "Account registered with Firebase!");
       onCustomerChange(res.customer);
       setPassword("");
       setConfirmPassword("");
@@ -106,12 +107,39 @@ export default function CustomerAuthPortal({
     setStatusBanner("You have been signed out of your account.");
   };
 
-  // Filter any quotes submitted by this customer's email
+  const [firestoreCustomerQuotes, setFirestoreCustomerQuotes] = useState<QuoteRequest[]>([]);
+
+  useEffect(() => {
+    if (!customer?.email) {
+      setFirestoreCustomerQuotes([]);
+      return;
+    }
+    let active = true;
+    fetchCustomerQuotesFromFirestore(customer.email)
+      .then((res) => {
+        if (active && Array.isArray(res)) {
+          setFirestoreCustomerQuotes(res as QuoteRequest[]);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [customer?.email]);
+
+  // Filter any quotes submitted by this customer's email (merged with Firestore /quoteRequests)
   const customerQuotes = customer
-    ? quotes.filter(
-        (q) =>
-          q.customerEmail &&
-          q.customerEmail.toLowerCase() === customer.email.toLowerCase()
+    ? Array.from(
+        new Map(
+          [
+            ...firestoreCustomerQuotes,
+            ...quotes.filter(
+              (q) =>
+                q.customerEmail &&
+                q.customerEmail.toLowerCase() === customer.email.toLowerCase()
+            )
+          ].map((q) => [q.id, q])
+        ).values()
       )
     : [];
 
@@ -123,7 +151,7 @@ export default function CustomerAuthPortal({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-brand-border">
             <div className="space-y-1.5">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold uppercase tracking-widest">
-                <CheckCircle className="h-3.5 w-3.5" /> Supabase Customer Session Active
+                <CheckCircle className="h-3.5 w-3.5" /> Firebase Customer Session Active
               </div>
               <h2 className="font-serif font-bold text-2xl sm:text-3xl text-brand-dark">
                 Welcome, {customer.fullName}
@@ -192,8 +220,8 @@ export default function CustomerAuthPortal({
                 )}
 
                 <div className="pt-2 border-t border-brand-border/60 flex items-center justify-between text-[10px] text-brand-muted font-mono">
-                  <span>Supabase ID: {customer.uid.slice(0, 18)}...</span>
-                  <span>Connected: {new URL(SUPABASE_PROJECT_URL).hostname.split(".")[0]}</span>
+                  <span>Firebase UID: {customer.uid.slice(0, 18)}...</span>
+                  <span>Project: {FIREBASE_PROJECT_ID}</span>
                 </div>
               </div>
             </div>
@@ -293,7 +321,7 @@ export default function CustomerAuthPortal({
             <p className="text-brand-muted text-xs font-light mt-1">
               {authMode === "login"
                 ? "Sign in to access your saved details and bespoke quote requests."
-                : "Create a patron account powered by Supabase to streamline custom orders."}
+                : "Create a patron account powered by Firebase to streamline custom orders."}
             </p>
           </div>
         </div>
@@ -474,7 +502,7 @@ export default function CustomerAuthPortal({
           >
             {loading
               ? authMode === "signup"
-                ? "Registering with Supabase..."
+                ? "Registering with Firebase..."
                 : "Signing In..."
               : authMode === "signup"
               ? "Create Customer Account"
@@ -508,7 +536,7 @@ export default function CustomerAuthPortal({
             </p>
           )}
           <p className="text-[10px] text-brand-muted/70 font-mono">
-            Secured by Supabase Auth &bull; CDN v2
+            Secured by Firebase Auth &bull; Firestore
           </p>
         </div>
       </div>
