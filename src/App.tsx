@@ -267,7 +267,6 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(initialRoute.categoryId);
   const [searchQuery, setSearchQuery] = useState("");
-  const [featuredFirst, setFeaturedFirst] = useState<boolean>(false);
   const [selectedProductForQuote, setSelectedProductForQuote] = useState<Product | null>(null);
   const [selectedProductDetail, setSelectedProductDetail] = useState<Product | null>(() => {
     if (initialRoute.productId) {
@@ -1629,10 +1628,7 @@ export default function App() {
 
       return matchCategory && (matchNameOrDesc || matchGiftOccasion);
     })
-    .sort((a, b) => {
-      if (!featuredFirst) return 0;
-      return (b.featured ? 1 : 0) - (a.featured ? 1 : 0);
-    });
+    .sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0));
 
   return (
     <div className="min-h-screen bg-brand-bg flex flex-col font-sans selection:bg-brand-primary selection:text-white relative">
@@ -2368,34 +2364,18 @@ export default function App() {
                     );
                   })()}
 
-                  {/* Search Bar & Featured First Sort Option */}
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
-                    <button
-                      type="button"
-                      id="catalog-featured-first-btn"
-                      onClick={() => setFeaturedFirst((prev) => !prev)}
-                      className={`px-4 py-2 text-[10px] font-bold rounded-full transition-all cursor-pointer uppercase tracking-wider border inline-flex items-center justify-center gap-1.5 shrink-0 ${
-                        featuredFirst
-                          ? "bg-brand-primary text-white border-brand-primary shadow-xs"
-                          : "bg-white hover:bg-brand-highlight text-brand-dark border-brand-border shadow-2xs"
-                      }`}
-                    >
-                      <Star className={`h-3.5 w-3.5 ${featuredFirst ? "fill-white text-white" : "text-brand-primary"}`} />
-                      {featuredFirst ? "Featured First: On" : "Featured Items First"}
-                    </button>
-
-                    <div className="relative w-full md:w-64">
-                      <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-brand-muted">
-                        <Search className="h-4 w-4" />
-                      </span>
-                      <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search wood, leather..."
-                        className="w-full bg-white border border-brand-border rounded-full py-2 pl-10 pr-4 text-xs text-brand-text focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary shadow-2xs"
-                      />
-                    </div>
+                  {/* Search Bar */}
+                  <div className="relative w-full md:w-64">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-brand-muted">
+                      <Search className="h-4 w-4" />
+                    </span>
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search wood, leather..."
+                      className="w-full bg-white border border-brand-border rounded-full py-2 pl-10 pr-4 text-xs text-brand-text focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary shadow-2xs"
+                    />
                   </div>
                 </div>
 
