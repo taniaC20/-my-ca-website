@@ -174,20 +174,26 @@ export const NicolettaLogo: React.FC<NicolettaLogoProps> = ({
     <div className={`flex items-center gap-3 ${className}`} id="nicoletta-logo-wrapper">
       {/* Brand Logo Mark (Transparent Background, No Circle Border) */}
       {logoImageUrl && !imgError ? (
-        <img
-          id="nicoletta-logo-image"
-          src={effectiveImgSrc}
-          alt={logoText || "Custom Logo"}
-          onError={() => setImgError(true)}
-          style={{
-            width: size || 56,
-            height: size || 56,
-            backgroundColor: "transparent",
-            filter: !processedUrls && colorTheme === "dark" ? "brightness(0) invert(1)" : undefined
-          }}
-          className="shrink-0 object-contain bg-transparent border-0 rounded-none shadow-none transition-transform duration-300 group-hover:scale-105"
-          referrerPolicy="no-referrer"
-        />
+        processedUrls ? (
+          <img
+            id="nicoletta-logo-image"
+            src={colorTheme === "dark" ? processedUrls.dark : processedUrls.light}
+            alt={logoText || "Custom Logo"}
+            onError={() => setImgError(true)}
+            style={{
+              width: size || 56,
+              height: size || 56,
+              backgroundColor: "transparent"
+            }}
+            className="shrink-0 object-contain bg-transparent border-0 rounded-none shadow-none transition-transform duration-300 group-hover:scale-105"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <div
+            style={{ width: size || 56, height: size || 56 }}
+            className="shrink-0"
+          />
+        )
       ) : (
         <svg
           id="nicoletta-logo-badge"
