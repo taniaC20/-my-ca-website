@@ -8,7 +8,7 @@ import {
   INITIAL_CUSTOMIZATION
 } from "./initialData";
 import { db } from "./lib/firebase";
-import { collection, doc, getDoc, getDocs, setDoc, query, orderBy } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, orderBy } from "firebase/firestore";
 
 export interface CloudStoreSnapshot {
   updatedAt: string;
@@ -126,6 +126,36 @@ export async function fetchCloudStore(bypassCacheTtl = false, hardBypass = false
     if (!cachedSnapshot) {
       cachedSnapshot = BUNDLED_SNAPSHOT;
     }
+  }
+
+  // Check Firestore /settings/cms_snapshot_meta first for any newer snapshot
+  try {
+    const metaSnap = await getDoc(doc(db, "settings", "cms_snapshot_meta"));
+    if (metaSnap.exists()) {
+      const meta = metaSnap.data();
+      const fsUpdatedAtMs = Number(meta?.updatedAtMs || 0);
+      const totalChunks = Number(meta?.totalChunks || 0);
+      if (totalChunks > 0 && fsUpdatedAtMs > (cachedSnapshot?.updatedAtMs || 0)) {
+        const chunkPromises = [];
+        for (let i = 0; i < totalChunks; i++) {
+          chunkPromises.push(getDoc(doc(db, "settings", `cms_chunk_${i}`)));
+        }
+        const chunkSnaps = await Promise.all(chunkPromises);
+        if (chunkSnaps.every((s) => s.exists())) {
+          const joined = chunkSnaps.map((s) => s.data()?.data || "").join("");
+          const fsParsed = JSON.parse(joined) as CloudStoreSnapshot;
+          if (fsParsed && Array.isArray(fsParsed.products)) {
+            cachedSnapshot = fsParsed;
+            lastFetchTimestamp = Date.now();
+            persistKeyVal("nicoletta_cached_cloud_store", fsParsed);
+            notifyListeners("synced", fsParsed.updatedAt || lastSyncedAt);
+            return fsParsed;
+          }
+        }
+      }
+    }
+  } catch {
+    // Fall through to secondary cloud ref check
   }
 
   try {
@@ -388,6 +418,55 @@ export function pushCloudStore(partial: Partial<CloudStoreSnapshot>): Promise<bo
         cachedSnapshot = storeMerged;
         lastFetchTimestamp = Date.now();
         persistKeyVal("nicoletta_cached_cloud_store", storeMerged);
+
+        // Sync updated collections directly to Firestore (chunk-safe < 900KB per doc)
+        (async () => {
+          try {
+            if (Array.isArray(partial.products)) {
+              for (const p of partial.products) {
+                if (p?.id && JSON.stringify(p).length < 900000) {
+                  await setDoc(doc(db, "products", String(p.id)), p, { merge: true }).catch(() => {});
+                }
+              }
+            }
+            if (Array.isArray(partial.categories)) {
+              for (const c of partial.categories) {
+                if (c?.id && JSON.stringify(c).length < 900000) {
+                  await setDoc(doc(db, "categories", String(c.id)), c, { merge: true }).catch(() => {});
+                }
+              }
+            }
+            if (Array.isArray(partial.testimonials)) {
+              for (const t of partial.testimonials) {
+                if (t?.id && JSON.stringify(t).length < 900000) {
+                  await setDoc(doc(db, "testimonials", String(t.id)), t, { merge: true }).catch(() => {});
+                }
+              }
+            }
+            if (Array.isArray(partial.announcements)) {
+              for (const a of partial.announcements) {
+                if (a?.id && JSON.stringify(a).length < 900000) {
+                  await setDoc(doc(db, "announcements", String(a.id)), a, { merge: true }).catch(() => {});
+                }
+              }
+            }
+            // Also store chunked full snapshot in /settings for Firestore backup regardless of image size
+            const serialized = JSON.stringify(storeMerged);
+            const chunkSize = 700000; // 700KB per chunk (well below 1MB Firestore limit)
+            const totalChunks = Math.ceil(serialized.length / chunkSize);
+            for (let i = 0; i < totalChunks; i++) {
+              const slice = serialized.slice(i * chunkSize, (i + 1) * chunkSize);
+              await setDoc(doc(db, "settings", `cms_chunk_${i}`), { index: i, data: slice, updatedAtMs: nowMs }).catch(() => {});
+            }
+            await setDoc(
+              doc(db, "settings", "cms_snapshot_meta"),
+              { updatedAt: nowIso, updatedAtMs: nowMs, totalChunks },
+              { merge: true }
+            ).catch(() => {});
+          } catch {
+            // Non-blocking background Firestore sync
+          }
+        })();
 
         // Create UTF-8 Git Blob for cms-store
         const blobRes = await fetch(`${REPO_API_BASE}/blobs`, {
