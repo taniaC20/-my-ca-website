@@ -44,7 +44,8 @@ import {
   getStoredCustomerSession,
   subscribeToAuthChanges,
   trackFirebaseEvent,
-  saveQuoteRequestToFirestore
+  saveQuoteRequestToFirestore,
+  deleteQuoteFromFirestore
 } from "./lib/firebase";
 import { safeSetLocalStorage, safeParseLocal, persistKeyVal, idbGet } from "./storage";
 import { fetchCloudStore, fetchCloudQuotes, pushCloudStore, scoreCustomizationRichness } from "./cloudStore";
@@ -1322,11 +1323,36 @@ export default function App() {
 
   const updateQuotesState = async (newQuotes: QuoteRequest[]) => {
     const safeQuotes = Array.isArray(newQuotes) ? newQuotes : [];
+    const removedQuotes = quotes.filter((q) => !safeQuotes.some((sq) => sq.id === q.id));
     setQuotes(safeQuotes);
     persistKeyVal("nicoletta_quotes", safeQuotes);
     pushCloudStore({ quotes: safeQuotes }).catch(() => {});
     try {
       let synced = false;
+      if (removedQuotes.length > 0) {
+        await Promise.all(
+          removedQuotes.map((rq) => deleteQuoteFromFirestore(rq.id).catch(() => false))
+        );
+        if (removedQuotes.length === 1) {
+          const res = await safeFetchJson(`/api/admin/quotes/${removedQuotes[0].id}`, {
+            method: "DELETE",
+            headers: { "Authorization": `Bearer ${token}` }
+          });
+          synced = res.ok;
+        } else {
+          const res = await safeFetchJson("/api/admin/quotes", {
+            method: "DELETE",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({ ids: removedQuotes.map((rq) => rq.id) })
+          });
+          synced = res.ok;
+        }
+        return;
+      }
+
       const changed = safeQuotes.find(nq => {
         const old = quotes.find(q => q.id === nq.id);
         return old && JSON.stringify(old) !== JSON.stringify(nq);

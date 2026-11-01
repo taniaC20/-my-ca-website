@@ -1314,6 +1314,25 @@ app.put("/api/admin/quotes/:id/details", requireAdmin, (req, res) => {
   res.json(quote);
 });
 
+app.delete("/api/admin/quotes/:id", requireAdmin, (req, res) => {
+  const { id } = req.params;
+  dbState.quotes = dbState.quotes.filter((q) => q.id !== id);
+  saveDatabase();
+  res.json({ success: true, deletedId: id });
+});
+
+app.delete("/api/admin/quotes", requireAdmin, (req, res) => {
+  const { ids } = req.body || {};
+  if (Array.isArray(ids) && ids.length > 0) {
+    const removeSet = new Set(ids);
+    dbState.quotes = dbState.quotes.filter((q) => !removeSet.has(q.id));
+  } else {
+    dbState.quotes = [];
+  }
+  saveDatabase();
+  res.json({ success: true, remaining: dbState.quotes.length });
+});
+
 app.post("/api/admin/customization", requireAdmin, (req, res) => {
   const { logoText, logoSubtext, logoImageUrl, logoShowText, sections, logoSize, logoHideBorder, philosophyQuote, philosophyAuthor, giftOccasionFilters } = req.body;
   

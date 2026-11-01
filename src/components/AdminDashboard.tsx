@@ -1904,6 +1904,38 @@ export default function AdminDashboard({
   const quoteRequestsList = quotes.filter(isQuoteReq);
   const contactMessagesList = quotes.filter(isContactMsg);
 
+  const handleDeleteQuoteItem = (quoteId: string, label = "this entry") => {
+    if (!window.confirm(`Are you sure you want to permanently delete ${label}?`)) {
+      return;
+    }
+    if (selectedQuoteId === quoteId) {
+      setSelectedQuoteId(null);
+    }
+    const updated = quotes.filter((q) => q.id !== quoteId);
+    onUpdateQuotes(updated);
+    try {
+      localStorage.setItem("nicoletta_quotes", JSON.stringify(updated));
+    } catch {}
+  };
+
+  const handleClearAllEntries = (mode: "quotes" | "messages") => {
+    const count = mode === "quotes" ? quoteRequestsList.length : contactMessagesList.length;
+    if (count === 0) return;
+    const label = mode === "quotes" ? "quote requests" : "contact messages";
+    if (!window.confirm(`Are you sure you want to permanently delete all ${count} ${label}?`)) {
+      return;
+    }
+    setSelectedQuoteId(null);
+    const updated =
+      mode === "quotes"
+        ? quotes.filter((q) => isContactMsg(q))
+        : quotes.filter((q) => isQuoteReq(q));
+    onUpdateQuotes(updated);
+    try {
+      localStorage.setItem("nicoletta_quotes", JSON.stringify(updated));
+    } catch {}
+  };
+
   const pendingQuotes = quoteRequestsList.filter((q) => q.status === "pending").length;
   const pendingMessages = contactMessagesList.filter((q) => q.status === "pending").length;
   const totalApprovedTestimonials = testimonials.filter((t) => t.approved).length;
@@ -2054,14 +2086,27 @@ export default function AdminDashboard({
         {/* ==================== TABS 1: QUOTE REQUESTS ==================== */}
         {activeTab === "quotes" && (
           <div id="admin-tab-quotes-panel" className="space-y-6">
-            <div className="flex justify-between items-center pb-4 border-b border-stone-200">
+            <div className="flex flex-wrap justify-between items-center gap-3 pb-4 border-b border-stone-200">
               <div>
                 <h3 className="font-serif font-bold text-stone-900 text-xl md:text-2xl">Bespoke Engraving Quote Requests</h3>
                 <p className="text-stone-500 text-xs">Review incoming catalog requests or custom ideas, calculate base estimates, and log comments.</p>
               </div>
-              <span className="bg-amber-50 text-amber-900 text-xs font-bold px-3 py-1.5 border border-amber-200 rounded-sm">
-                Total Requests: {quoteRequestsList.length}
-              </span>
+              <div className="flex items-center gap-2">
+                {quoteRequestsList.length > 0 && (
+                  <button
+                    type="button"
+                    id="clear-all-quotes-btn"
+                    onClick={() => handleClearAllEntries("quotes")}
+                    className="bg-red-50 hover:bg-red-600 text-red-700 hover:text-white text-xs font-bold px-3 py-1.5 border border-red-200 hover:border-red-600 rounded-sm cursor-pointer transition-colors flex items-center gap-1.5"
+                    title="Delete all quote requests"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Clear All Quotes
+                  </button>
+                )}
+                <span className="bg-amber-50 text-amber-900 text-xs font-bold px-3 py-1.5 border border-amber-200 rounded-sm">
+                  Total Requests: {quoteRequestsList.length}
+                </span>
+              </div>
             </div>
 
             {/* Horizontal Status Filters */}
@@ -2176,6 +2221,16 @@ export default function AdminDashboard({
                             }`}
                           >
                             {selectedQuoteId === q.id ? "Close Manager" : "Manage / Price"}
+                          </button>
+
+                          <button
+                            type="button"
+                            id={`delete-quote-btn-${q.id}`}
+                            onClick={() => handleDeleteQuoteItem(q.id, `quote from ${q.customerName}`)}
+                            className="bg-red-50 hover:bg-red-600 text-red-700 hover:text-white border border-red-200 hover:border-red-600 text-[11px] font-bold py-1 px-2.5 rounded-sm cursor-pointer transition-colors flex items-center gap-1"
+                            title="Delete Quote Request"
+                          >
+                            <Trash2 className="h-3 w-3" /> Delete
                           </button>
                         </div>
                       </div>
@@ -2579,6 +2634,13 @@ export default function AdminDashboard({
                             <div className="flex gap-2">
                               <button
                                 type="button"
+                                onClick={() => handleDeleteQuoteItem(q.id, `quote from ${q.customerName}`)}
+                                className="bg-red-50 hover:bg-red-600 text-red-700 hover:text-white border border-red-200 text-xs font-bold py-1.5 px-3.5 rounded-md cursor-pointer transition-colors flex items-center gap-1.5"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" /> Delete
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => setSelectedQuoteId(null)}
                                 className="bg-stone-200 hover:bg-stone-300 text-stone-800 text-xs font-bold py-1.5 px-3.5 rounded-md cursor-pointer transition-colors"
                               >
@@ -2607,14 +2669,27 @@ export default function AdminDashboard({
         {/* ==================== TABS 2: CONTACT MESSAGES ==================== */}
         {activeTab === "messages" && (
           <div id="admin-tab-messages-panel" className="space-y-6">
-            <div className="flex justify-between items-center pb-4 border-b border-stone-200">
+            <div className="flex flex-wrap justify-between items-center gap-3 pb-4 border-b border-stone-200">
               <div>
                 <h3 className="font-serif font-bold text-stone-900 text-xl md:text-2xl">Contact Us Messages</h3>
                 <p className="text-stone-500 text-xs">Direct client inquiries, questions, custom design proposals, and message submissions.</p>
               </div>
-              <span className="bg-amber-50 text-amber-900 text-xs font-bold px-3 py-1.5 border border-amber-200 rounded-sm">
-                Total Messages: {contactMessagesList.length}
-              </span>
+              <div className="flex items-center gap-2">
+                {contactMessagesList.length > 0 && (
+                  <button
+                    type="button"
+                    id="clear-all-messages-btn"
+                    onClick={() => handleClearAllEntries("messages")}
+                    className="bg-red-50 hover:bg-red-600 text-red-700 hover:text-white text-xs font-bold px-3 py-1.5 border border-red-200 hover:border-red-600 rounded-sm cursor-pointer transition-colors flex items-center gap-1.5"
+                    title="Delete all contact messages"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Clear All Messages
+                  </button>
+                )}
+                <span className="bg-amber-50 text-amber-900 text-xs font-bold px-3 py-1.5 border border-amber-200 rounded-sm">
+                  Total Messages: {contactMessagesList.length}
+                </span>
+              </div>
             </div>
 
             {/* Horizontal Status Filters */}
@@ -2729,6 +2804,16 @@ export default function AdminDashboard({
                             }`}
                           >
                             {selectedQuoteId === q.id ? "Close Manager" : "Manage / Note"}
+                          </button>
+
+                          <button
+                            type="button"
+                            id={`delete-message-btn-${q.id}`}
+                            onClick={() => handleDeleteQuoteItem(q.id, `message from ${q.customerName}`)}
+                            className="bg-red-50 hover:bg-red-600 text-red-700 hover:text-white border border-red-200 hover:border-red-600 text-[11px] font-bold py-1 px-2.5 rounded-sm cursor-pointer transition-colors flex items-center gap-1"
+                            title="Delete Message"
+                          >
+                            <Trash2 className="h-3 w-3" /> Delete
                           </button>
                         </div>
                       </div>
@@ -3113,6 +3198,13 @@ export default function AdminDashboard({
                             )}
 
                             <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteQuoteItem(q.id, `message from ${q.customerName}`)}
+                                className="bg-red-50 hover:bg-red-600 text-red-700 hover:text-white border border-red-200 text-xs font-bold py-1.5 px-3.5 rounded-md cursor-pointer transition-colors flex items-center gap-1.5"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" /> Delete
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => setSelectedQuoteId(null)}
