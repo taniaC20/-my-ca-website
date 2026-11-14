@@ -5,6 +5,7 @@ import crypto from "crypto";
 import dotenv from "dotenv";
 import nodemailer from "nodemailer";
 import { createServer as createViteServer } from "vite";
+import scanReceiptHandler from "./api/scan-receipt";
 
 
 dotenv.config();
@@ -900,6 +901,10 @@ app.post("/api/send-email", async (req, res) => {
       details: error.code || "SMTP_ERROR"
     });
   }
+});
+
+app.post("/api/scan-receipt", async (req, res) => {
+  await scanReceiptHandler(req, res);
 });
 
 app.post("/api/testimonials", (req, res) => {

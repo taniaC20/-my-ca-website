@@ -52,6 +52,8 @@ import { NicolettaLogo } from "./NicolettaLogo";
 import { safeSetLocalStorage, persistKeyVal } from "../storage";
 import { pushCloudStore, subscribeCloudSync, CloudSyncState } from "../cloudStore";
 import { dispatchClientProposal, openGmailCompose, DEFAULT_ADMIN_EMAIL } from "../emailService";
+import { BusinessTracker } from "./BusinessTracker";
+import { syncCompletedWebsiteOrder } from "../businessStore";
 
 interface AdminDashboardProps {
   products: Product[];
@@ -71,7 +73,7 @@ interface AdminDashboardProps {
   onSyncQuotes?: (quotes: QuoteRequest[]) => void;
 }
 
-type AdminTab = "analytics" | "products" | "categories" | "testimonials" | "quotes" | "messages" | "announcements" | "site-customizer" | "security";
+type AdminTab = "analytics" | "business-tracker" | "products" | "categories" | "testimonials" | "quotes" | "messages" | "announcements" | "site-customizer" | "security";
 
 async function compressImageToDataUrl(
   file: File,
@@ -1804,6 +1806,13 @@ export default function AdminDashboard({
     );
     onUpdateQuotes(updated);
 
+    if (status === "completed") {
+      const targetQuote = updated.find((q) => q.id === id);
+      if (targetQuote) {
+        syncCompletedWebsiteOrder(targetQuote, products);
+      }
+    }
+
     if (token) {
       try {
         await fetch(`/api/admin/quotes/${id}/status`, {
@@ -1881,6 +1890,13 @@ export default function AdminDashboard({
         : q
     );
     onUpdateQuotes(updated);
+
+    if (finalStatus === "completed") {
+      const targetQuote = updated.find((q) => q.id === selectedQuoteId);
+      if (targetQuote) {
+        syncCompletedWebsiteOrder(targetQuote, products);
+      }
+    }
 
     if (token) {
       try {
@@ -2028,6 +2044,23 @@ export default function AdminDashboard({
           </button>
 
           <button
+            id="tab-btn-business-tracker"
+            onClick={() => setActiveTab("business-tracker")}
+            className={`w-full text-left py-2.5 px-3.5 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center justify-between transition-colors cursor-pointer ${
+              activeTab === "business-tracker"
+                ? "bg-brand-primary text-white shadow-xs"
+                : "bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-400/25"
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <BadgeDollarSign className="h-3.5 w-3.5" /> Business &amp; Inventory
+            </span>
+            <span className="bg-amber-400 text-stone-950 text-[8px] font-extrabold px-1.5 py-0.5 rounded-full">
+              ERP
+            </span>
+          </button>
+
+          <button
             id="tab-btn-analytics"
             onClick={() => setActiveTab("analytics")}
             className={`w-full text-left py-2 px-3.5 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 transition-colors cursor-pointer ${activeTab === "analytics" ? "bg-brand-primary text-white" : "hover:bg-brand-primary/10 text-brand-muted"}`}
@@ -2094,6 +2127,15 @@ export default function AdminDashboard({
 
       {/* Main Content Pane */}
       <div className="md:col-span-9 bg-white p-6 md:p-8 rounded-r-[24px]">
+        {/* ==================== TAB: BUSINESS & INVENTORY TRACKER ==================== */}
+        {activeTab === "business-tracker" && (
+          <BusinessTracker
+            websiteProducts={products}
+            websiteQuotes={quotes}
+            onUpdateWebsiteProducts={onUpdateProducts}
+          />
+        )}
+
         {/* ==================== TABS 1: QUOTE REQUESTS ==================== */}
         {activeTab === "quotes" && (
           <div id="admin-tab-quotes-panel" className="space-y-6">
