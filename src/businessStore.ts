@@ -498,12 +498,17 @@ export function commitScannedReceiptToStore(params: {
     }
   }
 
-  // 2. Create ExpenseRecord entries
+  // 2. Create ExpenseRecord entries with exact receipt quantity (qtyBought)
   const addedExpenses: ExpenseRecord[] = [];
   if (params.logMode === "single-receipt" && params.items.length > 0) {
     const totalSum = Number(
       params.items.reduce((acc, it) => acc + (Number(it.price) || 0), 0).toFixed(2)
     );
+    const totalReceiptQty = params.items.reduce(
+      (acc, it) => acc + Math.max(1, Number(it.qtyBought) || 1),
+      0
+    );
+    const unitPricePerReceiptItem = Number((totalSum / Math.max(1, totalReceiptQty)).toFixed(2));
     const primaryCat = params.items[0]?.category || "Material";
     const summaryNames = params.items
       .map((i) => i.friendlyName || i.rawName)
@@ -515,15 +520,17 @@ export function commitScannedReceiptToStore(params: {
       category: totalSum < 0 ? "Refund" : primaryCat,
       description: `${params.vendor}${summaryNames ? ` (${summaryNames.slice(0, 60)})` : ""}`,
       paymentMethod: params.paymentMethod || current.settings.defaultPaymentMethod,
-      price: totalSum,
-      qty: 1,
+      price: unitPricePerReceiptItem,
+      qty: totalReceiptQty,
       total: totalSum,
       receiptImageUrl: params.receiptImageUrl,
       syncedToInventory: updatedInventoryCount > 0
     });
   } else {
     params.items.forEach((it, idx) => {
+      const qtyBought = Math.max(1, Number(it.qtyBought) || 1);
       const lineTotal = Number((Number(it.price) || 0).toFixed(2));
+      const unitPackPrice = Number((lineTotal / qtyBought).toFixed(2));
       const cleanName = (it.friendlyName || it.rawName || params.vendor).trim();
       addedExpenses.push({
         id: `exp_${Date.now()}_${idx}`,
@@ -534,8 +541,8 @@ export function commitScannedReceiptToStore(params: {
             ? params.vendor
             : `${params.vendor} - ${cleanName}`,
         paymentMethod: params.paymentMethod || current.settings.defaultPaymentMethod,
-        price: lineTotal,
-        qty: 1,
+        price: unitPackPrice,
+        qty: qtyBought,
         total: lineTotal,
         receiptImageUrl: params.receiptImageUrl,
         syncedToInventory: it.syncToInventory

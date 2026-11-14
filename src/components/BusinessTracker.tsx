@@ -803,13 +803,14 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
   const handleAddManualExpense = (e: React.FormEvent) => {
     e.preventDefault();
     const rawPrice = Number(manualExpForm.price);
-    const qty = Number(manualExpForm.qty) || 1;
+    const qty = Math.max(1, Number(manualExpForm.qty) || 1);
     if (!manualExpForm.description.trim() || isNaN(rawPrice)) {
       showToast("Please enter a vendor/description and valid price.");
       return;
     }
     const finalPrice =
       manualExpForm.category === "Refund" && rawPrice > 0 ? -rawPrice : rawPrice;
+    const lineTotal = Number((finalPrice * qty).toFixed(2));
 
     if (manualExpForm.syncToInventory) {
       const packQty = Math.max(1, Number(manualExpForm.packQty) || 1);
@@ -834,15 +835,15 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
             matchedInventoryId: matchedInv?.id,
             category: manualExpForm.category,
             qtyBought: qty,
-            price: finalPrice,
+            price: lineTotal,
             packQty,
-            unitPrice: finalPrice / (qty * packQty),
+            unitPrice: lineTotal / (qty * packQty),
             syncToInventory: true
           }
         ]
       });
       showToast(
-        `Expense logged & added ${qty * packQty} pieces (${qty} pack(s) × ${packQty} pcs) to Inventory!`
+        `Expense logged (Qty: ${qty}, Total: ${fmtMoney(lineTotal)}) & added ${qty * packQty} pieces to Inventory!`
       );
     } else {
       const newExp: ExpenseRecord = {
@@ -853,12 +854,12 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
         paymentMethod: manualExpForm.paymentMethod || "VISA 7992",
         price: finalPrice,
         qty,
-        total: Number((finalPrice * qty).toFixed(2))
+        total: lineTotal
       };
       saveBusinessStore({
         expenses: [newExp, ...store.expenses]
       });
-      showToast("Expense added!");
+      showToast(`Expense added (Qty: ${qty}, Total: ${fmtMoney(lineTotal)})!`);
     }
 
     setManualExpForm({
@@ -2603,7 +2604,7 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
             <h4 className="font-serif font-bold text-stone-900 text-base">
               Manual Expense / Refund Entry
             </h4>
-            <form onSubmit={handleAddManualExpense} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 text-xs">
+            <form onSubmit={handleAddManualExpense} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3 text-xs">
               <div>
                 <label className="font-bold text-stone-700 block mb-1">Date</label>
                 <input
@@ -2656,20 +2657,34 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
               </div>
               <div>
                 <label className="font-bold text-stone-700 block mb-1">
-                  Price ($) {manualExpForm.category === "Refund" && "(auto-negative)"}
+                  Price ($/item) {manualExpForm.category === "Refund" && "(refund)"}
                 </label>
                 <input
                   type="number"
                   step="0.01"
                   value={manualExpForm.price}
                   onChange={(e) => setManualExpForm({ ...manualExpForm, price: e.target.value })}
-                  placeholder="48.26"
+                  placeholder="5.00"
+                  className="w-full bg-white border border-stone-300 rounded-lg p-2 font-mono font-bold"
+                  required
+                />
+              </div>
+              <div>
+                <label className="font-bold text-stone-700 block mb-1">
+                  Qty (on Receipt)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={manualExpForm.qty}
+                  onChange={(e) => setManualExpForm({ ...manualExpForm, qty: e.target.value })}
                   className="w-full bg-white border border-stone-300 rounded-lg p-2 font-mono font-bold"
                   required
                 />
               </div>
 
-              <div className="sm:col-span-2 lg:col-span-6 flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-stone-200">
+              <div className="sm:col-span-2 lg:col-span-7 flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-stone-200">
                 <div className="flex flex-wrap items-center gap-3">
                   <label className="flex items-center gap-1.5 font-semibold text-stone-700 cursor-pointer">
                     <input
@@ -2858,8 +2873,49 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
                         </td>
                         <td className="py-2 px-3 font-bold text-stone-900">{e.description}</td>
                         <td className="py-2 px-3 font-mono text-stone-500">{e.paymentMethod}</td>
-                        <td className="py-2 px-3 text-right font-mono">{fmtMoney(e.price)}</td>
-                        <td className="py-2 px-2 text-center font-mono">{e.qty}</td>
+                        <td className="py-2 px-3 text-right font-mono">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={e.price}
+                            onChange={(ev) => {
+                              const nextPrice = Number(ev.target.value) || 0;
+                              const nextExpenses = store.expenses.map((row) =>
+                                row.id === e.id
+                                  ? {
+                                      ...row,
+                                      price: nextPrice,
+                                      total: Number((nextPrice * (row.qty || 1)).toFixed(2))
+                                    }
+                                  : row
+                              );
+                              saveBusinessStore({ expenses: nextExpenses });
+                            }}
+                            className="w-20 text-right bg-transparent hover:bg-white focus:bg-white border border-transparent hover:border-stone-300 focus:border-stone-400 rounded px-1.5 py-0.5 font-mono"
+                          />
+                        </td>
+                        <td className="py-2 px-2 text-center font-mono">
+                          <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={e.qty}
+                            onChange={(ev) => {
+                              const nextQty = Math.max(1, Number(ev.target.value) || 1);
+                              const nextExpenses = store.expenses.map((row) =>
+                                row.id === e.id
+                                  ? {
+                                      ...row,
+                                      qty: nextQty,
+                                      total: Number(((row.price || 0) * nextQty).toFixed(2))
+                                    }
+                                  : row
+                              );
+                              saveBusinessStore({ expenses: nextExpenses });
+                            }}
+                            className="w-14 text-center bg-transparent hover:bg-white focus:bg-white border border-transparent hover:border-stone-300 focus:border-stone-400 rounded px-1 py-0.5 font-mono font-bold"
+                          />
+                        </td>
                         <td
                           className={`py-2 px-3 text-right font-mono font-bold ${
                             e.total < 0 ? "text-emerald-700" : "text-stone-900"
