@@ -925,6 +925,20 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
     showToast("Created new product recipe!");
   };
 
+  const handleDeleteRecipe = (recipeId: string) => {
+    const target = store.recipes.find((r) => r.id === recipeId);
+    if (!target) return;
+    if (!window.confirm(`Delete product recipe "${target.name}"?`)) return;
+
+    const nextRecipes = store.recipes.filter((r) => r.id !== recipeId);
+    saveBusinessStore({ recipes: nextRecipes });
+
+    if (selectedRecipeId === recipeId) {
+      setSelectedRecipeId(nextRecipes[0]?.id || "");
+    }
+    showToast(`Deleted recipe "${target.name}".`);
+  };
+
   const handleSyncRecipePriceToWebsite = (rec: ProductRecipe) => {
     const targetWebProd = rec.websiteProductId
       ? websiteProducts.find((p) => p.id === rec.websiteProductId)
@@ -2938,6 +2952,19 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
       {/* ==========================================================================
           TAB 5: ITEM PRICING & RECIPE CALCULATOR
          ========================================================================== */}
+      {subTab === "item-pricing" && !activeRecipe && (
+        <div className="bg-stone-50 border border-stone-200 rounded-2xl p-8 text-center space-y-3 animate-fade-in">
+          <p className="text-sm font-bold text-stone-700">No product recipes remaining.</p>
+          <button
+            type="button"
+            onClick={handleCreateNewRecipe}
+            className="bg-brand-primary hover:bg-brand-primary-hover text-white font-bold py-2 px-4 rounded-xl text-xs inline-flex items-center gap-1.5 cursor-pointer"
+          >
+            <Plus className="h-3.5 w-3.5" /> Create Product Recipe
+          </button>
+        </div>
+      )}
+
       {subTab === "item-pricing" && activeRecipe && (
         <div className="space-y-6 animate-fade-in">
           {/* Top Bar: Select Product Recipe or Create New + Global Labor Rate */}
@@ -2961,6 +2988,14 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
                 className="bg-brand-primary hover:bg-brand-primary-hover text-white font-bold py-2 px-3.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer"
               >
                 <Plus className="h-3.5 w-3.5" /> New Recipe
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteRecipe(activeRecipe.id)}
+                className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold py-2 px-3.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                title="Delete this product recipe"
+              >
+                <Trash2 className="h-3.5 w-3.5" /> Delete Recipe
               </button>
             </div>
 
@@ -3353,7 +3388,7 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
                   <th className="py-2.5 px-3 text-right bg-emerald-50 text-emerald-950">
                     Profit per Item
                   </th>
-                  <th className="py-2.5 px-3 text-center">Calculator</th>
+                  <th className="py-2.5 px-3 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100">
@@ -3389,16 +3424,26 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
                       {fmtMoney(r.profitPerItem)}
                     </td>
                     <td className="py-2 px-3 text-center">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedRecipeId(r.id);
-                          setSubTab("item-pricing");
-                        }}
-                        className="text-brand-primary hover:underline font-bold text-[11px] cursor-pointer"
-                      >
-                        Edit Recipe &rarr;
-                      </button>
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedRecipeId(r.id);
+                            setSubTab("item-pricing");
+                          }}
+                          className="text-brand-primary hover:underline font-bold text-[11px] cursor-pointer"
+                        >
+                          Edit Recipe &rarr;
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteRecipe(r.id)}
+                          className="text-stone-400 hover:text-red-600 p-1 cursor-pointer transition-colors"
+                          title={`Delete recipe "${r.name}"`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
