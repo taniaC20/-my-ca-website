@@ -597,6 +597,8 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
     price: string;
     qty: string;
     syncToInventory: boolean;
+    selectedInventoryId: string;
+    newMaterialName: string;
     packQty: string;
   }>({
     date: new Date().toISOString().slice(0, 10),
@@ -606,6 +608,8 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
     price: "",
     qty: "1",
     syncToInventory: false,
+    selectedInventoryId: "__NEW__",
+    newMaterialName: "",
     packQty: "1"
   });
 
@@ -809,6 +813,14 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
 
     if (manualExpForm.syncToInventory) {
       const packQty = Number(manualExpForm.packQty) || 1;
+      const matchedInv =
+        manualExpForm.selectedInventoryId && manualExpForm.selectedInventoryId !== "__NEW__"
+          ? store.inventory.find((x) => x.id === manualExpForm.selectedInventoryId)
+          : undefined;
+      const finalMaterialName = matchedInv
+        ? matchedInv.name
+        : manualExpForm.newMaterialName.trim() || manualExpForm.description.trim();
+
       commitScannedReceiptToStore({
         vendor: manualExpForm.description.trim(),
         date: manualExpForm.date,
@@ -818,11 +830,12 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
           {
             id: `man_${Date.now()}`,
             rawName: manualExpForm.description.trim(),
-            friendlyName: manualExpForm.description.trim(),
+            friendlyName: finalMaterialName,
+            matchedInventoryId: matchedInv?.id,
             category: manualExpForm.category,
             price: finalPrice * qty,
             packQty,
-            unitPrice: ( finalPrice * qty ) / packQty,
+            unitPrice: (finalPrice * qty) / packQty,
             syncToInventory: true
           }
         ]
@@ -851,6 +864,8 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
       price: "",
       qty: "1",
       syncToInventory: false,
+      selectedInventoryId: "__NEW__",
+      newMaterialName: "",
       packQty: "1"
     });
   };
@@ -2252,12 +2267,18 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
 
                 {/* Line Items Editable Table */}
                 <div className="overflow-x-auto">
+                  <datalist id="inventory-material-names-list">
+                    {store.inventory.map((inv) => (
+                      <option key={inv.id} value={inv.name} />
+                    ))}
+                  </datalist>
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
                       <tr className="bg-stone-100 text-stone-600 font-bold text-[10px] uppercase">
                         <th className="py-2 px-2.5">Raw Receipt Text</th>
-                        <th className="py-2 px-2.5">Friendly Item Name (Editable)</th>
-                        <th className="py-2 px-2.5">Match Existing Inventory</th>
+                        <th className="py-2 px-2.5 min-w-[280px]">
+                          Material / Item Name (Pick from Inventory or Add New)
+                        </th>
                         <th className="py-2 px-2.5">Category</th>
                         <th className="py-2 px-2.5 text-right">Bulk Price ($)</th>
                         <th className="py-2 px-2.5 text-right">#Items in Pack</th>
@@ -2270,47 +2291,106 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
                       {receiptDraftItems.map((it, idx) => {
                         const unitCost =
                           (Number(it.price) || 0) / (Number(it.packQty) > 0 ? Number(it.packQty) : 1);
+                        const isExistingSelected = Boolean(
+                          it.matchedInventoryId &&
+                            store.inventory.some((inv) => inv.id === it.matchedInventoryId)
+                        );
                         return (
                           <tr key={it.id} className="hover:bg-stone-50">
                             <td className="py-2 px-2.5 font-mono text-[11px] text-stone-500">
                               {it.rawName}
                             </td>
                             <td className="py-2 px-2.5">
-                              <input
-                                type="text"
-                                value={it.friendlyName}
-                                onChange={(e) => {
-                                  const next = [...receiptDraftItems];
-                                  next[idx] = { ...it, friendlyName: e.target.value };
-                                  setReceiptDraftItems(next);
-                                }}
-                                className="w-full border border-stone-300 rounded-md px-2 py-1 font-bold text-stone-900"
-                              />
-                            </td>
-                            <td className="py-2 px-2.5">
-                              <select
-                                value={it.matchedInventoryId || ""}
-                                onChange={(e) => {
-                                  const invId = e.target.value;
-                                  const matched = store.inventory.find((x) => x.id === invId);
-                                  const next = [...receiptDraftItems];
-                                  next[idx] = {
-                                    ...it,
-                                    matchedInventoryId: invId || undefined,
-                                    friendlyName: matched ? matched.name : it.friendlyName,
-                                    packQty: matched ? matched.bulkQty : it.packQty
-                                  };
-                                  setReceiptDraftItems(next);
-                                }}
-                                className="w-full border border-stone-300 rounded-md px-2 py-1 text-[11px]"
-                              >
-                                <option value="">+ Auto-match / Create New</option>
-                                {store.inventory.map((inv) => (
-                                  <option key={inv.id} value={inv.id}>
-                                    {inv.name} (Pack of {inv.bulkQty})
+                              <div className="space-y-1.5">
+                                <select
+                                  value={isExistingSelected ? it.matchedInventoryId! : "__NEW__"}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    const next = [...receiptDraftItems];
+                                    if (val === "__NEW__") {
+                                      next[idx] = {
+                                        ...it,
+                                        matchedInventoryId: undefined
+                                      };
+                                    } else {
+                                      const matched = store.inventory.find((x) => x.id === val);
+                                      if (matched) {
+                                        next[idx] = {
+                                          ...it,
+                                          matchedInventoryId: matched.id,
+                                          friendlyName: matched.name,
+                                          packQty: matched.bulkQty,
+                                          unitPrice:
+                                            (Number(it.price) || 0) / (matched.bulkQty || 1),
+                                          syncToInventory: true
+                                        };
+                                      }
+                                    }
+                                    setReceiptDraftItems(next);
+                                  }}
+                                  className={`w-full border rounded-md px-2 py-1.5 text-xs font-bold cursor-pointer ${
+                                    isExistingSelected
+                                      ? "bg-emerald-50/70 border-emerald-400 text-emerald-950"
+                                      : "bg-amber-50/60 border-amber-300 text-amber-950"
+                                  }`}
+                                >
+                                  <option value="__NEW__">
+                                    ➕ Add New Material / Custom Item Name...
                                   </option>
-                                ))}
-                              </select>
+                                  <optgroup label={`Pick from Inventory List (${store.inventory.length} materials)`}>
+                                    {store.inventory.map((inv) => (
+                                      <option key={inv.id} value={inv.id}>
+                                        {inv.name} (Pack of {inv.bulkQty} • Stock: {inv.stock})
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                </select>
+
+                                {!isExistingSelected ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <input
+                                      type="text"
+                                      list="inventory-material-names-list"
+                                      value={it.friendlyName}
+                                      onChange={(e) => {
+                                        const typedName = e.target.value;
+                                        const exactInv = store.inventory.find(
+                                          (inv) =>
+                                            inv.name.trim().toLowerCase() ===
+                                            typedName.trim().toLowerCase()
+                                        );
+                                        const next = [...receiptDraftItems];
+                                        next[idx] = {
+                                          ...it,
+                                          friendlyName: typedName,
+                                          matchedInventoryId: exactInv?.id,
+                                          packQty: exactInv ? exactInv.bulkQty : it.packQty
+                                        };
+                                        setReceiptDraftItems(next);
+                                      }}
+                                      placeholder="Type new material name (e.g. Sublimation Paper)..."
+                                      className="w-full border border-stone-300 rounded-md px-2 py-1 font-bold text-stone-900 bg-white"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center justify-between text-[10px] text-emerald-800 px-1">
+                                    <span>
+                                      ✓ Linked to Inventory: <strong>{it.friendlyName}</strong>
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const next = [...receiptDraftItems];
+                                        next[idx] = { ...it, matchedInventoryId: undefined };
+                                        setReceiptDraftItems(next);
+                                      }}
+                                      className="text-stone-500 hover:text-stone-900 underline cursor-pointer"
+                                    >
+                                      Rename / New
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
                             </td>
                             <td className="py-2 px-2.5">
                               <select
@@ -2556,17 +2636,55 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
                     Also add/update this item in Inventory
                   </label>
                   {manualExpForm.syncToInventory && (
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-stone-600">#Items in Pack:</span>
-                      <input
-                        type="number"
-                        min="1"
-                        value={manualExpForm.packQty}
-                        onChange={(e) =>
-                          setManualExpForm({ ...manualExpForm, packQty: e.target.value })
-                        }
-                        className="w-16 bg-white border border-stone-300 rounded px-2 py-1 font-mono"
-                      />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <select
+                        value={manualExpForm.selectedInventoryId}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const matched = store.inventory.find((x) => x.id === val);
+                          setManualExpForm({
+                            ...manualExpForm,
+                            selectedInventoryId: val,
+                            packQty: matched ? String(matched.bulkQty) : manualExpForm.packQty
+                          });
+                        }}
+                        className="bg-white border border-stone-300 rounded-lg px-2.5 py-1.5 font-bold text-stone-900"
+                      >
+                        <option value="__NEW__">➕ Add New Material to Inventory...</option>
+                        <optgroup label="Pick Existing Material from Inventory">
+                          {store.inventory.map((inv) => (
+                            <option key={inv.id} value={inv.id}>
+                              {inv.name} (Pack of {inv.bulkQty})
+                            </option>
+                          ))}
+                        </optgroup>
+                      </select>
+                      {manualExpForm.selectedInventoryId === "__NEW__" && (
+                        <input
+                          type="text"
+                          value={manualExpForm.newMaterialName}
+                          onChange={(e) =>
+                            setManualExpForm({
+                              ...manualExpForm,
+                              newMaterialName: e.target.value
+                            })
+                          }
+                          placeholder="New material name (e.g. Sublimation Paper)..."
+                          className="bg-white border border-stone-300 rounded-lg px-2.5 py-1.5 font-bold text-stone-900 min-w-[220px]"
+                        />
+                      )}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-stone-600">#Items in Pack:</span>
+                        <input
+                          type="number"
+                          min="1"
+                          value={manualExpForm.packQty}
+                          onChange={(e) =>
+                            setManualExpForm({ ...manualExpForm, packQty: e.target.value })
+                          }
+                          className="w-16 bg-white border border-stone-300 rounded px-2 py-1 font-mono"
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
