@@ -44,6 +44,12 @@ import {
   computeIncomeRow
 } from "../businessTypes";
 import {
+  extractPdfReceiptContent,
+  parseReceiptText,
+  preprocessReceiptImage,
+  runImageOcrInBrowser
+} from "../receiptOcrEngine";
+import {
   getInitialBusinessSnapshot,
   loadBusinessStore,
   saveBusinessStore,
@@ -605,6 +611,7 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
 
   // AI Receipt Scanner states
   const [isScanningReceipt, setIsScanningReceipt] = useState(false);
+  const [scanProgressStatus, setScanProgressStatus] = useState<string>("");
   const [receiptRawText, setReceiptRawText] = useState("");
   const [receiptPreviewUrl, setReceiptPreviewUrl] = useState<string>("");
   const [receiptDraftVendor, setReceiptDraftVendor] = useState("Michaels");
@@ -612,51 +619,136 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
   const [receiptDraftPayment, setReceiptDraftPayment] = useState("VISA 7992");
   const [receiptLogMode, setReceiptLogMode] = useState<"per-item" | "single-receipt">("per-item");
   const [receiptDraftItems, setReceiptDraftItems] = useState<ReceiptLineItemDraft[]>([]);
+  const [receiptDetectedTax, setReceiptDetectedTax] = useState<number | undefined>(undefined);
+  const [receiptDetectedTotal, setReceiptDetectedTotal] = useState<number | undefined>(undefined);
   const [showReceiptReview, setShowReceiptReview] = useState(false);
   const [geminiKeyInput, setGeminiKeyInput] = useState(store.settings.geminiApiKey || "");
   const [showApiKeyConfig, setShowApiKeyConfig] = useState(false);
+
+  const processReceiptFile = async (file: File) => {
+    setIsScanningReceipt(true);
+    setScanProgressStatus("Preparing receipt...");
+
+    try {
+      const isPdf =
+        file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+
+      let previewUrl = "";
+      let ocrImageUrl = "";
+      let extractedText = "";
+
+      if (isPdf) {
+        const pdfContent = await extractPdfReceiptContent(file, setScanProgressStatus);
+        extractedText = pdfContent.text;
+        previewUrl = pdfContent.pageImageDataUrl || "";
+        ocrImageUrl = pdfContent.pageImageDataUrl || "";
+
+        // If the PDF is a scanned image (very little digital text), run OCR on the rendered PDF page
+        if (extractedText.replace(/\s+/g, "").length < 15 && ocrImageUrl) {
+          extractedText = await runImageOcrInBrowser(ocrImageUrl, setScanProgressStatus);
+        }
+      } else {
+        setScanProgressStatus("Optimizing receipt image...");
+        const processed = await preprocessReceiptImage(file);
+        previewUrl = processed.previewDataUrl;
+        ocrImageUrl = processed.ocrDataUrl;
+      }
+
+      setReceiptPreviewUrl(previewUrl);
+
+      // 1. Try Gemini Vision API if a Gemini key is configured
+      const activeKey = (geminiKeyInput || store.settings.geminiApiKey || "").trim();
+      let apiHandled = false;
+
+      if (activeKey && activeKey !== "MY_GEMINI_API_KEY") {
+        setScanProgressStatus("Analyzing receipt with Gemini Vision AI...");
+        try {
+          const res = await fetch("/api/scan-receipt", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              imageDataUrl: previewUrl,
+              rawText: extractedText,
+              fileName: file.name,
+              apiKey: activeKey
+            })
+          });
+          const data = await res.json();
+          if (data && data.success && data.result && Array.isArray(data.result.items) && data.result.items.length > 0) {
+            setReceiptDraftVendor(data.result.vendor || "Michaels");
+            setReceiptDraftDate(data.result.date || new Date().toISOString().slice(0, 10));
+            setReceiptDraftPayment(data.result.paymentMethod || "VISA 7992");
+            setReceiptDraftItems(data.result.items);
+            setReceiptDetectedTax(data.result.taxAmount);
+            setReceiptDetectedTotal(data.result.totalAmount);
+            setShowReceiptReview(true);
+            apiHandled = true;
+            showToast(
+              `Receipt scanned (${data.result.items.length} item(s) detected)! Review & rename below.`
+            );
+          }
+        } catch {
+          // Fall back to automatic browser OCR
+        }
+      }
+
+      // 2. Automatic Browser OCR + Multi-format Receipt Parser (works with 0 external keys)
+      if (!apiHandled) {
+        if (!extractedText && ocrImageUrl) {
+          extractedText = await runImageOcrInBrowser(ocrImageUrl, setScanProgressStatus);
+        }
+        if (extractedText) {
+          setReceiptRawText(extractedText);
+        }
+
+        setScanProgressStatus("Detecting items & costs...");
+        const parsed = parseReceiptText(extractedText, file.name, store.inventory);
+
+        setReceiptDraftVendor(parsed.vendor || "Michaels");
+        setReceiptDraftDate(parsed.date || new Date().toISOString().slice(0, 10));
+        setReceiptDraftPayment(parsed.paymentMethod || "VISA 7992");
+        setReceiptDetectedTax(parsed.taxAmount);
+        setReceiptDetectedTotal(parsed.receiptTotalAmount || parsed.totalAmount);
+
+        if (parsed.items.length > 0) {
+          setReceiptDraftItems(parsed.items);
+          setShowReceiptReview(true);
+          showToast(
+            `Receipt scanned! Detected ${parsed.items.length} item(s) from ${parsed.vendor}. Review & rename below.`
+          );
+        } else {
+          // Even if the image was too blurry to read individual prices, open the review table with 1 editable row so the user isn't stuck
+          setReceiptDraftItems([
+            {
+              id: `scan_${Date.now()}_0`,
+              rawName: file.name,
+              friendlyName: `${parsed.vendor} Supplies`,
+              category: "Material",
+              price: parsed.totalAmount || 0,
+              packQty: 1,
+              unitPrice: parsed.totalAmount || 0,
+              syncToInventory: true
+            }
+          ]);
+          setShowReceiptReview(true);
+          showToast(
+            "Receipt opened for review — please verify the item name and price below."
+          );
+        }
+      }
+    } catch (err: any) {
+      showToast(`Could not read receipt file: ${err?.message || "Please try another image or paste text"}`);
+    } finally {
+      setIsScanningReceipt(false);
+      setScanProgressStatus("");
+    }
+  };
 
   const handleReceiptFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = "";
-    setIsScanningReceipt(true);
-
-    try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => reject(new Error("Failed to read file"));
-        reader.readAsDataURL(file);
-      });
-      setReceiptPreviewUrl(dataUrl);
-
-      const res = await fetch("/api/scan-receipt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageDataUrl: dataUrl,
-          rawText: receiptRawText,
-          fileName: file.name,
-          apiKey: geminiKeyInput || store.settings.geminiApiKey
-        })
-      });
-      const data = await res.json();
-      if (data && data.result) {
-        setReceiptDraftVendor(data.result.vendor || "Michaels");
-        setReceiptDraftDate(data.result.date || new Date().toISOString().slice(0, 10));
-        setReceiptDraftPayment(data.result.paymentMethod || "VISA 7992");
-        setReceiptDraftItems(data.result.items || []);
-        setShowReceiptReview(true);
-        showToast(
-          `Receipt scanned (${data.result.items?.length || 0} items detected)! Review & rename items below before saving.`
-        );
-      }
-    } catch (err: any) {
-      showToast(`Could not scan receipt automatically: ${err?.message || "Please review manually"}`);
-    } finally {
-      setIsScanningReceipt(false);
-    }
+    await processReceiptFile(file);
   };
 
   const handleScanReceiptText = async (sampleText?: string) => {
@@ -666,28 +758,22 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
       return;
     }
     setIsScanningReceipt(true);
+    setScanProgressStatus("Parsing receipt items & prices...");
     try {
-      const res = await fetch("/api/scan-receipt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          rawText: textToUse,
-          apiKey: geminiKeyInput || store.settings.geminiApiKey
-        })
-      });
-      const data = await res.json();
-      if (data && data.result) {
-        setReceiptDraftVendor(data.result.vendor || "Michaels");
-        setReceiptDraftDate(data.result.date || new Date().toISOString().slice(0, 10));
-        setReceiptDraftPayment(data.result.paymentMethod || "VISA 7992");
-        setReceiptDraftItems(data.result.items || []);
-        setShowReceiptReview(true);
-        showToast(`Parsed ${data.result.items?.length || 0} receipt line items! Review & rename below.`);
-      }
+      const parsed = parseReceiptText(textToUse, undefined, store.inventory);
+      setReceiptDraftVendor(parsed.vendor || "Michaels");
+      setReceiptDraftDate(parsed.date || new Date().toISOString().slice(0, 10));
+      setReceiptDraftPayment(parsed.paymentMethod || "VISA 7992");
+      setReceiptDetectedTax(parsed.taxAmount);
+      setReceiptDetectedTotal(parsed.receiptTotalAmount || parsed.totalAmount);
+      setReceiptDraftItems(parsed.items);
+      setShowReceiptReview(true);
+      showToast(`Parsed ${parsed.items.length} receipt line item(s)! Review & rename below.`);
     } catch {
       showToast("Error parsing receipt text.");
     } finally {
       setIsScanningReceipt(false);
+      setScanProgressStatus("");
     }
   };
 
@@ -2017,23 +2103,40 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
               {/* Upload Photo/PDF */}
-              <div className="lg:col-span-5 flex flex-col justify-between bg-white border-2 border-dashed border-amber-300 rounded-xl p-4 text-center space-y-3">
+              <div
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const file = e.dataTransfer?.files?.[0];
+                  if (file) processReceiptFile(file);
+                }}
+                className="lg:col-span-5 flex flex-col justify-between bg-white border-2 border-dashed border-amber-300 rounded-xl p-4 text-center space-y-3"
+              >
                 <div className="space-y-1">
                   <Upload className="h-7 w-7 text-amber-700 mx-auto" />
                   <p className="font-bold text-stone-800 text-xs">
-                    Upload Receipt Photo or PDF
+                    Upload or Drop Receipt Photo / PDF
                   </p>
                   <p className="text-[11px] text-stone-500">
-                    Supports JPG, PNG, WEBP, or PDF receipts from mobile camera or desktop
+                    Automatically reads &amp; detects items and prices from JPG, PNG, WEBP, or PDF receipts
                   </p>
+                  {isScanningReceipt && scanProgressStatus && (
+                    <p className="text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg py-1.5 px-3 animate-pulse">
+                      {scanProgressStatus}
+                    </p>
+                  )}
                 </div>
                 <div className="flex flex-wrap justify-center gap-2">
                   <label className="bg-brand-primary hover:bg-brand-primary-hover text-white font-bold py-2 px-4 rounded-xl text-xs cursor-pointer transition-colors inline-flex items-center gap-1.5 shadow-xs">
                     <Upload className="h-3.5 w-3.5" />
-                    <span>{isScanningReceipt ? "Scanning Receipt..." : "Choose Receipt Image / PDF"}</span>
+                    <span>
+                      {isScanningReceipt
+                        ? scanProgressStatus || "Scanning Receipt..."
+                        : "Choose Receipt Image / PDF"}
+                    </span>
                     <input
                       type="file"
-                      accept="image/*,application/pdf"
+                      accept="image/*,application/pdf,.pdf"
                       onChange={handleReceiptFileUpload}
                       className="hidden"
                       disabled={isScanningReceipt}
@@ -2057,10 +2160,10 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
               <div className="lg:col-span-7 bg-white border border-stone-200 rounded-xl p-4 space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-stone-700">
-                    Or Paste Amazon / Shein / Michaels Receipt Lines
+                    Detected / Pasted Receipt Text (Editable)
                   </label>
                   <span className="text-[10px] text-stone-400">
-                    Format: Item Name + Price (e.g. SUBL PPR 8.5X11 43.69)
+                    Auto-populated when you upload a photo/PDF, or paste lines directly
                   </span>
                 </div>
                 <textarea
@@ -2297,31 +2400,63 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
                 </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-stone-200">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setReceiptDraftItems([
-                        ...receiptDraftItems,
-                        {
-                          id: `scan_${Date.now()}`,
-                          rawName: "MANUAL LINE",
-                          friendlyName: "New Receipt Material",
-                          category: "Material",
-                          price: 10,
-                          packQty: 1,
-                          unitPrice: 10,
-                          syncToInventory: true
-                        }
-                      ])
-                    }
-                    className="text-xs font-bold text-brand-primary hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <Plus className="h-3.5 w-3.5" /> Add Another Receipt Line
-                  </button>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setReceiptDraftItems([
+                          ...receiptDraftItems,
+                          {
+                            id: `scan_${Date.now()}`,
+                            rawName: "MANUAL LINE",
+                            friendlyName: "New Receipt Material",
+                            category: "Material",
+                            price: 10,
+                            packQty: 1,
+                            unitPrice: 10,
+                            syncToInventory: true
+                          }
+                        ])
+                      }
+                      className="text-xs font-bold text-brand-primary hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Add Another Receipt Line
+                    </button>
 
-                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updated = receiptDraftItems.map((it) => {
+                          const taxedPrice = Number(((Number(it.price) || 0) * 1.15).toFixed(2));
+                          return {
+                            ...it,
+                            price: taxedPrice,
+                            unitPrice: Number((taxedPrice / (Number(it.packQty) || 1)).toFixed(4))
+                          };
+                        });
+                        setReceiptDraftItems(updated);
+                        showToast("Added 15% HST to all item prices!");
+                      }}
+                      className="bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold py-1 px-2.5 rounded-lg text-[11px] cursor-pointer transition-colors"
+                      title="Multiply pre-tax receipt item prices by 1.15 (+15% HST)"
+                    >
+                      +15% HST to Item Prices
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    {receiptDetectedTax !== undefined && receiptDetectedTax > 0 && (
+                      <span className="text-[11px] font-mono text-stone-500">
+                        Detected Tax: {fmtMoney(receiptDetectedTax)}
+                      </span>
+                    )}
+                    {receiptDetectedTotal !== undefined && receiptDetectedTotal > 0 && (
+                      <span className="text-[11px] font-mono text-stone-500">
+                        Receipt Total Printed: {fmtMoney(receiptDetectedTotal)}
+                      </span>
+                    )}
                     <span className="text-xs font-mono font-bold text-stone-800">
-                      Receipt Total:{" "}
+                      Items Sum:{" "}
                       {fmtMoney(receiptDraftItems.reduce((s, i) => s + (Number(i.price) || 0), 0))}
                     </span>
                     <button
