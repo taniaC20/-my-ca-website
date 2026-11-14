@@ -994,8 +994,25 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
     saveBusinessStore({ recipes: nextRecipes });
   };
 
-  const handleAddMaterialToRecipe = (invId?: string) => {
+  const handleAddMaterialToRecipe = (mode: "inventory" | "custom" = "inventory", invId?: string) => {
     if (!activeRecipe) return;
+    if (mode === "custom") {
+      const customMat: RecipeMaterialLine = {
+        id: `mat_${Date.now()}`,
+        inventoryItemId: undefined,
+        name: "",
+        bulkPrice: 5,
+        bulkQty: 1,
+        unitPrice: 5,
+        qtyUsed: 1,
+        lineCost: 5
+      };
+      handleUpdateActiveRecipe({
+        materials: [...activeRecipe.materials, customMat]
+      });
+      return;
+    }
+
     const invItem = invId ? store.inventory.find((i) => i.id === invId) : store.inventory[0];
     const newMat: RecipeMaterialLine = {
       id: `mat_${Date.now()}`,
@@ -1010,6 +1027,72 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
     handleUpdateActiveRecipe({
       materials: [...activeRecipe.materials, newMat]
     });
+  };
+
+  const handleSaveRecipeMaterialToInventory = (mIdx: number) => {
+    if (!activeRecipe) return;
+    const mat = activeRecipe.materials[mIdx];
+    if (!mat) return;
+    const cleanName = (mat.name || "").trim();
+    if (!cleanName) {
+      showToast("Please type a name for this material first.");
+      return;
+    }
+    const bulkPrice = Number(mat.bulkPrice) || 0;
+    const bulkQty = Math.max(1, Number(mat.bulkQty) || 1);
+    const unitPrice = bulkPrice / bulkQty;
+
+    const existing = store.inventory.find(
+      (i) => i.name.trim().toLowerCase() === cleanName.toLowerCase()
+    );
+    let targetInvId: string;
+    let nextInventory: InventoryItem[];
+
+    if (existing) {
+      targetInvId = existing.id;
+      nextInventory = store.inventory.map((i) =>
+        i.id === existing.id
+          ? { ...i, bulkPrice, bulkQty, unitPrice, updatedAt: new Date().toISOString() }
+          : i
+      );
+    } else {
+      const nextNum = store.inventory.length + 1;
+      const newInv: InventoryItem = {
+        id: `inv_${Date.now()}`,
+        itemCode: `INV-${String(nextNum).padStart(3, "0")}`,
+        name: cleanName,
+        category: activeRecipe.category || "General Supplies",
+        bulkPrice,
+        bulkQty,
+        unitPrice,
+        stock: bulkQty,
+        minStock: Math.max(2, Math.round(bulkQty * 0.25)),
+        status: "In stock",
+        notes: `Added from Recipe Calculator (${activeRecipe.name})`,
+        updatedAt: new Date().toISOString()
+      };
+      targetInvId = newInv.id;
+      nextInventory = [newInv, ...store.inventory];
+    }
+
+    const nextMats = [...activeRecipe.materials];
+    nextMats[mIdx] = {
+      ...mat,
+      inventoryItemId: targetInvId,
+      name: cleanName,
+      unitPrice,
+      lineCost: unitPrice * (Number(mat.qtyUsed) || 1)
+    };
+    const updatedRec = recalculateRecipe(
+      { ...activeRecipe, materials: nextMats },
+      store.settings.hourlyLaborRate
+    );
+    const nextRecipes = store.recipes.map((r) => (r.id === activeRecipe.id ? updatedRec : r));
+    saveBusinessStore({
+      inventory: nextInventory,
+      recipes: nextRecipes
+    });
+    showToast(`Saved "${cleanName}" to Inventory list!`);
   };
 
   const handleCreateNewRecipe = () => {
@@ -3400,18 +3483,22 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Craft Category</label>
-                  <select
+                  <label className="font-bold text-stone-700 block mb-1">
+                    Craft Category (Pick or Type Custom)
+                  </label>
+                  <input
+                    type="text"
+                    list="recipe-craft-categories-list"
                     value={activeRecipe.category}
                     onChange={(e) => handleUpdateActiveRecipe({ category: e.target.value })}
+                    placeholder="Sublimation, Vinyl, Pipe Cleaner Floral..."
                     className="w-full border border-stone-300 rounded-lg p-2 font-semibold"
-                  >
+                  />
+                  <datalist id="recipe-craft-categories-list">
                     {PRODUCT_CRAFT_CATEGORIES.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
+                      <option key={c} value={c} />
                     ))}
-                  </select>
+                  </datalist>
                 </div>
                 <div className="sm:col-span-2">
                   <label className="font-bold text-stone-700 block mb-1">
@@ -3456,7 +3543,9 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="bg-stone-100 text-stone-600 font-bold text-[10px] uppercase">
-                      <th className="py-2 px-2">Material (From Inventory)</th>
+                      <th className="py-2 px-2 min-w-[230px]">
+                        Material (Pick from Inventory or Add New)
+                      </th>
                       <th className="py-2 px-2 text-right">Pack Price ($)</th>
                       <th className="py-2 px-2 text-right">Pieces / Pack</th>
                       <th className="py-2 px-2 text-right">Cost / Piece</th>
@@ -3473,40 +3562,86 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
                     {activeRecipe.materials.map((m, mIdx) => {
                       const costPerPiece = (Number(m.bulkPrice) || 0) / (Number(m.bulkQty) || 1);
                       const qtyUsed = Number(m.qtyUsed) > 0 ? Number(m.qtyUsed) : 1;
+                      const isLinkedToInventory = Boolean(
+                        m.inventoryItemId &&
+                          store.inventory.some((inv) => inv.id === m.inventoryItemId)
+                      );
                       return (
                         <tr key={m.id} className="hover:bg-stone-50">
                           <td className="py-2 px-2">
-                            <select
-                              value={m.inventoryItemId || ""}
-                              onChange={(e) => {
-                                const invId = e.target.value;
-                                const inv = store.inventory.find((i) => i.id === invId);
-                                const nextMats = [...activeRecipe.materials];
-                                if (inv) {
-                                  const unitP = inv.bulkPrice / (inv.bulkQty || 1);
-                                  nextMats[mIdx] = {
-                                    ...m,
-                                    inventoryItemId: inv.id,
-                                    name: inv.name,
-                                    bulkPrice: inv.bulkPrice,
-                                    bulkQty: inv.bulkQty,
-                                    unitPrice: unitP,
-                                    lineCost: unitP * qtyUsed
-                                  };
-                                } else {
-                                  nextMats[mIdx] = { ...m, inventoryItemId: undefined };
-                                }
-                                handleUpdateActiveRecipe({ materials: nextMats });
-                              }}
-                              className="w-full border border-stone-300 rounded px-2 py-1 font-semibold text-stone-800"
-                            >
-                              <option value="">{m.name}</option>
-                              {store.inventory.map((inv) => (
-                                <option key={inv.id} value={inv.id}>
-                                  {inv.name} (${inv.bulkPrice} / {inv.bulkQty} pcs)
+                            <div className="space-y-1.5">
+                              <select
+                                value={isLinkedToInventory ? m.inventoryItemId! : "__CUSTOM__"}
+                                onChange={(e) => {
+                                  const invId = e.target.value;
+                                  const nextMats = [...activeRecipe.materials];
+                                  if (invId === "__CUSTOM__") {
+                                    nextMats[mIdx] = {
+                                      ...m,
+                                      inventoryItemId: undefined
+                                    };
+                                  } else {
+                                    const inv = store.inventory.find((i) => i.id === invId);
+                                    if (inv) {
+                                      const unitP = inv.bulkPrice / (inv.bulkQty || 1);
+                                      nextMats[mIdx] = {
+                                        ...m,
+                                        inventoryItemId: inv.id,
+                                        name: inv.name,
+                                        bulkPrice: inv.bulkPrice,
+                                        bulkQty: inv.bulkQty,
+                                        unitPrice: unitP,
+                                        lineCost: unitP * qtyUsed
+                                      };
+                                    }
+                                  }
+                                  handleUpdateActiveRecipe({ materials: nextMats });
+                                }}
+                                className={`w-full border rounded px-2 py-1 font-semibold cursor-pointer ${
+                                  isLinkedToInventory
+                                    ? "border-stone-300 bg-white text-stone-800"
+                                    : "border-amber-300 bg-amber-50/60 text-amber-950"
+                                }`}
+                              >
+                                <option value="__CUSTOM__">
+                                  ➕ Custom / New Item (Not in List)...
                                 </option>
-                              ))}
-                            </select>
+                                <optgroup label={`Pick from Inventory List (${store.inventory.length})`}>
+                                  {store.inventory.map((inv) => (
+                                    <option key={inv.id} value={inv.id}>
+                                      {inv.name} (${inv.bulkPrice} / {inv.bulkQty} pcs)
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              </select>
+
+                              {!isLinkedToInventory && (
+                                <div className="flex items-center gap-1.5">
+                                  <input
+                                    type="text"
+                                    value={m.name}
+                                    onChange={(e) => {
+                                      const nextMats = [...activeRecipe.materials];
+                                      nextMats[mIdx] = {
+                                        ...m,
+                                        name: e.target.value
+                                      };
+                                      handleUpdateActiveRecipe({ materials: nextMats });
+                                    }}
+                                    placeholder="Type custom item/material name..."
+                                    className="flex-1 border border-stone-300 rounded px-2 py-1 font-bold text-stone-900 bg-white"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSaveRecipeMaterialToInventory(mIdx)}
+                                    className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold px-2 py-1 rounded text-[10px] whitespace-nowrap cursor-pointer"
+                                    title="Also save this new material to your Inventory list"
+                                  >
+                                    + Save to Inv.
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           </td>
                           <td className="py-2 px-2 text-right">
                             <input
@@ -3598,13 +3733,22 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
                 </table>
               </div>
 
-              <button
-                type="button"
-                onClick={() => handleAddMaterialToRecipe()}
-                className="text-xs font-bold text-brand-primary hover:underline flex items-center gap-1 cursor-pointer"
-              >
-                <Plus className="h-3.5 w-3.5" /> Add Material Row from Inventory
-              </button>
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => handleAddMaterialToRecipe("inventory")}
+                  className="text-xs font-bold text-brand-primary hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add Material from Inventory
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleAddMaterialToRecipe("custom")}
+                  className="text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add Custom Item (Not in List)
+                </button>
+              </div>
             </div>
 
             {/* Right 5 cols: Costing & Profit Margin Formula Card */}
