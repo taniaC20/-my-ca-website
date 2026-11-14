@@ -418,12 +418,16 @@ export function commitScannedReceiptToStore(params: {
   let updatedRecipes = [...current.recipes];
   let updatedInventoryCount = 0;
 
-  // 1. Upsert checked items into Inventory
+  // 1. Upsert checked items into Inventory (storing stock in individual pieces)
   for (const item of params.items) {
     if (!item.syncToInventory) continue;
-    const bulkPrice = Math.abs(Number(item.price) || 0);
-    const bulkQty = Number(item.packQty) > 0 ? Number(item.packQty) : 1;
-    const unitPrice = bulkPrice / bulkQty;
+    const totalLinePrice = Math.abs(Number(item.price) || 0);
+    const qtyBought = Math.max(1, Number(item.qtyBought) || 1); // # of packs/items bought on receipt (e.g. 3 packs)
+    const piecesPerPack = Math.max(1, Number(item.packQty) || 1); // # of pieces inside 1 pack (e.g. 300 pieces)
+    const totalPiecesBought = qtyBought * piecesPerPack; // e.g. 3 * 300 = 900 individual pieces
+    const bulkPrice = Number((totalLinePrice / qtyBought).toFixed(2)); // Price of 1 pack
+    const bulkQty = piecesPerPack; // Pieces per 1 pack
+    const unitPrice = totalLinePrice / totalPiecesBought; // Cost per 1 individual piece
     const cleanName = (item.friendlyName || item.rawName || "Supply Item").trim();
 
     const existingIdx = updatedInventory.findIndex(
@@ -434,7 +438,8 @@ export function commitScannedReceiptToStore(params: {
 
     if (existingIdx !== -1) {
       const existing = updatedInventory[existingIdx];
-      const deltaStock = item.category === "Refund" || item.price < 0 ? -bulkQty : bulkQty;
+      const deltaStock =
+        item.category === "Refund" || item.price < 0 ? -totalPiecesBought : totalPiecesBought;
       const nextStock = Math.max(0, Number((existing.stock + deltaStock).toFixed(2)));
       const nextItem: InventoryItem = {
         ...existing,
@@ -476,14 +481,16 @@ export function commitScannedReceiptToStore(params: {
         id: `inv_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         itemCode: `INV-${String(nextNum).padStart(3, "0")}`,
         name: cleanName,
-        category: item.inventoryCategory || (item.category === "Packaging" ? "Packaging" : "General Supplies"),
+        category:
+          item.inventoryCategory ||
+          (item.category === "Packaging" ? "Packaging" : "General Supplies"),
         bulkPrice,
         bulkQty,
         unitPrice,
-        stock: bulkQty,
-        minStock: Math.max(2, Math.round(bulkQty * 0.25)),
+        stock: totalPiecesBought,
+        minStock: Math.max(2, Math.round(piecesPerPack * 0.25)),
         status: "In stock",
-        notes: `Added from ${params.vendor} receipt (${params.date})`,
+        notes: `Added ${qtyBought} pack(s) × ${piecesPerPack} pcs (${totalPiecesBought} pcs) from ${params.vendor} (${params.date})`,
         updatedAt: new Date().toISOString()
       };
       updatedInventory = [newInv, ...updatedInventory];

@@ -14,7 +14,7 @@ const ABBREVIATION_MAP: Array<[RegExp, string, ExpenseCategory, number]> = [
   [/easy\s*subli/i, "EasySubli HTV", "Material", 5],
   [/vinyl|htv|cricut\s*vnl|smart\s*vinyl/i, "Vinyl", "Material", 15],
   [/trans\w*\s*tape/i, "Transfer Tape", "Material", 80],
-  [/pipe\s*cl\w*|chenille|fuzzy\s*stick/i, "Pipe Cleaner Set", "Material", 5],
+  [/pipe\s*cl\w*|chenille|fuzzy\s*stick/i, "Pipe Cleaner Set", "Material", 300],
   [/silic\w*|glue\s*stick|hot\s*glue/i, "Silicon (Hot Glue)", "Material", 100],
   [/floral\s*tape|stem\s*tape/i, "Tape (Floral)", "Material", 50],
   [/wrap\w*\s*(ppr|paper)|bouquet\s*wrap/i, "Wrapping Paper (Bouquet)", "Material", 3],
@@ -32,25 +32,50 @@ const ABBREVIATION_MAP: Array<[RegExp, string, ExpenseCategory, number]> = [
   [/chatgpt|openai|canva|adobe/i, "Subscription Service", "Subscriptions", 1]
 ];
 
+export function extractExplicitPiecesPerPack(text: string): number | undefined {
+  const clean = text || "";
+  // 1. "300 pcs", "300 pieces", "300pc", "300 ct", "300 count", "100 sheets", "50 rolls", "6pk", "6 pack"
+  const m1 = clean.match(
+    /\b(\d{1,5})\s*(?:pcs|pc|pieces|piece|ct|count|sheets|sheet|sht|stems|stem|rolls|roll|pk|pack)\b/i
+  );
+  if (m1) {
+    const n = Number(m1[1]);
+    if (n > 0) return n;
+  }
+  // 2. "Pack of 300", "Set of 300", "Box of 100"
+  const m2 = clean.match(/\b(?:pack|set|box|bag|bundle|roll)\s+of\s+(\d{1,5})\b/i);
+  if (m2) {
+    const n = Number(m2[1]);
+    if (n > 0) return n;
+  }
+  return undefined;
+}
+
 export function expandReceiptItemName(rawName: string): {
   friendlyName: string;
   category: ExpenseCategory;
   suggestedPackQty: number;
+  hasExplicitPackQty?: boolean;
 } {
   const clean = (rawName || "")
     .replace(/^\d{5,14}\s+/, "") // Strip leading barcode/SKU
     .replace(/\s+[A-Z]$/, "") // Strip trailing tax code letter
     .trim();
 
-  for (const [regex, friendlyName, category, suggestedPackQty] of ABBREVIATION_MAP) {
+  const explicitPieces = extractExplicitPiecesPerPack(clean);
+
+  for (const [regex, friendlyName, category, defaultPackQty] of ABBREVIATION_MAP) {
     if (regex.test(clean)) {
-      return { friendlyName, category, suggestedPackQty };
+      return {
+        friendlyName,
+        category,
+        suggestedPackQty: explicitPieces || defaultPackQty,
+        hasExplicitPackQty: Boolean(explicitPieces)
+      };
     }
   }
 
-  // Check if pack count is mentioned in the item name (e.g. "6PK", "12 PACK", "100CT", "50 PCS")
-  const packMatch = clean.match(/\b(\d{1,4})\s*(?:pk|pack|ct|count|pcs|pc|sheets|sht|rolls)\b/i);
-  const extractedPackQty = packMatch ? Math.max(1, Number(packMatch[1])) : 1;
+  const extractedPackQty = explicitPieces || 1;
 
   const isRefund = /refund|return|credit/i.test(clean);
   const isPkg = /bag|box|tissue|wrap|ribbon|shipping|mailer|label|sticker/i.test(clean);
@@ -87,7 +112,8 @@ export function expandReceiptItemName(rawName: string): {
       : isOffice
       ? "Office Supplies"
       : "Material",
-    suggestedPackQty: extractedPackQty
+    suggestedPackQty: extractedPackQty,
+    hasExplicitPackQty: Boolean(explicitPieces)
   };
 }
 
@@ -346,21 +372,40 @@ export function parseReceiptText(
     }
 
     // Check if line has a price at the end:
-    // Supports: "SUBL PPR 8.5X11   $43.69 H", "0400123456 MUG 11OZ  26.45", "CDN$ 55.41"
+    // Supports: "3x PIPE CLEANERS 300PCS $15.00", "SUBL PPR 8.5X11 $43.69 H", "0400123456 MUG 11OZ 26.45"
     const linePriceMatch = line.match(
-      /^(.*?)(?:\s+(?:x|qty:?)\s*(\d{1,3}))?\s+(?:CDN\$|CA\$|US\$|\$)?\s*(-?\d{1,4}\.\d{2})\s*(?:[A-Z*]{1,3}|CAD)?$/i
+      /^(?:(\d{1,3})\s*(?:x|X|packs?\s+of|packs?)\s+)?(.*?)(?:\s+(?:x|qty:?)\s*(\d{1,3}))?\s+(?:CDN\$|CA\$|US\$|\$)?\s*(-?\d{1,4}\.\d{2})\s*(?:[A-Z*]{1,3}|CAD)?$/i
     );
 
     if (linePriceMatch) {
-      let namePart = linePriceMatch[1]
+      const leadingQty = linePriceMatch[1] ? Number(linePriceMatch[1]) : undefined;
+      let namePart = linePriceMatch[2]
         .replace(/^(?:CDN\$|CA\$|US\$|\$)+/i, "")
         .replace(/[-–—:.$]+$/, "")
         .trim();
-      const explicitQty = linePriceMatch[2] ? Number(linePriceMatch[2]) : pendingQty;
-      const price = Number(linePriceMatch[3]);
+      const trailingQty = linePriceMatch[3] ? Number(linePriceMatch[3]) : undefined;
+      const explicitQty = trailingQty || leadingQty || pendingQty;
+      const price = Number(linePriceMatch[4]);
 
       // Strip leading barcode / SKU numbers if followed by text
       namePart = namePart.replace(/^\d{5,14}\s+/, "").trim();
+
+      // Check if namePart starts with a small quantity number like "3 PIPE CLEANERS 300PCS"
+      let finalQtyBought = explicitQty;
+      const leadingSimpleCount = namePart.match(/^(\d{1,2})\s+([a-zA-Z].*)$/);
+      if (leadingSimpleCount && !leadingQty && !trailingQty && pendingQty === 1) {
+        const possibleQty = Number(leadingSimpleCount[1]);
+        const restName = leadingSimpleCount[2].trim();
+        // Make sure it's not "11 oz mug" or "20 oz tumbler" or "300 pcs"
+        if (
+          possibleQty >= 1 &&
+          possibleQty <= 25 &&
+          !/^(?:oz|inch|in|mm|cm|pk|pack|pcs|pc|ct|sheets)\b/i.test(restName)
+        ) {
+          finalQtyBought = possibleQty;
+          namePart = restName;
+        }
+      }
 
       // If namePart is empty or just a barcode/SKU, use pendingItemName from previous line!
       if ((!namePart || /^\d+$/.test(namePart) || /^price$/i.test(namePart)) && pendingItemName) {
@@ -376,7 +421,7 @@ export function parseReceiptText(
         price !== 0 &&
         Math.abs(price) < 10000
       ) {
-        addExtractedItem(namePart, price, explicitQty);
+        addExtractedItem(namePart, price, finalQtyBought);
         pendingItemName = "";
         pendingQty = 1;
         continue;
@@ -413,15 +458,16 @@ export function parseReceiptText(
     }
   }
 
-  function addExtractedItem(rawName: string, price: number, detectedQty = 1) {
+  function addExtractedItem(rawName: string, price: number, detectedQtyBought = 1) {
     const exp = expandReceiptItemName(rawName);
     const matchedInv = matchInventoryItem(exp.friendlyName, rawName, existingInventory);
-    const packQty =
-      detectedQty > 1
-        ? detectedQty
-        : matchedInv
-        ? matchedInv.bulkQty
-        : exp.suggestedPackQty || 1;
+    const qtyBought = Math.max(1, Number(detectedQtyBought) || 1);
+    const packQty = exp.hasExplicitPackQty
+      ? exp.suggestedPackQty
+      : matchedInv
+      ? matchedInv.bulkQty
+      : exp.suggestedPackQty || 1;
+    const totalPieces = qtyBought * packQty;
     const category: ExpenseCategory =
       price < 0 ? "Refund" : (exp.category as ExpenseCategory);
 
@@ -430,9 +476,10 @@ export function parseReceiptText(
       rawName,
       friendlyName: matchedInv ? matchedInv.name : exp.friendlyName,
       category,
+      qtyBought,
       price: Number(price.toFixed(2)),
       packQty,
-      unitPrice: Number((price / packQty).toFixed(4)),
+      unitPrice: Number((price / totalPieces).toFixed(4)),
       syncToInventory: category === "Material" || category === "Packaging",
       matchedInventoryId: matchedInv?.id,
       inventoryCategory: matchedInv?.category || category
@@ -447,6 +494,7 @@ export function parseReceiptText(
       rawName: `${vendor} Receipt Total`,
       friendlyName: `${vendor} Supplies`,
       category: receiptTotalAmount < 0 ? "Refund" : exp.category,
+      qtyBought: 1,
       price: Number(receiptTotalAmount.toFixed(2)),
       packQty: 1,
       unitPrice: Number(receiptTotalAmount.toFixed(4)),

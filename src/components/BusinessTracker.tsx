@@ -812,7 +812,7 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
       manualExpForm.category === "Refund" && rawPrice > 0 ? -rawPrice : rawPrice;
 
     if (manualExpForm.syncToInventory) {
-      const packQty = Number(manualExpForm.packQty) || 1;
+      const packQty = Math.max(1, Number(manualExpForm.packQty) || 1);
       const matchedInv =
         manualExpForm.selectedInventoryId && manualExpForm.selectedInventoryId !== "__NEW__"
           ? store.inventory.find((x) => x.id === manualExpForm.selectedInventoryId)
@@ -833,14 +833,17 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
             friendlyName: finalMaterialName,
             matchedInventoryId: matchedInv?.id,
             category: manualExpForm.category,
-            price: finalPrice * qty,
+            qtyBought: qty,
+            price: finalPrice,
             packQty,
-            unitPrice: (finalPrice * qty) / packQty,
+            unitPrice: finalPrice / (qty * packQty),
             syncToInventory: true
           }
         ]
       });
-      showToast("Expense logged & synced to Inventory!");
+      showToast(
+        `Expense logged & added ${qty * packQty} pieces (${qty} pack(s) × ${packQty} pcs) to Inventory!`
+      );
     } else {
       const newExp: ExpenseRecord = {
         id: `exp_${Date.now()}`,
@@ -2275,29 +2278,38 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
                       <tr className="bg-stone-100 text-stone-600 font-bold text-[10px] uppercase">
-                        <th className="py-2 px-2.5">Raw Receipt Text</th>
-                        <th className="py-2 px-2.5 min-w-[280px]">
+                        <th className="py-2 px-2">Raw Receipt Text</th>
+                        <th className="py-2 px-2.5 min-w-[260px]">
                           Material / Item Name (Pick from Inventory or Add New)
                         </th>
-                        <th className="py-2 px-2.5">Category</th>
-                        <th className="py-2 px-2.5 text-right">Bulk Price ($)</th>
-                        <th className="py-2 px-2.5 text-right">#Items in Pack</th>
-                        <th className="py-2 px-2.5 text-right">Unit Cost ($/ea)</th>
-                        <th className="py-2 px-2 text-center">Sync Inventory</th>
+                        <th className="py-2 px-2">Category</th>
+                        <th className="py-2 px-2 text-right"># Packs Bought</th>
+                        <th className="py-2 px-2 text-right">Pieces / Pack</th>
+                        <th className="py-2 px-2 text-center bg-amber-50 text-amber-950">
+                          Total Pieces
+                        </th>
+                        <th className="py-2 px-2 text-right">Line Price ($)</th>
+                        <th className="py-2 px-2.5 text-right bg-emerald-50 text-emerald-950">
+                          Cost / Piece
+                        </th>
+                        <th className="py-2 px-2 text-center">Sync Inv.</th>
                         <th className="py-2 px-2 text-center">Del</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-stone-200">
                       {receiptDraftItems.map((it, idx) => {
-                        const unitCost =
-                          (Number(it.price) || 0) / (Number(it.packQty) > 0 ? Number(it.packQty) : 1);
+                        const qtyBought = Math.max(1, Number(it.qtyBought) || 1);
+                        const piecesPerPack = Math.max(1, Number(it.packQty) || 1);
+                        const totalPieces = qtyBought * piecesPerPack;
+                        const linePrice = Number(it.price) || 0;
+                        const costPerPiece = linePrice / totalPieces;
                         const isExistingSelected = Boolean(
                           it.matchedInventoryId &&
                             store.inventory.some((inv) => inv.id === it.matchedInventoryId)
                         );
                         return (
                           <tr key={it.id} className="hover:bg-stone-50">
-                            <td className="py-2 px-2.5 font-mono text-[11px] text-stone-500">
+                            <td className="py-2 px-2 font-mono text-[11px] text-stone-500 max-w-[140px] truncate" title={it.rawName}>
                               {it.rawName}
                             </td>
                             <td className="py-2 px-2.5">
@@ -2315,13 +2327,13 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
                                     } else {
                                       const matched = store.inventory.find((x) => x.id === val);
                                       if (matched) {
+                                        const nextPackQty = matched.bulkQty || 1;
                                         next[idx] = {
                                           ...it,
                                           matchedInventoryId: matched.id,
                                           friendlyName: matched.name,
-                                          packQty: matched.bulkQty,
-                                          unitPrice:
-                                            (Number(it.price) || 0) / (matched.bulkQty || 1),
+                                          packQty: nextPackQty,
+                                          unitPrice: linePrice / (qtyBought * nextPackQty),
                                           syncToInventory: true
                                         };
                                       }
@@ -2340,7 +2352,7 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
                                   <optgroup label={`Pick from Inventory List (${store.inventory.length} materials)`}>
                                     {store.inventory.map((inv) => (
                                       <option key={inv.id} value={inv.id}>
-                                        {inv.name} (Pack of {inv.bulkQty} • Stock: {inv.stock})
+                                        {inv.name} ({inv.bulkQty} pcs/pack • Stock: {inv.stock} pcs)
                                       </option>
                                     ))}
                                   </optgroup>
@@ -2368,7 +2380,7 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
                                         };
                                         setReceiptDraftItems(next);
                                       }}
-                                      placeholder="Type new material name (e.g. Sublimation Paper)..."
+                                      placeholder="Type new material name (e.g. Pipe Cleaner Set)..."
                                       className="w-full border border-stone-300 rounded-md px-2 py-1 font-bold text-stone-900 bg-white"
                                     />
                                   </div>
@@ -2392,7 +2404,7 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
                                 )}
                               </div>
                             </td>
-                            <td className="py-2 px-2.5">
+                            <td className="py-2 px-2">
                               <select
                                 value={it.category}
                                 onChange={(e) => {
@@ -2409,7 +2421,50 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
                                 ))}
                               </select>
                             </td>
-                            <td className="py-2 px-2.5 text-right">
+                            <td className="py-2 px-2 text-right">
+                              <input
+                                type="number"
+                                min="1"
+                                step="1"
+                                value={qtyBought}
+                                onChange={(e) => {
+                                  const nextQtyBought = Math.max(1, Number(e.target.value) || 1);
+                                  const next = [...receiptDraftItems];
+                                  next[idx] = {
+                                    ...it,
+                                    qtyBought: nextQtyBought,
+                                    unitPrice: linePrice / (nextQtyBought * piecesPerPack)
+                                  };
+                                  setReceiptDraftItems(next);
+                                }}
+                                className="w-14 text-right border border-stone-300 rounded-md px-1.5 py-1 font-mono font-bold"
+                                title="How many packs/items you bought on this receipt"
+                              />
+                            </td>
+                            <td className="py-2 px-2 text-right">
+                              <input
+                                type="number"
+                                min="1"
+                                step="1"
+                                value={piecesPerPack}
+                                onChange={(e) => {
+                                  const nextPackQty = Math.max(1, Number(e.target.value) || 1);
+                                  const next = [...receiptDraftItems];
+                                  next[idx] = {
+                                    ...it,
+                                    packQty: nextPackQty,
+                                    unitPrice: linePrice / (qtyBought * nextPackQty)
+                                  };
+                                  setReceiptDraftItems(next);
+                                }}
+                                className="w-16 text-right border border-stone-300 rounded-md px-1.5 py-1 font-mono font-bold"
+                                title="How many individual pieces are inside 1 pack (e.g. 300 pieces per pack)"
+                              />
+                            </td>
+                            <td className="py-2 px-2 text-center font-mono font-bold text-amber-950 bg-amber-50/50">
+                              +{totalPieces} pcs
+                            </td>
+                            <td className="py-2 px-2 text-right">
                               <input
                                 type="number"
                                 step="0.01"
@@ -2420,34 +2475,21 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
                                   next[idx] = {
                                     ...it,
                                     price,
-                                    unitPrice: price / (Number(it.packQty) || 1)
+                                    unitPrice: price / totalPieces
                                   };
                                   setReceiptDraftItems(next);
                                 }}
                                 className="w-20 text-right border border-stone-300 rounded-md px-2 py-1 font-mono font-bold"
+                                title="Total price paid on receipt for all packs bought on this line"
                               />
+                              {qtyBought > 1 && (
+                                <span className="block text-[10px] font-mono text-stone-400">
+                                  ({fmtMoney(linePrice / qtyBought)}/pack)
+                                </span>
+                              )}
                             </td>
-                            <td className="py-2 px-2.5 text-right">
-                              <input
-                                type="number"
-                                min="1"
-                                step="1"
-                                value={it.packQty}
-                                onChange={(e) => {
-                                  const packQty = Math.max(1, Number(e.target.value) || 1);
-                                  const next = [...receiptDraftItems];
-                                  next[idx] = {
-                                    ...it,
-                                    packQty,
-                                    unitPrice: (Number(it.price) || 0) / packQty
-                                  };
-                                  setReceiptDraftItems(next);
-                                }}
-                                className="w-16 text-right border border-stone-300 rounded-md px-2 py-1 font-mono"
-                              />
-                            </td>
-                            <td className="py-2 px-2.5 text-right font-mono font-bold text-emerald-800">
-                              {fmtMoney(unitCost, 4)}
+                            <td className="py-2 px-2.5 text-right font-mono font-bold text-emerald-800 bg-emerald-50/40">
+                              {fmtMoney(costPerPiece, 4)}/pc
                             </td>
                             <td className="py-2 px-2 text-center">
                               <input
@@ -2491,6 +2533,7 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
                             rawName: "MANUAL LINE",
                             friendlyName: "New Receipt Material",
                             category: "Material",
+                            qtyBought: 1,
                             price: 10,
                             packQty: 1,
                             unitPrice: 10,
@@ -2508,10 +2551,13 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
                       onClick={() => {
                         const updated = receiptDraftItems.map((it) => {
                           const taxedPrice = Number(((Number(it.price) || 0) * 1.15).toFixed(2));
+                          const totPcs =
+                            Math.max(1, Number(it.qtyBought) || 1) *
+                            Math.max(1, Number(it.packQty) || 1);
                           return {
                             ...it,
                             price: taxedPrice,
-                            unitPrice: Number((taxedPrice / (Number(it.packQty) || 1)).toFixed(4))
+                            unitPrice: Number((taxedPrice / totPcs).toFixed(4))
                           };
                         });
                         setReceiptDraftItems(updated);
@@ -2674,7 +2720,19 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
                         />
                       )}
                       <div className="flex items-center gap-1.5">
-                        <span className="text-stone-600">#Items in Pack:</span>
+                        <span className="text-stone-600"># Packs Bought:</span>
+                        <input
+                          type="number"
+                          min="1"
+                          value={manualExpForm.qty}
+                          onChange={(e) =>
+                            setManualExpForm({ ...manualExpForm, qty: e.target.value })
+                          }
+                          className="w-14 bg-white border border-stone-300 rounded px-2 py-1 font-mono font-bold"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-stone-600">Pieces / Pack:</span>
                         <input
                           type="number"
                           min="1"
@@ -2682,9 +2740,12 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
                           onChange={(e) =>
                             setManualExpForm({ ...manualExpForm, packQty: e.target.value })
                           }
-                          className="w-16 bg-white border border-stone-300 rounded px-2 py-1 font-mono"
+                          className="w-16 bg-white border border-stone-300 rounded px-2 py-1 font-mono font-bold"
                         />
                       </div>
+                      <span className="text-[11px] font-mono font-bold text-amber-900 bg-amber-100 border border-amber-300 px-2 py-1 rounded">
+                        = +{(Number(manualExpForm.qty) || 1) * (Number(manualExpForm.packQty) || 1)} total pcs
+                      </span>
                     </div>
                   )}
                 </div>
@@ -2929,7 +2990,7 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Bulk Price ($)</label>
+                  <label className="font-bold text-stone-700 block mb-1">Price per Pack ($)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -2940,19 +3001,23 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Pack / Bulk Qty</label>
+                  <label className="font-bold text-stone-700 block mb-1">
+                    Pieces per Pack (e.g. 300)
+                  </label>
                   <input
                     type="number"
-                    step="0.1"
+                    step="1"
                     min="0.1"
                     value={invForm.bulkQty}
                     onChange={(e) => setInvForm({ ...invForm, bulkQty: e.target.value })}
-                    className="w-full bg-white border border-stone-300 rounded-lg p-2 font-mono"
+                    className="w-full bg-white border border-stone-300 rounded-lg p-2 font-mono font-bold"
                     required
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-stone-700 block mb-1">Current Stock</label>
+                  <label className="font-bold text-stone-700 block mb-1">
+                    Stock (Total Pieces)
+                  </label>
                   <input
                     type="number"
                     step="0.5"
@@ -3075,10 +3140,10 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
                     <th className="py-2.5 px-3">Item ID</th>
                     <th className="py-2.5 px-3">Item Name</th>
                     <th className="py-2.5 px-3">Type / Category</th>
-                    <th className="py-2.5 px-2.5 text-right">Price Bulk</th>
-                    <th className="py-2.5 px-2.5 text-right">#Items</th>
-                    <th className="py-2.5 px-2.5 text-right">Price / Unit</th>
-                    <th className="py-2.5 px-3 text-center">Stock</th>
+                    <th className="py-2.5 px-2.5 text-right">Pack Price</th>
+                    <th className="py-2.5 px-2.5 text-right">Pieces / Pack</th>
+                    <th className="py-2.5 px-2.5 text-right">Cost / Piece</th>
+                    <th className="py-2.5 px-3 text-center">Stock (Pieces)</th>
                     <th className="py-2.5 px-3">Status</th>
                     <th className="py-2.5 px-3">Notes</th>
                     <th className="py-2.5 px-2 text-center">Actions</th>
@@ -3336,104 +3401,143 @@ export const BusinessTracker: React.FC<BusinessTrackerProps> = ({
                   <thead>
                     <tr className="bg-stone-100 text-stone-600 font-bold text-[10px] uppercase">
                       <th className="py-2 px-2">Material (From Inventory)</th>
-                      <th className="py-2 px-2 text-right">Price Bulk</th>
-                      <th className="py-2 px-2 text-right">#Items</th>
-                      <th className="py-2 px-2 text-right">Price/Unit</th>
+                      <th className="py-2 px-2 text-right">Pack Price ($)</th>
+                      <th className="py-2 px-2 text-right">Pieces / Pack</th>
+                      <th className="py-2 px-2 text-right">Cost / Piece</th>
+                      <th className="py-2 px-2 text-right bg-amber-50 text-amber-950">
+                        Pieces Used
+                      </th>
+                      <th className="py-2 px-2 text-right bg-emerald-50 text-emerald-950">
+                        Line Cost
+                      </th>
                       <th className="py-2 px-2 text-center">Del</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-100">
-                    {activeRecipe.materials.map((m, mIdx) => (
-                      <tr key={m.id} className="hover:bg-stone-50">
-                        <td className="py-2 px-2">
-                          <select
-                            value={m.inventoryItemId || ""}
-                            onChange={(e) => {
-                              const invId = e.target.value;
-                              const inv = store.inventory.find((i) => i.id === invId);
-                              const nextMats = [...activeRecipe.materials];
-                              if (inv) {
+                    {activeRecipe.materials.map((m, mIdx) => {
+                      const costPerPiece = (Number(m.bulkPrice) || 0) / (Number(m.bulkQty) || 1);
+                      const qtyUsed = Number(m.qtyUsed) > 0 ? Number(m.qtyUsed) : 1;
+                      return (
+                        <tr key={m.id} className="hover:bg-stone-50">
+                          <td className="py-2 px-2">
+                            <select
+                              value={m.inventoryItemId || ""}
+                              onChange={(e) => {
+                                const invId = e.target.value;
+                                const inv = store.inventory.find((i) => i.id === invId);
+                                const nextMats = [...activeRecipe.materials];
+                                if (inv) {
+                                  const unitP = inv.bulkPrice / (inv.bulkQty || 1);
+                                  nextMats[mIdx] = {
+                                    ...m,
+                                    inventoryItemId: inv.id,
+                                    name: inv.name,
+                                    bulkPrice: inv.bulkPrice,
+                                    bulkQty: inv.bulkQty,
+                                    unitPrice: unitP,
+                                    lineCost: unitP * qtyUsed
+                                  };
+                                } else {
+                                  nextMats[mIdx] = { ...m, inventoryItemId: undefined };
+                                }
+                                handleUpdateActiveRecipe({ materials: nextMats });
+                              }}
+                              className="w-full border border-stone-300 rounded px-2 py-1 font-semibold text-stone-800"
+                            >
+                              <option value="">{m.name}</option>
+                              {store.inventory.map((inv) => (
+                                <option key={inv.id} value={inv.id}>
+                                  {inv.name} (${inv.bulkPrice} / {inv.bulkQty} pcs)
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="py-2 px-2 text-right">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={m.bulkPrice}
+                              onChange={(e) => {
+                                const bulkPrice = Number(e.target.value) || 0;
+                                const unitP = bulkPrice / (m.bulkQty || 1);
+                                const nextMats = [...activeRecipe.materials];
                                 nextMats[mIdx] = {
                                   ...m,
-                                  inventoryItemId: inv.id,
-                                  name: inv.name,
-                                  bulkPrice: inv.bulkPrice,
-                                  bulkQty: inv.bulkQty,
-                                  unitPrice: inv.bulkPrice / inv.bulkQty,
-                                  lineCost: (inv.bulkPrice / inv.bulkQty) * (m.qtyUsed || 1)
+                                  bulkPrice,
+                                  unitPrice: unitP,
+                                  lineCost: unitP * qtyUsed
                                 };
-                              } else {
-                                nextMats[mIdx] = { ...m, inventoryItemId: undefined };
+                                handleUpdateActiveRecipe({ materials: nextMats });
+                              }}
+                              className="w-18 text-right border border-stone-300 rounded px-1.5 py-1 font-mono"
+                            />
+                          </td>
+                          <td className="py-2 px-2 text-right">
+                            <input
+                              type="number"
+                              step="1"
+                              min="0.1"
+                              value={m.bulkQty}
+                              onChange={(e) => {
+                                const bulkQty = Math.max(0.1, Number(e.target.value) || 1);
+                                const unitP = m.bulkPrice / bulkQty;
+                                const nextMats = [...activeRecipe.materials];
+                                nextMats[mIdx] = {
+                                  ...m,
+                                  bulkQty,
+                                  unitPrice: unitP,
+                                  lineCost: unitP * qtyUsed
+                                };
+                                handleUpdateActiveRecipe({ materials: nextMats });
+                              }}
+                              className="w-16 text-right border border-stone-300 rounded px-1.5 py-1 font-mono"
+                              title="How many pieces are in 1 pack (e.g. 300 pieces)"
+                            />
+                          </td>
+                          <td className="py-2 px-2 text-right font-mono text-[11px] text-stone-500">
+                            {fmtMoney(costPerPiece, 4)}
+                          </td>
+                          <td className="py-2 px-2 text-right bg-amber-50/40">
+                            <input
+                              type="number"
+                              step="0.5"
+                              min="0.01"
+                              value={qtyUsed}
+                              onChange={(e) => {
+                                const nextQtyUsed = Math.max(0.01, Number(e.target.value) || 1);
+                                const unitP = m.bulkPrice / (m.bulkQty || 1);
+                                const nextMats = [...activeRecipe.materials];
+                                nextMats[mIdx] = {
+                                  ...m,
+                                  qtyUsed: nextQtyUsed,
+                                  unitPrice: unitP,
+                                  lineCost: unitP * nextQtyUsed
+                                };
+                                handleUpdateActiveRecipe({ materials: nextMats });
+                              }}
+                              className="w-16 text-right border border-amber-300 bg-white rounded px-1.5 py-1 font-mono font-bold text-amber-950"
+                              title="How many individual pieces are used for 1 craft (e.g. 75 pipe cleaners for a Sunflower)"
+                            />
+                          </td>
+                          <td className="py-2 px-2 text-right font-mono font-bold text-emerald-900 bg-emerald-50/40">
+                            {fmtMoney(m.lineCost, 4)}
+                          </td>
+                          <td className="py-2 px-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleUpdateActiveRecipe({
+                                  materials: activeRecipe.materials.filter((_, i) => i !== mIdx)
+                                })
                               }
-                              handleUpdateActiveRecipe({ materials: nextMats });
-                            }}
-                            className="w-full border border-stone-300 rounded px-2 py-1 font-semibold text-stone-800"
-                          >
-                            <option value="">{m.name}</option>
-                            {store.inventory.map((inv) => (
-                              <option key={inv.id} value={inv.id}>
-                                {inv.name} (${inv.bulkPrice} / {inv.bulkQty})
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="py-2 px-2 text-right">
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={m.bulkPrice}
-                            onChange={(e) => {
-                              const bulkPrice = Number(e.target.value) || 0;
-                              const nextMats = [...activeRecipe.materials];
-                              nextMats[mIdx] = {
-                                ...m,
-                                bulkPrice,
-                                unitPrice: bulkPrice / (m.bulkQty || 1),
-                                lineCost: (bulkPrice / (m.bulkQty || 1)) * (m.qtyUsed || 1)
-                              };
-                              handleUpdateActiveRecipe({ materials: nextMats });
-                            }}
-                            className="w-20 text-right border border-stone-300 rounded px-1.5 py-1 font-mono"
-                          />
-                        </td>
-                        <td className="py-2 px-2 text-right">
-                          <input
-                            type="number"
-                            step="0.5"
-                            min="0.1"
-                            value={m.bulkQty}
-                            onChange={(e) => {
-                              const bulkQty = Math.max(0.1, Number(e.target.value) || 1);
-                              const nextMats = [...activeRecipe.materials];
-                              nextMats[mIdx] = {
-                                ...m,
-                                bulkQty,
-                                unitPrice: m.bulkPrice / bulkQty,
-                                lineCost: (m.bulkPrice / bulkQty) * (m.qtyUsed || 1)
-                              };
-                              handleUpdateActiveRecipe({ materials: nextMats });
-                            }}
-                            className="w-16 text-right border border-stone-300 rounded px-1.5 py-1 font-mono"
-                          />
-                        </td>
-                        <td className="py-2 px-2 text-right font-mono font-bold text-stone-900">
-                          {fmtMoney(m.lineCost, 4)}
-                        </td>
-                        <td className="py-2 px-2 text-center">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleUpdateActiveRecipe({
-                                materials: activeRecipe.materials.filter((_, i) => i !== mIdx)
-                              })
-                            }
-                            className="text-stone-400 hover:text-red-600 cursor-pointer"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                              className="text-stone-400 hover:text-red-600 cursor-pointer"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

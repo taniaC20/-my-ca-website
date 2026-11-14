@@ -48,11 +48,12 @@ Rules:
 2. Identify the receipt date in YYYY-MM-DD format (default to today's 2026 date if missing).
 3. Identify the payment method (e.g., "VISA 7992" if Visa or unknown card).
 4. Extract every individual line item purchased. Do NOT include Subtotal, Tax/HST, or Total as line items. For each line item:
-   - "rawName": exact text on receipt (e.g. "SUBL PPR 8.5X11")
-   - "friendlyName": human-friendly craft material name (e.g. "Sublimation Paper", "Sublimation Tape", "Mugs (11oz Blank)", "Pipe Cleaner Set", "Packaging Trace Paper")
+   - "rawName": exact text on receipt (e.g. "3x PIPE CLEANERS 300PCS")
+   - "friendlyName": human-friendly craft material name (e.g. "Pipe Cleaner Set", "Sublimation Paper", "Sublimation Tape", "Mugs (11oz Blank)", "Packaging Trace Paper")
    - "category": one of "Material", "Packaging", "Marketing", "Office Supplies", "Subscriptions", "Equipment", "Other", "Refund"
-   - "price": total line price paid (use negative number if refund/return)
-   - "packQty": number of individual units in the pack if mentioned (e.g. 6 for a 6-pack of mugs, 100 for a 100-sheet pack, or 1 if single item)`;
+   - "qtyBought": how many packs/items of this line were bought (e.g. 3 if the customer bought 3 packs, or 1 if 1 pack)
+   - "packQty": how many individual pieces/sheets/units are inside 1 pack (e.g. 300 for a 300-piece pack of pipe cleaners, 6 for a 6-pack of mugs, 100 for a 100-sheet pack, or 1 if single piece)
+   - "price": total line price paid for all packs bought on this line (use negative number if refund/return)`;
 
       parts.push({ text: promptText });
 
@@ -78,10 +79,11 @@ Rules:
                     rawName: { type: Type.STRING },
                     friendlyName: { type: Type.STRING },
                     category: { type: Type.STRING },
+                    qtyBought: { type: Type.NUMBER },
                     price: { type: Type.NUMBER },
                     packQty: { type: Type.NUMBER }
                   },
-                  required: ["rawName", "friendlyName", "category", "price", "packQty"]
+                  required: ["rawName", "friendlyName", "category", "qtyBought", "price", "packQty"]
                 }
               }
             },
@@ -93,17 +95,27 @@ Rules:
       const parsed = JSON.parse(response.text || "{}");
       if (parsed && Array.isArray(parsed.items) && parsed.items.length > 0) {
         const enrichedItems = parsed.items.map((it: any, idx: number) => {
-          const exp = expandReceiptItemName(it.friendlyName || it.rawName || "Item");
-          const packQty = Number(it.packQty) > 0 ? Number(it.packQty) : exp.suggestedPackQty;
+          const exp = expandReceiptItemName(it.rawName || it.friendlyName || "Item");
+          const qtyBought = Math.max(1, Number(it.qtyBought) || 1);
+          const packQty =
+            Number(it.packQty) > 1
+              ? Number(it.packQty)
+              : exp.hasExplicitPackQty
+              ? exp.suggestedPackQty
+              : Number(it.packQty) > 0
+              ? Number(it.packQty)
+              : exp.suggestedPackQty;
+          const totalPieces = qtyBought * packQty;
           const price = Number(it.price) || 0;
           return {
             id: `scan_${Date.now()}_${idx}`,
             rawName: it.rawName || it.friendlyName || "Receipt Item",
             friendlyName: it.friendlyName || exp.friendlyName,
             category: it.category || exp.category,
+            qtyBought,
             price,
             packQty,
-            unitPrice: Number((price / packQty).toFixed(4)),
+            unitPrice: Number((price / totalPieces).toFixed(4)),
             syncToInventory:
               (it.category || exp.category) === "Material" ||
               (it.category || exp.category) === "Packaging"

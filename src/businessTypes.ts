@@ -147,9 +147,10 @@ export interface ReceiptLineItemDraft {
   rawName: string;
   friendlyName: string;
   category: ExpenseCategory;
-  price: number; // Total price paid for this line/pack
-  packQty: number; // Number of units inside the pack (for unit cost calculation)
-  unitPrice: number; // price / packQty
+  qtyBought?: number; // Number of packs / items bought on the receipt (e.g. 3 packs)
+  price: number; // Total line price paid on receipt (e.g. $15.00 for all packs bought)
+  packQty: number; // Number of individual pieces inside 1 pack (e.g. 300 pieces per pack)
+  unitPrice: number; // Cost per 1 individual piece: price / (qtyBought * packQty)
   syncToInventory: boolean;
   matchedInventoryId?: string; // If linked to an existing InventoryItem
   inventoryCategory?: string;
